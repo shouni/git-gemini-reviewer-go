@@ -1,4 +1,3 @@
-// Package internal internal/reviewer.go
 package internal
 
 import (
@@ -64,8 +63,8 @@ func RunReviewer(params ReviewParams) error {
 	//if err := backlogClient.PostComment(params.IssueID, finalComment); err != nil {
 	//	return fmt.Errorf("Backlogへのコメント投稿に失敗しました: %w", err)
 	//}
-
-	log.Printf("Backlog課題 %s へのコメント投稿処理を完了しました。", params.IssueID)
+	//
+	//log.Printf("Backlog課題 %s へのコメント投稿処理を完了しました。", params.IssueID)
 
 	log.Println("レビュー処理を完了しました。")
 	return nil
