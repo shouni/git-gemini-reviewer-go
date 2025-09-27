@@ -4,9 +4,10 @@ package cli
 import (
 	"fmt"
 	"git-gemini-reviewer-go/internal"
-	"github.com/spf13/cobra"
 	"log"
 	"os"
+
+	"github.com/spf13/cobra"
 )
 
 // RunEでフラグ変数を扱うための構造体を定義
@@ -78,7 +79,7 @@ func init() {
 	// -i/--issue-id (必須フラグ)
 	rootCmd.Flags().StringVarP(&flags.IssueID, "issue-id", "i", "", "Backlogの課題ID (例: APP-101) (必須)")
 	// -p/--local-path (デフォルト: カレントディレクトリ)
-	rootCmd.Flags().StringVarP(&flags.LocalPath, "local-path", "p", "", "リポジトリのクローン先/作業ディレクトリ (デフォルト: カレントディレクトリ)")
+	rootCmd.Flags().StringVarP(&flags.LocalPath, "local-path", "p", "", "リポジトリのクローン先/作業ディレクトリ")
 	// -g/--gemini-model-name (デフォルト: gemini-2.0-flash)
 	rootCmd.Flags().StringVarP(&flags.ModelName, "gemini-model-name", "g", "gemini-2.0-flash", "コードレビューに使用するGeminiのモデル名。")
 
