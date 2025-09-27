@@ -50,7 +50,6 @@
 
     ```bash
     go version
-    # 例: go version go1.22.0 darwin/amd64
     ```
 
 ### 2\. プロジェクトのビルド
@@ -59,7 +58,6 @@
 
 ```bash
 go build
-# 実行可能ファイルがカレントディレクトリに生成されます (例: ./git-gemini-reviewer-go)
 ```
 
 ### 3\. 環境変数の設定 (必須)
