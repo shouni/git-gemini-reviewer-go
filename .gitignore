@@ -28,8 +28,7 @@
 # Windows
 Thumbs.db
 
-#
-backlog-reviewer-go
-backlog-reviewer
+# app
+git-gemini-reviewer-go
 # Temporary testing directories/files
 /var/tmp/
