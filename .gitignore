@@ -1,0 +1,35 @@
+*.exe
+*.dll
+*.so
+*.dylib
+
+# テストとベンチマーク結果
+*.test
+*.out
+
+# Goの依存関係とキャッシュ
+/vendor/
+/pkg/
+# Goモジュールキャッシュ (通常はユーザーディレクトリにあるが、念のため)
+.cache/
+
+# IDE/エディタ設定ファイル
+
+# JetBrains IDEs (GoLand, IntelliJ IDEA)
+.idea/
+*.iml
+
+# Visual Studio Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+#
+backlog-reviewer-go
+backlog-reviewer
+# Temporary testing directories/files
+/var/tmp/
