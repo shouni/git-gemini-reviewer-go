@@ -2,8 +2,6 @@ package services
 
 import (
 	"context"
-	// 💡 修正点: go:embed ディレクティブを使うために、
-	// パッケージ内の関数を直接使わない場合はアンダースコアインポート `_ "embed"` を追加します。
 	_ "embed"
 	"fmt"
 	"os"
