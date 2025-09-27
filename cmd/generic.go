@@ -33,8 +33,8 @@ func init() {
 
 	genericCmd.Flags().StringVar(&genericCfg.GeminiModelName, "gemini-model-name", "gemini-2.5-flash", "使用するGeminiモデル名")
 
-	genericCmd.Flags().StringVar(&genericCfg.SSHKeyPath, "ssh-key-path", "",
-		"SSH認証に使用する秘密鍵ファイルのパス (例: ~/.ssh/id_rsa)")
+	genericCmd.Flags().StringVar(&genericCfg.SSHKeyPath, "ssh-key-path", "~/.ssh/id_rsa",
+		"SSH認証に使用する秘密鍵ファイルのパス (デフォルト: ~/.ssh/id_rsa)")
 
 	genericCmd.Flags().StringVar(&genericCfg.PromptFilePath, "prompt-file", "review_prompt.md",
 		"Geminiへのレビュー依頼に使用するプロンプトファイルのパス")

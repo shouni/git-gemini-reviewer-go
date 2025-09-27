@@ -3,6 +3,9 @@ package services
 import (
 	"fmt"
 	"os"
+	"os/user"
+	"path/filepath"
+	"strings"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -25,6 +28,19 @@ func NewGitClient(localPath string, sshKeyPath string) *GitClient {
 	}
 }
 
+// expandTilde はパス内のチルダ (~) をホームディレクトリに展開します。
+func expandTilde(path string) (string, error) {
+	if strings.HasPrefix(path, "~/") {
+		usr, err := user.Current()
+		if err != nil {
+			return "", err
+		}
+		// "~/" をホームディレクトリパスで置き換える
+		return filepath.Join(usr.HomeDir, path[2:]), nil
+	}
+	return path, nil
+}
+
 // getAuthMethod はSSHキーファイルから認証メソッドを作成します。
 func (c *GitClient) getAuthMethod() (transport.AuthMethod, error) {
 	if c.SSHKeyPath == "" {
@@ -32,12 +48,19 @@ func (c *GitClient) getAuthMethod() (transport.AuthMethod, error) {
 		return nil, nil
 	}
 
-	// 秘密鍵のパスと、必要であればパスフレーズを指定
-	// 🔑 ここではパスフレーズなしを想定しています。
-	// ユーザー名には慣習として "git" を使用します。
-	auth, err := ssh.NewPublicKeysFromFile("git", c.SSHKeyPath, "")
+	// 💡 修正: パスを使用する前にチルダを展開する
+	keyPath, err := expandTilde(c.SSHKeyPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create SSH public keys from %s: %w", c.SSHKeyPath, err)
+		return nil, fmt.Errorf("failed to expand SSH key path: %w", err)
+	}
+
+	// 秘密鍵のパスと、必要であればパスフレーズを指定
+	auth, err := ssh.NewPublicKeysFromFile("git", keyPath, "")
+	if err != nil {
+		// ⚠️ 注意: デフォルトパスでファイルが存在しない場合もエラーになります
+		//       ただし、存在しないパスを許可すると意図しない認証なしになってしまうため、
+		//       エラーとして通知するのが望ましいです。
+		return nil, fmt.Errorf("failed to create SSH public keys from %s: %w", keyPath, err)
 	}
 	return auth, nil
 }
