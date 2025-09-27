@@ -2,86 +2,91 @@ package services
 
 import (
 	"context"
-	_ "embed"
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
 )
 
-var ReviewPromptTemplate string
-
-/*
-	【重要】もし `no matching files found` エラーが出る場合:
-	`review_prompt.md` ファイルが、この `gemini_client.go` と同じディレクトリ
-	(つまり `internal/services/`) に存在しているか確認してください。
-*/
-
-// テンプレートを利用する例
-func GetFilledReviewPrompt(diffContent string) string {
-	// テンプレート変数はすでにビルド時に埋め込まれているので、そのまま fmt.Sprintf で利用できる
-	finalPrompt := fmt.Sprintf(ReviewPromptTemplate, diffContent)
-	return finalPrompt
-}
-
-// GeminiClient は Gemini API へのアクセスを管理
+// GeminiClient はGemini APIとの通信を管理します。
 type GeminiClient struct {
-	ModelName string
 	client    *genai.Client
+	modelName string
 }
 
-// NewGeminiClient は GeminiClient の新しいインスタンスを作成します。
-// 環境変数 GEMINI_API_KEY からキーを読み込みます。
+// NewGeminiClient はGeminiClientを初期化します。
 func NewGeminiClient(modelName string) (*GeminiClient, error) {
+	// 1. APIキーの取得
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
-		return nil, fmt.Errorf("GEMINI_API_KEY environment variable not set")
+		return nil, fmt.Errorf("GEMINI_API_KEY environment variable is not set")
 	}
 
+	// 2. クライアントの作成
 	client, err := genai.NewClient(context.Background(), option.WithAPIKey(apiKey))
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize Gemini client: %w", err)
+		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 
 	return &GeminiClient{
-		ModelName: modelName,
 		client:    client,
+		modelName: modelName,
 	}, nil
 }
 
-// Close は基になるGeminiクライアント接続をクローズします。
-// アプリケーション終了時に呼び出す必要があります。
-func (c *GeminiClient) Close() error {
+// Close はクライアントを閉じ、リソースを解放します。
+func (c *GeminiClient) Close() {
 	if c.client != nil {
-		return c.client.Close()
+		c.client.Close()
 	}
-	return nil
 }
 
-// ReviewCodeDiff はコードの差分を受け取り、Geminiにレビューを依頼します。
-func (c *GeminiClient) ReviewCodeDiff(ctx context.Context, codeDiff string) (string, error) {
-	// AIに渡すためのプロンプトを構築
-	prompt := fmt.Sprintf(ReviewPromptTemplate, codeDiff)
-
-	// モデルにリクエストを送信
-	resp, err := c.client.GenerativeModel(c.ModelName).GenerateContent(
-		ctx,
-		genai.Text(prompt),
-	)
-
+// ReviewCodeDiff はコード差分を基にGeminiにレビューを依頼します。
+func (c *GeminiClient) ReviewCodeDiff(ctx context.Context, codeDiff string, promptFilePath string) (string, error) {
+	// 1. プロンプトファイルの読み込み
+	promptTemplate, err := ioutil.ReadFile(promptFilePath)
 	if err != nil {
-		return "", fmt.Errorf("failed to request review from Gemini API: %w", err)
+		return "", fmt.Errorf("failed to read prompt file %s: %w", promptFilePath, err)
 	}
 
-	// レスポンスからテキストを安全に抽出
+	// 2. プロンプトの構成
+	prompt := fmt.Sprintf(string(promptTemplate), codeDiff)
+
+	// 3. API呼び出し
+	resp, err := c.client.GenerativeModel(c.modelName).GenerateContent(ctx, genai.Text(prompt))
+	if err != nil {
+		return "", fmt.Errorf("GenerateContent failed: %w", err)
+	}
+
+	// 4. レスポンスの処理
 	if len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil {
-		return "", fmt.Errorf("Gemini returned an invalid or empty response")
+		return "レビュー結果を取得できませんでした。レスポンスが空です。", nil
 	}
 
-	if textPart, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
-		return string(textPart), nil
+	if len(resp.Candidates[0].Content.Parts) == 0 {
+		return "レビュー結果を取得できませんでした。コンテンツが空です。", nil
 	}
 
-	return "", fmt.Errorf("Gemini response content was not in expected text format")
-}
+	// genai.Part の型アサーションを使用してテキストを安全に取り出す
+	part := resp.Candidates[0].Content.Parts[0]
+
+	reviewTextPart, ok := part.(genai.Text)
+
+	if !ok {
+		// テキストでない場合（画像などが返された場合）
+		return "レビュー結果を取得できませんでしたが、APIは応答しました。", nil
+	}
+
+	reviewText := string(reviewTextPart)
+
+	if reviewText == "" {
+		return "レビュー結果を取得できませんでした。レスポンスのPartが空のテキストです。", nil
+	}
+
+	return reviewText, nil
+} // 93行目付近
+// 最後の } がここにあるべきです！
+
+// EOF

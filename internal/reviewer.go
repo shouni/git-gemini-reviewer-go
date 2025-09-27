@@ -1,4 +1,3 @@
-// Package internal internal/reviewer.go
 package internal
 
 import (

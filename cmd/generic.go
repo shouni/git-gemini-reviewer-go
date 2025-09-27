@@ -1,63 +1,98 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"git-gemini-reviewer-go/internal/services"
+
 	"github.com/spf13/cobra"
 )
-
-// ReviewConfig は引数を保持する構造体です。
-// ⚠️ 構造体は共通パッケージに切り出すことが推奨されますが、ここでは簡略化しています。
-type ReviewConfig struct {
-	GitCloneURL     string
-	BaseBranch      string
-	FeatureBranch   string
-	LocalPath       string
-	IssueID         string
-	GeminiModelName string
-}
 
 var genericCfg ReviewConfig
 
 func init() {
-	// ルートコマンドにサブコマンドを登録
 	RootCmd.AddCommand(genericCmd)
 
-	// LocalPath のデフォルト値を設定
 	defaultLocalPath := filepath.Join(os.TempDir(), "git-reviewer-repos", "tmp")
 
 	// --- フラグの定義 ---
-
-	// 必須引数 (cobraでは MarkFlagRequired で必須化)
 	genericCmd.Flags().StringVar(&genericCfg.GitCloneURL, "git-clone-url", "", "レビュー対象のGitリポジトリURL")
-	genericCmd.MarkFlagRequired("git-clone-url") // 必須化
+	genericCmd.MarkFlagRequired("git-clone-url")
 
 	genericCmd.Flags().StringVar(&genericCfg.BaseBranch, "base-branch", "", "差分比較の基準ブランチ")
-	genericCmd.MarkFlagRequired("base-branch") // 必須化
+	genericCmd.MarkFlagRequired("base-branch")
 
 	genericCmd.Flags().StringVar(&genericCfg.FeatureBranch, "feature-branch", "", "レビュー対象のフィーチャーブランチ")
-	genericCmd.MarkFlagRequired("feature-branch") // 必須化
+	genericCmd.MarkFlagRequired("feature-branch")
 
-	// 任意の引数
 	genericCmd.Flags().StringVar(&genericCfg.LocalPath, "local-path", defaultLocalPath,
 		fmt.Sprintf("リポジトリを格納するローカルパス (デフォルト: %s)", defaultLocalPath))
 
-	// Backlog連携がないため、IssueIDは任意
-	genericCmd.Flags().StringVar(&genericCfg.IssueID, "issue-id", "", "関連する課題ID (レビュープロンプトのコンテキストに使用)")
-
 	genericCmd.Flags().StringVar(&genericCfg.GeminiModelName, "gemini-model-name", "gemini-2.5-flash", "使用するGeminiモデル名")
+
+	genericCmd.Flags().StringVar(&genericCfg.SSHKeyPath, "ssh-key-path", "",
+		"SSH認証に使用する秘密鍵ファイルのパス (例: ~/.ssh/id_rsa)")
+
+	genericCmd.Flags().StringVar(&genericCfg.PromptFilePath, "prompt-file", "review_prompt.md",
+		"Geminiへのレビュー依頼に使用するプロンプトファイルのパス")
 }
 
 var genericCmd = &cobra.Command{
 	Use:   "generic",
-	Short: "Backlog連携を行わず、結果を標準出力する汎用レビューモード",
-	Long:  `このモードは、差分レビューの結果を標準出力にMarkdownとして出力します。`,
+	Short: "Gitリポジトリの差分をレビューし、結果を標準出力します。",
+	Long:  `このモードは、差分レビューの結果を標準出力に出力します。`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// --- 実行ロジック ---
-		fmt.Println("--- ✅ 汎用レビューモードを実行しました ---")
-		fmt.Printf("設定:\n%+v\n", genericCfg)
-		// ここで GitCodeReviewer(args) の実行を実装します。
+		ctx := context.Background()
+
+		// 1. Gitクライアントを初期化し、リポジトリを処理
+		gitClient := services.NewGitClient(genericCfg.LocalPath, genericCfg.SSHKeyPath)
+		repo, err := gitClient.CloneOrOpen(genericCfg.GitCloneURL)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error processing repository: %v\n", err)
+			os.Exit(1)
+		}
+
+		// 1.5. 最新の変更をフェッチ
+		if err := gitClient.Fetch(repo); err != nil {
+			fmt.Fprintf(os.Stderr, "Error fetching latest changes: %v\n", err)
+			os.Exit(1)
+		}
+
+		// 2. コード差分を取得
+		codeDiff, err := gitClient.GetCodeDiff(repo, genericCfg.BaseBranch, genericCfg.FeatureBranch)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error getting code diff: %v\n", err)
+			os.Exit(1)
+		}
+
+		if codeDiff == "" {
+			fmt.Println("レビュー対象の差分がありませんでした。処理を終了します。")
+			os.Exit(0)
+		}
+
+		fmt.Println("--- 差分取得完了。Geminiにレビューを依頼します... ---")
+
+		// 3. Geminiクライアントを初期化
+		geminiClient, err := services.NewGeminiClient(genericCfg.GeminiModelName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error initializing Gemini client: %v\n", err)
+			os.Exit(1)
+		}
+		defer geminiClient.Close()
+
+		// 4. Geminiにレビューを依頼 (サービス層の関数を呼び出すだけ)
+		reviewResult, err := geminiClient.ReviewCodeDiff(ctx, codeDiff, genericCfg.PromptFilePath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error requesting review from Gemini: %v\n", err)
+			os.Exit(1)
+		}
+
+		// 5. 結果を標準出力
+		fmt.Println("\n--- 📝 Gemini Code Review Result ---")
+		fmt.Println(reviewResult)
+		fmt.Println("------------------------------------")
 	},
 }

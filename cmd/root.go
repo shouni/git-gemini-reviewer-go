@@ -7,6 +7,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// ReviewConfig はコマンドライン引数を保持する構造体です。
+// 全てのコマンドが参照できるよう、root.goで一度だけ宣言します。
+type ReviewConfig struct {
+	GitCloneURL     string
+	BaseBranch      string
+	FeatureBranch   string
+	LocalPath       string
+	IssueID         string
+	GeminiModelName string
+	SSHKeyPath      string
+	PromptFilePath  string
+}
+
 // RootCmd はアプリケーションのベースコマンド（"git-gemini-reviewer-go" 本体）です。
 var RootCmd = &cobra.Command{
 	Use:   "git-gemini-reviewer-go",
