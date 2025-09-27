@@ -104,7 +104,7 @@
 
 Gemini API を利用するために、APIキーを環境変数に設定する必要があります。Backlog 連携を使用する場合は、Backlog の情報も設定してください。
 
-```bash
+```
 # Gemini API キー (必須)
 export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
 
@@ -144,8 +144,8 @@ Git Diff:
 
 #### 実行コマンド例
 
-```bash
-./git-gemini-reviewer-go generic \
+```
+git-gemini-reviewer-go generic \
   --git-clone-url "git@github.com:your-org/your-repo.git" \
   --base-branch "main" \
   --feature-branch "feature/new-feature-branch"
@@ -168,8 +168,8 @@ Git Diff:
 
 #### 実行コマンド例
 
-```bash
-./git-gemini-reviewer-go backlog \
+```
+git-gemini-reviewer-go backlog \
   --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
   --base-branch "develop" \
   --feature-branch "bugfix/issue-456" \
