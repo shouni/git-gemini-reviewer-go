@@ -1,22 +1,11 @@
-# 🤖 git-gemini-reviewer-go
+# 🤖 Git Gemini Reviewer Go
 
 [![Language](https://img.shields.io/badge/Language-Go-blue)](https://golang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-提供いただいたREADMEの内容と、Goバイナリを`bin/`ディレクトリに出力・実行する手順に合わせて、READMEを更新します。
-
-特に、ビルド手順と実行手順を、Goの標準的な開発フローに沿って整理しました。
-
------
-
-# 🤖 Git Gemini Reviewer Go
-
-[](https://golang.org/)
-[](https://opensource.org/licenses/MIT)
-
 ## 🚀 概要 (About) - 開発チームの生産性を高めるAIパートナー
 
-**`git-gemini-reviewer-go`** は、**Google Gemini の強力なAI**を活用し、**コードレビューを自動でお手伝い**するコマンドラインツールです。
+**`Git Gemini Reviewer Go`** は、**Google Gemini の強力なAI**を活用し、**コードレビューを自動でお手伝い**するコマンドラインツールです。
 
 このツールを導入することで、開発チームは単なる作業の効率化を超え、より**創造的で価値の高い業務**に集中できるようになります。AIは煩雑な初期チェックを担う、**チームの優秀な新しいパートナー**のような存在です。
 
