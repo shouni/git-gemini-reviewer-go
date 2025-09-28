@@ -8,6 +8,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
@@ -149,38 +150,57 @@ func (c *GitClient) Fetch(repo *git.Repository) error {
 	return nil
 }
 
-// GetCodeDiff は指定された2つのブランチ間の差分を取得します。
+// GetCodeDiff は指定された2つのブランチ間の「純粋な差分」（3点比較）を、リモートの最新情報に基づいて取得します。
 func (c *GitClient) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch string) (string, error) {
-	// 1. ベースブランチのコミットを取得
-	// 💡 修正: plumbing.NewRemoteRefName の代わりに plumbing.NewRemoteReferenceName を使用
-	baseRefName := plumbing.NewRemoteReferenceName("origin", baseBranch)
-	baseRef, err := repo.Reference(baseRefName, true)
-	if err != nil {
-		return "", fmt.Errorf("failed to get base branch reference (%s): %w", baseBranch, err)
-	}
-	baseCommit, err := repo.CommitObject(baseRef.Hash())
-	if err != nil {
-		return "", fmt.Errorf("failed to get base commit object: %w", err)
+	const remoteName = "origin"
+
+	// ヘルパー関数: リモートブランチのコミットオブジェクトを取得
+	getRemoteCommit := func(branch string) (*object.Commit, error) {
+		// 例: refs/remotes/origin/main
+		refName := plumbing.NewRemoteReferenceName(remoteName, branch)
+		ref, err := repo.Reference(refName, true)
+		if err != nil {
+			return nil, fmt.Errorf("リモートリファレンス '%s/%s' の取得に失敗しました: %w", remoteName, branch, err)
+		}
+		commit, err := repo.CommitObject(ref.Hash())
+		if err != nil {
+			return nil, fmt.Errorf("コミットオブジェクトの取得に失敗しました: %w", err)
+		}
+		return commit, nil
 	}
 
-	// 2. フィーチャーブランチのコミットを取得
-	// 💡 修正: plumbing.NewRemoteRefName の代わりに plumbing.NewRemoteReferenceName を使用
-	featureRefName := plumbing.NewRemoteReferenceName("origin", featureBranch)
-	featureRef, err := repo.Reference(featureRefName, true)
+	// 1. ベースブランチとフィーチャーブランチのコミットを取得
+	baseCommit, err := getRemoteCommit(baseBranch)
 	if err != nil {
-		return "", fmt.Errorf("failed to get feature branch reference (%s): %w", featureBranch, err)
-	}
-	featureCommit, err := repo.CommitObject(featureRef.Hash())
-	if err != nil {
-		return "", fmt.Errorf("failed to get feature commit object: %w", err)
+		return "", fmt.Errorf("ベースブランチのコミット取得に失敗: %w", err)
 	}
 
-	// 3. 差分を取得
-	// baseCommit.Patch(featureCommit) は、featureCommitがbaseCommitに対して行った変更（featureCommitが導入した差分）を表します。
-	// これは 'git diff <baseBranch>...<featureBranch>' の挙動と一致します。
-	patch, err := baseCommit.Patch(featureCommit)
+	featureCommit, err := getRemoteCommit(featureBranch)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate patch (diff): %w", err)
+		return "", fmt.Errorf("フィーチャーブランチのコミット取得に失敗: %w", err)
+	}
+
+	// --- 2. 3点比較のためのマージベースの特定 ---
+	// 'git merge-base origin/base origin/feature' に相当する処理
+	mergeBaseCommits, err := baseCommit.MergeBase(featureCommit)
+	if err != nil {
+		// go-gitのMergeBaseは、エラーを返さず空のスライスを返すケースが多いため、このエラーは通常、Git内部のエラー。
+		return "", fmt.Errorf("マージベース計算中に内部エラーが発生しました: %w", err)
+	}
+
+	if len(mergeBaseCommits) == 0 {
+		return "", fmt.Errorf("ベースブランチとフィーチャーブランチ間に共通の祖先コミット（マージベース）が見つかりませんでした")
+	}
+
+	// マージベースが複数ある場合でも、最初の一つを使用する
+	mergeBaseCommit := mergeBaseCommits[0]
+
+	// 3. パッチの生成 (3点比較の実現)
+	// マージベースCommitからフィーチャーCommitへの差分を取得。
+	// これは 'git diff <MergeBase> <feature>' と同義で、「純粋な差分」を抽出します。
+	patch, err := mergeBaseCommit.Patch(featureCommit)
+	if err != nil {
+		return "", fmt.Errorf("差分パッチの生成に失敗しました: %w", err)
 	}
 
 	return patch.String(), nil
