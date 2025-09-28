@@ -3,6 +3,17 @@
 [![Language](https://img.shields.io/badge/Language-Go-blue)](https://golang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+提供いただいたREADMEの内容と、Goバイナリを`bin/`ディレクトリに出力・実行する手順に合わせて、READMEを更新します。
+
+特に、ビルド手順と実行手順を、Goの標準的な開発フローに沿って整理しました。
+
+-----
+
+# 🤖 Git Gemini Reviewer Go
+
+[](https://golang.org/)
+[](https://opensource.org/licenses/MIT)
+
 ## 🚀 概要 (About) - 開発チームの生産性を高めるAIパートナー
 
 **`git-gemini-reviewer`** は、**Google Gemini の強力なAI**を活用し、**コードレビューを自動でお手伝い**するコマンドラインツールです。
@@ -30,7 +41,7 @@
 | :--- | :--- | :--- |
 | **言語** | **Go (Golang)** | ツールの開発言語。クロスプラットフォームでの高速な実行を実現します。 |
 | **CLI フレームワーク** | **Cobra** | コマンドライン引数（フラグ）の解析とサブコマンド構造 (`generic`, `backlog`) の構築に使用します。 |
-| **Git 操作** | **go-git** | リポジトリのクローン、フェッチ、およびブランチ間の差分 (`git diff`) の取得に使用します。SSH認証に対応しています。 |
+| **Git 操作** | **go-git** | リポジトリのクローン、フェッチ、およびブランチ間の差分 (`git diff A...B`) の取得に使用します。SSH認証に対応しています。 |
 | **AI モデル** | **Google Gemini API** | 取得したコード差分を分析し、レビューコメントを生成するために使用します。 |
 | **Backlog 連携** | **標準 `net/http`** | Backlog API (REST API) を使用して、生成されたレビュー結果を課題にコメントとして投稿します。 |
 
@@ -55,12 +66,15 @@
 以下のコマンドで、このリポジトリをクローンし、実行ファイルを生成します。
 
 ```bash
+# リポジトリをクローン
 git clone git@github.com:shouni/git-gemini-reviewer-go.git
 cd git-gemini-reviewer-go
-go build -o git-gemini-reviewer-go 
+
+# 実行ファイルを bin/ ディレクトリに生成 (バイナリ名は 'gemini_reviewer' に設定)
+go build -o bin/gemini_reviewer
 ```
 
-実行ファイルがカレントディレクトリに生成されます。
+実行ファイルは、プロジェクトルートの `./bin/gemini_reviewer` に生成されます。
 
 -----
 
@@ -77,6 +91,8 @@ export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
 # Backlog 連携を使用する場合 (`backlog` コマンド利用時のみ)
 export BACKLOG_API_KEY="YOUR_BACKLOG_API_KEY"
 export BACKLOG_SPACE_URL="https://your-space.backlog.jp"
+export BACKLOG_SPACE_URL="https://your-space.backlog.jp"
+export PROJECT_ID="YOUR_PROJECT_ID"
 ```
 
 > **Note:** 環境変数を恒久的に設定するには、シェルの設定ファイル (`.zshrc`, `.bash_profile` など) で編集してください。
@@ -115,7 +131,8 @@ Git Diff:
 #### 実行コマンド例
 
 ```bash
-./git-gemini-reviewer-go generic \
+# 生成されたバイナリを './bin/' ディレクトリから実行します
+./bin/gemini_reviewer generic \
   --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
   --base-branch "main" \
   --feature-branch "develop" \
@@ -127,7 +144,7 @@ Git Diff:
 リポジトリURLを変更して実行した場合、以下のログが出力され、自動的に再クローンされます。
 
 ```
-snknsk@MacBookAir git-gemini-reviewer-go % ./git-gemini-reviewer-go generic \
+snknsk@MacBookAir git-gemini-reviewer-go % ./bin/gemini_reviewer generic \
   --git-clone-url "git@github.com:shouni/git-gemini-reviewer-go.git" \
   --base-branch "main" \
   --feature-branch "develop" \
@@ -136,8 +153,11 @@ Opening repository at /var/folders/33/_g2b345n3s70j8jjv55kzh7h0000gn/T/git-revie
 Warning: Existing repository remote URL (git@github.com:shouni/git-gemini-reviewer.git) does not match the requested URL (git@github.com:shouni/git-gemini-reviewer-go.git). Re-cloning...
 Cloning git@github.com:shouni/git-gemini-reviewer-go.git into /var/folders/...
 ... (クローン進捗)
-Fetching latest changes from remote...
---- 差分取得完了。Geminiにレビューを依頼します... ---
+'tmp' のリモート情報を更新中 (git fetch)...
+--- 1. Gitリポジトリのセットアップと差分取得を開始 ---
+Git差分の取得に成功しました。
+取得したDiffのサイズ: 1234バイト
+--- 2. AIレビュー（Gemini）を開始 ---
 AIレビューの取得に成功しました。
 レビュー処理を完了しました。
 
@@ -156,6 +176,7 @@ AIレビューの取得に成功しました。
 | `--ssh-key-path` | SSH認証用の秘密鍵パス（SSH URL接続時に必要） | ❌ | `~/.ssh/id_rsa` |
 | `--prompt-file` | プロンプトファイルのパス | ❌ | `review_prompt.md` |
 | `--local-path` | リポジトリのクローン先 | ❌ | OSの一時ディレクトリ |
+| `--model` | 使用するGeminiモデル名 | ❌ | `gemini-2.5-flash` |
 
 -----
 
@@ -168,7 +189,7 @@ AIレビューの取得に成功しました。
 **GitリポジトリがSSH認証を必要とする場合、`--ssh-key-path`は必須です。**
 
 ```bash
-./git-gemini-reviewer-go backlog \
+./bin/gemini_reviewer backlog \
   --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
   --base-branch "main" \
   --feature-branch "bugfix/issue-456" \
