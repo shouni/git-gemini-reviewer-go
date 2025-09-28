@@ -183,6 +183,6 @@ Git Diff:
 
 -----
 
-この修正版 README は、Windows と Mac の両方のユーザーにとってより分かりやすく、実行可能になったはずです。`--ssh-key-path`のデフォルト値も、あなたのコードベースに合わせたものに変更しました。
+### 📜 ライセンス (License)
 
-他に何か気づいた点や疑問があれば、いつでもお知らせください。
+このプロジェクトは [MIT License](https://opensource.org/licenses/MIT) の下で公開されています。
