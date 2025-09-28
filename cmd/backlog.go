@@ -25,7 +25,8 @@ var backlogCfg BacklogConfig
 // backlogCmd は、レビュー結果を Backlog にコメント投稿するコマンドです。
 var backlogCmd = &cobra.Command{
 	Use:   "backlog",
-	Short: "Perform a code review and post the result as a comment to Backlog.",
+	Short: "コードレビューを実行し、その結果をBacklogにコメントとして投稿します。",
+	Long:  `このコマンドは、Gitリポジトリの差分をAIでレビューし、結果を指定されたBacklog課題にコメントとして投稿します。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 

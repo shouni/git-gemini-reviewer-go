@@ -19,7 +19,8 @@ var localCfg config.ReviewConfig
 // genericCmd は、レビュー結果を標準出力するコマンドです。
 var genericCmd = &cobra.Command{
 	Use:   "generic",
-	Short: "Perform a code review and output the result to stdout.",
+	Short: "コードレビューを実行し、その結果を標準出力に出力します。",
+	Long:  `このコマンドは、Gitリポジトリの差分をAIでレビューし、結果をターミナルに直接出力します。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Cobraの context を使用
 		ctx := cmd.Context()
