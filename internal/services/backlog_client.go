@@ -24,7 +24,8 @@ func NewBacklogClient() (*BacklogClient, error) {
 	}
 
 	// APIのベースURLを構築
-	apiURL := fmt.Sprintf("%s/api/v2", spaceURL)
+	apiURL := spaceURL
+
 	return &BacklogClient{
 		baseURL: apiURL,
 		apiKey:  apiKey,
