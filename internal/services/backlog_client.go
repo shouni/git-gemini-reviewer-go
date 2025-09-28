@@ -3,10 +3,10 @@ package services
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 )
 
@@ -27,15 +27,11 @@ type BacklogErrorResponse struct {
 }
 
 // NewBacklogClient はBacklogClientを初期化します。
-func NewBacklogClient() (*BacklogClient, error) {
-	apiKey := os.Getenv("BACKLOG_API_KEY")
-	spaceURL := os.Getenv("BACKLOG_SPACE_URL")
+func NewBacklogClient(spaceURL string, apiKey string) (*BacklogClient, error) {
 
-	if apiKey == "" {
-		return nil, fmt.Errorf("BACKLOG_API_KEY environment variable must be set for Backlog mode")
-	}
-	if spaceURL == "" {
-		return nil, fmt.Errorf("BACKLOG_SPACE_URL environment variable must be set for Backlog mode")
+	if spaceURL == "" || apiKey == "" {
+		// 💡 errors パッケージを使用
+		return nil, errors.New("BACKLOG_SPACE_URL および BACKLOG_API_KEY の設定が必要です")
 	}
 
 	// URLの正規化: 末尾の / を取り除き、/api/v2 を追加
