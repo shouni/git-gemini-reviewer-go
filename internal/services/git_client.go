@@ -71,15 +71,13 @@ func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) 
 
 // CloneOrOpen はリポジトリをクローンするか、既に存在する場合は開きます。
 func (c *GitClient) CloneOrOpen(url string) (*git.Repository, error) {
-	// 💡 URLに基づいて認証メソッドを取得
 	auth, err := c.getAuthMethod(url)
 	if err != nil {
 		return nil, err
 	}
 
-	// クローン先ディレクトリが存在するかチェック
+	// 1. クローン先ディレクトリが存在しない場合は、単純にクローン
 	if _, err := os.Stat(c.LocalPath); os.IsNotExist(err) {
-		// ディレクトリが存在しない場合はクローン
 		fmt.Printf("Cloning %s into %s...\n", url, c.LocalPath)
 		repo, err := git.PlainClone(c.LocalPath, false, &git.CloneOptions{
 			URL:      url,
@@ -92,11 +90,50 @@ func (c *GitClient) CloneOrOpen(url string) (*git.Repository, error) {
 		return repo, nil
 	}
 
-	// 既に存在する場合は開く
+	// 2. 既に存在する場合は開く
 	fmt.Printf("Opening repository at %s...\n", c.LocalPath)
 	repo, err := git.PlainOpen(c.LocalPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open existing repository at %s: %w", c.LocalPath, err)
+	}
+
+	// 3. 既存のリポジトリURLをチェックする
+	remote, err := repo.Remote("origin")
+	if err != nil {
+		// リモート'origin'がない、またはエラーの場合、再クローンが安全
+		fmt.Printf("Warning: Remote 'origin' not found or failed to read: %v. Re-cloning...\n", err)
+		return c.recloneRepository(url, auth)
+	}
+
+	// Fetch URLを取得し、渡されたURLと一致するか確認
+	// go-gitは複数のURLを格納する可能性があるため、最初のURLをチェック
+	remoteURLs := remote.Config().URLs
+	if len(remoteURLs) == 0 || remoteURLs[0] != url {
+		// URLが一致しない場合、古いリポジトリなので削除してクローンし直す
+		fmt.Printf("Warning: Existing repository remote URL (%s) does not match the requested URL (%s). Re-cloning...\n", remoteURLs[0], url)
+		return c.recloneRepository(url, auth)
+	}
+
+	// 4. URLが一致する場合は、そのままリポジトリを返す
+	return repo, nil
+}
+
+// recloneRepository は、既存のディレクトリを削除して新しいURLでクローンし直すヘルパー関数です。
+func (c *GitClient) recloneRepository(url string, auth transport.AuthMethod) (*git.Repository, error) {
+	// 既存のディレクトリを削除
+	if err := os.RemoveAll(c.LocalPath); err != nil {
+		return nil, fmt.Errorf("failed to remove old repository directory %s: %w", c.LocalPath, err)
+	}
+
+	// 新しいURLで再クローン
+	fmt.Printf("Re-cloning %s into %s...\n", url, c.LocalPath)
+	repo, err := git.PlainClone(c.LocalPath, false, &git.CloneOptions{
+		URL:      url,
+		Auth:     auth,
+		Progress: os.Stdout,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to clone repository %s after cleanup: %w", url, err)
 	}
 	return repo, nil
 }

@@ -122,15 +122,20 @@ Git Diff:
   --ssh-key-path "~/.ssh/id_rsa"
 ```
 
-#### 実行ログ例（成功時）
+#### 実行ログ例（Git URL変更時の自動クリーンアップを含む）
+
+リポジトリURLを変更して実行した場合、以下のログが出力され、自動的に再クローンされます。
 
 ```
 snknsk@MacBookAir git-gemini-reviewer-go % ./git-gemini-reviewer-go generic \
-  --git-clone-url "git@github.com:shouni/git-gemini-reviewer.git" \
+  --git-clone-url "git@github.com:shouni/git-gemini-reviewer-go.git" \
   --base-branch "main" \
   --feature-branch "develop" \
   --ssh-key-path "~/.ssh/id_rsa"
 Opening repository at /var/folders/33/_g2b345n3s70j8jjv55kzh7h0000gn/T/git-reviewer-repos/tmp...
+Warning: Existing repository remote URL (git@github.com:shouni/git-gemini-reviewer.git) does not match the requested URL (git@github.com:shouni/git-gemini-reviewer-go.git). Re-cloning...
+Cloning git@github.com:shouni/git-gemini-reviewer-go.git into /var/folders/...
+... (クローン進捗)
 Fetching latest changes from remote...
 --- 差分取得完了。Geminiにレビューを依頼します... ---
 AIレビューの取得に成功しました。
@@ -148,7 +153,7 @@ AIレビューの取得に成功しました。
 | `--git-clone-url` | レビュー対象のGitリポジトリURL（SSH形式推奨） | ✅ | なし |
 | `--base-branch` | 差分比較の基準ブランチ | ✅ | なし |
 | `--feature-branch` | レビュー対象のフィーチャーブランチ | ✅ | なし |
-| `--ssh-key-path` | SSH認証用の秘密鍵パス | ❌ | `~/.ssh/id_rsa` |
+| `--ssh-key-path` | SSH認証用の秘密鍵パス（SSH URL接続時に必要） | ❌ | `~/.ssh/id_rsa` |
 | `--prompt-file` | プロンプトファイルのパス | ❌ | `review_prompt.md` |
 | `--local-path` | リポジトリのクローン先 | ❌ | OSの一時ディレクトリ |
 
@@ -160,11 +165,12 @@ AIレビューの取得に成功しました。
 
 #### 実行コマンド例
 
+**GitリポジトリがSSH認証を必要とする場合、`--ssh-key-path`は必須です。**
+
 ```bash
 ./git-gemini-reviewer-go backlog \
   --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
   --base-branch "main" \
-  --feature-branch "feature/new-feature-branch" \
   --feature-branch "bugfix/issue-456" \
   --issue-id "PROJECT-123" \
   --ssh-key-path "~/.ssh/id_rsa" 
