@@ -77,6 +77,7 @@ export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
 # Backlog 連携を使用する場合 (`backlog` コマンド利用時のみ)
 export BACKLOG_API_KEY="YOUR_BACKLOG_API_KEY"
 export BACKLOG_SPACE_URL="https://your-space.backlog.jp"
+export PROJECT_ID="YOUR__ID"
 ```
 
 > **Note:** 環境変数を恒久的に設定するには、シェルの設定ファイル (`.zshrc`, `.bash_profile` など) で編集してください。
