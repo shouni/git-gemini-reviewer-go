@@ -3,7 +3,6 @@
 [![Language](https://img.shields.io/badge/Language-Go-blue)](https://golang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-
 ## 🚀 概要 (About) - 開発チームの生産性を高めるAIパートナー
 
 **`git-gemini-reviewer`** は、**Google Gemini の強力なAI**を活用し、**コードレビューを自動でお手伝い**するコマンドラインツールです。
@@ -45,48 +44,29 @@
 
 1.  **インストーラーのダウンロード:**
     [Go の公式サイト](https://go.dev/dl/)から、お使いのOSに合ったインストーラーをダウンロードし、実行してください。
-
 2.  **インストールの確認:**
-    ターミナル（またはコマンドプロモンプト）を再起動し、以下のコマンドでGoが正しくインストールされ、PATHが通っているか確認します。
-
+    ターミナルを再起動し、以下のコマンドでGoが正しくインストールされ、PATHが通っているか確認します。
     ```bash
-    # バージョンの確認
     go version
-    # 例: go version go1.22.4 darwin/amd64
-
-    # Goの環境変数が設定されているか確認 (オプション)
-    go env GOROOT
-    go env GOPATH
     ```
 
-### 2\. プロジェクトのセットアップ
+### 2\. プロジェクトのセットアップとビルド
 
-以下のコマンドで、このリポジトリをローカル環境にクローン（ダウンロード）します。
+以下のコマンドで、このリポジトリをクローンし、実行ファイルを生成します。
 
 ```bash
 git clone git@github.com:shouni/git-gemini-reviewer-go.git
 cd git-gemini-reviewer-go
+go build -o git-gemini-reviewer-go 
 ```
 
-### 3\. プロジェクトのビルド
-
-プロジェクトのルートディレクトリで以下のコマンドを実行し、実行可能ファイルを生成します。
-
-  * **macOS / Linux:**
-    ```bash
-    go build -o git-gemini-reviewer-go
-    ```
-  * **Windows:**
-    ```bash
-    go build -o git-gemini-reviewer-go.exe
-    ```
-    実行ファイルがカレントディレクトリに生成されます。
+実行ファイルがカレントディレクトリに生成されます。
 
 -----
 
-### 4\. 環境変数の設定 (必須)
+### 3\. 環境変数の設定 (必須)
 
-Gemini API を利用するために、API キーを環境変数に設定する必要があります。Backlog 連携を使用する場合は、Backlog の情報も設定してください。
+Gemini API を利用するために、API キーを環境変数に設定する必要があります。
 
 #### macOS / Linux (bash/zsh)
 
@@ -99,22 +79,11 @@ export BACKLOG_API_KEY="YOUR_BACKLOG_API_KEY"
 export BACKLOG_SPACE_URL="https://your-space.backlog.jp"
 ```
 
-#### Windows (PowerShell)
-
-```powershell
-# Gemini API キー (必須)
-$env:GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
-
-# Backlog 連携を使用する場合 (`backlog` コマンド利用時のみ)
-$env:BACKLOG_API_KEY="YOUR_BACKLOG_API_KEY"
-$env:BACKLOG_SPACE_URL="https://your-space.backlog.jp"
-```
-
-> **Note:** 環境変数を恒久的に設定するには、シェルの設定ファイル (`.zshrc`, `.bash_profile` など) や、Windowsの「環境変数」設定画面で編集してください。
+> **Note:** 環境変数を恒久的に設定するには、シェルの設定ファイル (`.zshrc`, `.bash_profile` など) で編集してください。
 
 -----
 
-### 5\. プロンプトファイルの準備 (必須)
+### 4\. プロンプトファイルの準備 (必須)
 
 プロジェクトのルートディレクトリに、Gemini にレビューを依頼する際の指示を記述した **`review_prompt.md`** ファイルを作成してください。
 
@@ -135,7 +104,7 @@ Git Diff:
 
 -----
 
-## 🚀 使い方 (Usage)
+## 🚀 使い方 (Usage) と実行例
 
 生成された実行ファイルを使用し、サブコマンドとフラグを指定して実行します。
 
@@ -145,27 +114,46 @@ Git Diff:
 
 #### 実行コマンド例
 
-  * **macOS / Linux:**
-    ```bash
-    ./git-gemini-reviewer-go generic \
-      --git-clone-url "git@github.com:your-org/your-repo.git" \
-      --base-branch "main" \
-      --feature-branch "feature/new-feature-branch"
-    ```
-  * **Windows (PowerShell):**
-    ```powershell
-    .\git-gemini-reviewer-go.exe generic `
-      --git-clone-url "git@github.com:your-org/your-repo.git" `
-      --base-branch "main" `
-      --feature-branch "feature/new-feature-branch"
-    ```
+```bash
+./git-gemini-reviewer-go generic \
+  --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
+  --base-branch "main" \
+  --feature-branch "develop" \
+  --ssh-key-path "~/.ssh/id_rsa"
+```
+
+#### 実行ログ例（Git URL変更時の自動クリーンアップを含む）
+
+リポジトリURLを変更して実行した場合、以下のログが出力され、自動的に再クローンされます。
+
+```
+snknsk@MacBookAir git-gemini-reviewer-go % ./git-gemini-reviewer-go generic \
+  --git-clone-url "git@github.com:shouni/git-gemini-reviewer-go.git" \
+  --base-branch "main" \
+  --feature-branch "develop" \
+  --ssh-key-path "~/.ssh/id_rsa"
+Opening repository at /var/folders/33/_g2b345n3s70j8jjv55kzh7h0000gn/T/git-reviewer-repos/tmp...
+Warning: Existing repository remote URL (git@github.com:shouni/git-gemini-reviewer.git) does not match the requested URL (git@github.com:shouni/git-gemini-reviewer-go.git). Re-cloning...
+Cloning git@github.com:shouni/git-gemini-reviewer-go.git into /var/folders/...
+... (クローン進捗)
+Fetching latest changes from remote...
+--- 差分取得完了。Geminiにレビューを依頼します... ---
+AIレビューの取得に成功しました。
+レビュー処理を完了しました。
+
+--- 📝 Gemini Code Review Result ---
+## レビュー結果
+この差分は、...
+...
+------------------------------------
+```
 
 | フラグ | 説明 | 必須 | デフォルト値 |
 | :--- | :--- | :--- | :--- |
 | `--git-clone-url` | レビュー対象のGitリポジトリURL（SSH形式推奨） | ✅ | なし |
 | `--base-branch` | 差分比較の基準ブランチ | ✅ | なし |
 | `--feature-branch` | レビュー対象のフィーチャーブランチ | ✅ | なし |
-| `--ssh-key-path` | SSH認証用の秘密鍵パス | ❌ | `~/.ssh/id_ed25519` |
+| `--ssh-key-path` | SSH認証用の秘密鍵パス（SSH URL接続時に必要） | ❌ | `~/.ssh/id_rsa` |
 | `--prompt-file` | プロンプトファイルのパス | ❌ | `review_prompt.md` |
 | `--local-path` | リポジトリのクローン先 | ❌ | OSの一時ディレクトリ |
 
@@ -177,28 +165,24 @@ Git Diff:
 
 #### 実行コマンド例
 
-  * **macOS / Linux:**
-    ```bash
-    ./git-gemini-reviewer-go backlog \
-      --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
-      --base-branch "develop" \
-      --feature-branch "bugfix/issue-456" \
-      --issue-id "PROJECT-123"
-    ```
-  * **Windows (PowerShell):**
-    ```powershell
-    .\git-gemini-reviewer-go.exe backlog `
-      --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" `
-      --base-branch "develop" `
-      --feature-branch "bugfix/issue-456" `
-      --issue-id "PROJECT-123"
-    ```
+**GitリポジトリがSSH認証を必要とする場合、`--ssh-key-path`は必須です。**
+
+```bash
+./git-gemini-reviewer-go backlog \
+  --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
+  --base-branch "main" \
+  --feature-branch "bugfix/issue-456" \
+  --issue-id "PROJECT-123" \
+  --ssh-key-path "~/.ssh/id_rsa" 
+```
 
 | フラグ | 説明 | 必須 | デフォルト値 |
 | :--- | :--- | :--- | :--- |
 | `--issue-id` | コメントを投稿するBacklog課題ID（例: PROJECT-123） | ✅ | なし |
 | `--no-post` | Backlogへのコメント投稿をスキップし、結果を標準出力する | ❌ | `false` |
 | **その他のフラグ** | **`generic` モードと同じ** | | |
+
+-----
 
 ### 📜 ライセンス (License)
 

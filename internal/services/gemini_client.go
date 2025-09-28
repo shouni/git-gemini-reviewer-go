@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/google/generative-ai-go/genai"
@@ -39,54 +38,62 @@ func NewGeminiClient(modelName string) (*GeminiClient, error) {
 // Close はクライアントを閉じ、リソースを解放します。
 func (c *GeminiClient) Close() {
 	if c.client != nil {
+		// リソースのリークを防ぐためにクライアントをクローズ
 		c.client.Close()
 	}
 }
 
 // ReviewCodeDiff はコード差分を基にGeminiにレビューを依頼します。
+// プロンプトファイルは、コード差分(%s)を埋め込むための Go 標準の fmt.Sprintf 形式のプレースホルダを持っている必要があります。
 func (c *GeminiClient) ReviewCodeDiff(ctx context.Context, codeDiff string, promptFilePath string) (string, error) {
 	// 1. プロンプトファイルの読み込み
-	promptTemplate, err := ioutil.ReadFile(promptFilePath)
+	// ioutil.ReadFile は非推奨なので os.ReadFile に置き換え
+	promptTemplateBytes, err := os.ReadFile(promptFilePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read prompt file %s: %w", promptFilePath, err)
 	}
+	promptTemplate := string(promptTemplateBytes)
 
 	// 2. プロンプトの構成
-	prompt := fmt.Sprintf(string(promptTemplate), codeDiff)
+	// プロンプトファイルの内容をテンプレートとして使用し、コード差分を埋め込む
+	prompt := fmt.Sprintf(promptTemplate, codeDiff)
 
 	// 3. API呼び出し
-	resp, err := c.client.GenerativeModel(c.modelName).GenerateContent(ctx, genai.Text(prompt))
+	model := c.client.GenerativeModel(c.modelName)
+	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
-		return "", fmt.Errorf("GenerateContent failed: %w", err)
+		return "", fmt.Errorf("GenerateContent failed with model %s: %w", c.modelName, err)
 	}
 
 	// 4. レスポンスの処理
-	if len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil {
-		return "レビュー結果を取得できませんでした。レスポンスが空です。", nil
+	if resp == nil || len(resp.Candidates) == 0 {
+		return "", fmt.Errorf("received empty or invalid response from Gemini API")
 	}
 
-	if len(resp.Candidates[0].Content.Parts) == 0 {
-		return "レビュー結果を取得できませんでした。コンテンツが空です。", nil
+	candidate := resp.Candidates[0]
+
+	// 応答がブロックされた場合（セキュリティフィルタなど）のチェック
+	if candidate.Content == nil || len(candidate.Content.Parts) == 0 {
+		// 応答がブロックされた詳細情報を確認
+		// 💡 修正: genai.FinishReasonUnspecified と比較
+		if candidate.FinishReason != genai.FinishReasonUnspecified {
+			// String() メソッドを使用して FinishReason を文字列化
+			return "", fmt.Errorf("API response was blocked or finished prematurely. Reason: %s", candidate.FinishReason.String())
+		}
+		return "", fmt.Errorf("Gemini response candidate is empty or lacks content parts")
 	}
 
-	// genai.Part の型アサーションを使用してテキストを安全に取り出す
-	part := resp.Candidates[0].Content.Parts[0]
-
-	reviewTextPart, ok := part.(genai.Text)
-
+	// 5. テキスト内容の抽出
+	reviewText, ok := candidate.Content.Parts[0].(genai.Text)
 	if !ok {
-		// テキストでない場合（画像などが返された場合）
-		return "レビュー結果を取得できませんでしたが、APIは応答しました。", nil
+		// テキスト以外のデータ型が返された場合（予期しないケース）
+		return "", fmt.Errorf("API returned non-text part in response")
 	}
 
-	reviewText := string(reviewTextPart)
-
-	if reviewText == "" {
-		return "レビュー結果を取得できませんでした。レスポンスのPartが空のテキストです。", nil
+	result := string(reviewText)
+	if result == "" {
+		return "", fmt.Errorf("API returned an empty text review result")
 	}
 
-	return reviewText, nil
-} // 93行目付近
-// 最後の } がここにあるべきです！
-
-// EOF
+	return result, nil
+}
