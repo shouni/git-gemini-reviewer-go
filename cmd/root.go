@@ -8,7 +8,9 @@ import (
 )
 
 // ReviewConfig はコマンドライン引数を保持する構造体です。
-// 全てのコマンドが参照できるよう、root.goで一度だけ宣言します。
+// main パッケージで定義されたものと同一ですが、利便性のためここではフィールドを再定義しています。
+// 依存性管理のため、実際には main パッケージの ReviewConfig をインポートして使用するのが望ましいです。
+// (今回は提示されたコードのスコープ内で構造体を整理しました)
 type ReviewConfig struct {
 	GitCloneURL     string
 	BaseBranch      string
@@ -29,11 +31,9 @@ var RootCmd = &cobra.Command{
 利用可能なサブコマンド:
   generic  (Backlog連携なし)
   backlog  (Backlog連携あり)`,
-	// ベースコマンド自体は処理を持たず、サブコマンドへ処理を委譲します。
-	Run: func(cmd *cobra.Command, args []string) {
-		// 引数なしで実行された場合などにヘルプを表示
-		cmd.Help()
-	},
+	// 💡 修正点: ベースコマンド自体にロジックを持たせないため、Run は nil にします。
+	// サブコマンドが存在する場合、引数なしで実行すると Cobra が自動でヘルプを表示します。
+	Run: nil,
 }
 
 // Execute はルートコマンドを実行し、アプリケーションを起動します。

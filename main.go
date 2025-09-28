@@ -3,12 +3,13 @@ package main
 import (
 	"flag"
 	"fmt"
-	"git-gemini-reviewer-go/cmd"
+	"git-gemini-reviewer-go/cmd" // 🚀 CLIのエントリポイント
 	"os"
 	"path/filepath"
-) // 👈 これで十分
+)
 
 // ReviewConfig はコマンドライン引数を保持する構造体です。
+// cmd パッケージ内のサブコマンドでフラグをバインドするために使用されます。
 type ReviewConfig struct {
 	// 必須引数
 	GitCloneURL   string
@@ -25,7 +26,7 @@ type ReviewConfig struct {
 }
 
 // setupFlags はコマンドライン引数の定義とデフォルト値の設定を行います。
-// 💡 修正点: flagSet を引数として受け取り、そのメソッドでフラグをバインドします。
+// cmd パッケージ内で再利用されるユーティリティ関数として残します。
 func setupFlags(flagSet *flag.FlagSet, cfg *ReviewConfig, isBacklogContext bool) {
 	// --- 必須の引数 ---
 	flagSet.StringVar(&cfg.GitCloneURL, "git-clone-url", "",
@@ -59,6 +60,7 @@ func setupFlags(flagSet *flag.FlagSet, cfg *ReviewConfig, isBacklogContext bool)
 }
 
 // validateRequiredArgs は必須引数が設定されているかチェックします。
+// cmd パッケージ内で再利用されるユーティリティ関数として残します。
 func validateRequiredArgs(cfg *ReviewConfig, flagSet *flag.FlagSet) bool {
 	valid := true
 
@@ -84,72 +86,8 @@ func validateRequiredArgs(cfg *ReviewConfig, flagSet *flag.FlagSet) bool {
 	return valid
 }
 
-// 実行するモードを定義
-const (
-	ModeBacklog = "backlog"
-	ModeGeneric = "generic"
-)
-
+// main はプログラムのエントリポイントです。
 func main() {
+	// 全ての CLI ロジックを cmd パッケージに委譲します。
 	cmd.Execute()
-}
-
-// runBacklogReviewer は Backlog 連携モードでの実行を処理します。
-func runBacklogReviewer(args []string) {
-	cfg := ReviewConfig{}
-
-	flagSet := flag.NewFlagSet("backlog-reviewer", flag.ExitOnError)
-	flagSet.Usage = func() {
-		fmt.Fprintf(flagSet.Output(), "使用法: backlog-reviewer [OPTIONS]\n")
-		fmt.Fprintln(flagSet.Output(), "Gitリポジトリの差分をGeminiでコードレビューし、Backlogにコメントします。")
-		fmt.Fprintln(flagSet.Output(), "\nオプション:")
-		flagSet.PrintDefaults()
-	}
-
-	// 💡 修正点: flagSetを渡す
-	setupFlags(flagSet, &cfg, true)
-
-	fullArgs := append([]string{"backlog-reviewer"}, args...)
-
-	flagSet.Parse(fullArgs)
-
-	if !validateRequiredArgs(&cfg, flagSet) {
-		os.Exit(1)
-	}
-
-	// ... (Backlog投稿ロジックの再現) ...
-
-	fmt.Printf("Backlogモードでレビューを実行します:\n%+v\n", cfg)
-
-	os.Exit(0)
-}
-
-// runGenericReviewer は 汎用レビューモードでの実行を処理します。
-func runGenericReviewer(args []string) {
-	cfg := ReviewConfig{}
-
-	flagSet := flag.NewFlagSet("git-gemini-review", flag.ExitOnError)
-	flagSet.Usage = func() {
-		fmt.Fprintf(flagSet.Output(), "使用法: git-gemini-review [OPTIONS]\n")
-		fmt.Fprintln(flagSet.Output(), "Gitリポジトリの差分をGeminiでコードレビューし、結果を標準出力します。")
-		fmt.Fprintln(flagSet.Output(), "\nオプション:")
-		flagSet.PrintDefaults()
-	}
-
-	// 💡 修正点: flagSetを渡す
-	setupFlags(flagSet, &cfg, false)
-
-	fullArgs := append([]string{"git-gemini-review"}, args...)
-
-	flagSet.Parse(fullArgs)
-
-	if !validateRequiredArgs(&cfg, flagSet) {
-		os.Exit(1)
-	}
-
-	// 汎用レビュークラスを呼び出すロジックをここに実装
-	// 最終的にこの行が出力されれば成功です。
-	fmt.Printf("汎用モードでレビューを実行します:\n%+v\n", cfg)
-
-	os.Exit(0)
 }

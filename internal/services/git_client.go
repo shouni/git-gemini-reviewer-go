@@ -30,10 +30,13 @@ func NewGitClient(localPath string, sshKeyPath string) *GitClient {
 
 // expandTilde はパス内のチルダ (~) をホームディレクトリに展開します。
 func expandTilde(path string) (string, error) {
+	if path == "" {
+		return "", nil
+	}
 	if strings.HasPrefix(path, "~/") {
 		usr, err := user.Current()
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("failed to get current user's home directory: %w", err)
 		}
 		// "~/" をホームディレクトリパスで置き換える
 		return filepath.Join(usr.HomeDir, path[2:]), nil
@@ -42,24 +45,25 @@ func expandTilde(path string) (string, error) {
 }
 
 // getAuthMethod はSSHキーファイルから認証メソッドを作成します。
-func (c *GitClient) getAuthMethod() (transport.AuthMethod, error) {
-	if c.SSHKeyPath == "" {
-		// キーパスが指定されていない場合は、認証なし (パブリックリポジトリ用)
+// SSHKeyPathが空の場合、またはリポジトリURLがSSHでない場合はnilを返します。
+func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) {
+	// 認証が不要な場合（HTTPSまたはSSHキーパスが未指定の場合）
+	// go-gitは認証情報なしでもクローンを試みるため、キーパスが空の場合はnilを返します。
+	if c.SSHKeyPath == "" || !strings.HasPrefix(repoURL, "git@") {
 		return nil, nil
 	}
 
-	// 💡 修正: パスを使用する前にチルダを展開する
+	// 💡 パスを使用する前にチルダを展開する
 	keyPath, err := expandTilde(c.SSHKeyPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to expand SSH key path: %w", err)
+		return nil, err
 	}
 
 	// 秘密鍵のパスと、必要であればパスフレーズを指定
+	// ユーザー名 'git' はSSHプロトコルでの標準
 	auth, err := ssh.NewPublicKeysFromFile("git", keyPath, "")
 	if err != nil {
-		// ⚠️ 注意: デフォルトパスでファイルが存在しない場合もエラーになります
-		//       ただし、存在しないパスを許可すると意図しない認証なしになってしまうため、
-		//       エラーとして通知するのが望ましいです。
+		// SSH認証が必要だが、キーファイルが見つからない、または読み込めない場合
 		return nil, fmt.Errorf("failed to create SSH public keys from %s: %w", keyPath, err)
 	}
 	return auth, nil
@@ -67,21 +71,23 @@ func (c *GitClient) getAuthMethod() (transport.AuthMethod, error) {
 
 // CloneOrOpen はリポジトリをクローンするか、既に存在する場合は開きます。
 func (c *GitClient) CloneOrOpen(url string) (*git.Repository, error) {
-	auth, err := c.getAuthMethod()
+	// 💡 URLに基づいて認証メソッドを取得
+	auth, err := c.getAuthMethod(url)
 	if err != nil {
 		return nil, err
 	}
 
+	// クローン先ディレクトリが存在するかチェック
 	if _, err := os.Stat(c.LocalPath); os.IsNotExist(err) {
 		// ディレクトリが存在しない場合はクローン
 		fmt.Printf("Cloning %s into %s...\n", url, c.LocalPath)
 		repo, err := git.PlainClone(c.LocalPath, false, &git.CloneOptions{
 			URL:      url,
-			Auth:     auth, // 💡 認証情報を適用
+			Auth:     auth,
 			Progress: os.Stdout,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("failed to clone repository: %w", err)
+			return nil, fmt.Errorf("failed to clone repository %s: %w", url, err)
 		}
 		return repo, nil
 	}
@@ -90,14 +96,15 @@ func (c *GitClient) CloneOrOpen(url string) (*git.Repository, error) {
 	fmt.Printf("Opening repository at %s...\n", c.LocalPath)
 	repo, err := git.PlainOpen(c.LocalPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open existing repository: %w", err)
+		return nil, fmt.Errorf("failed to open existing repository at %s: %w", c.LocalPath, err)
 	}
 	return repo, nil
 }
 
 // Fetch はリモートから最新のブランチ情報を取得します。
 func (c *GitClient) Fetch(repo *git.Repository) error {
-	auth, err := c.getAuthMethod()
+	// 認証メソッドを再利用
+	auth, err := c.getAuthMethod("") // Fetch時はURLチェックをスキップするため空文字列を渡す
 	if err != nil {
 		return err
 	}
@@ -108,7 +115,7 @@ func (c *GitClient) Fetch(repo *git.Repository) error {
 	refSpec := config.RefSpec("+refs/heads/*:refs/remotes/origin/*")
 
 	err = repo.Fetch(&git.FetchOptions{
-		Auth:     auth, // 💡 認証情報を適用
+		Auth:     auth,
 		RefSpecs: []config.RefSpec{refSpec},
 		Progress: os.Stdout,
 	})
@@ -117,44 +124,46 @@ func (c *GitClient) Fetch(repo *git.Repository) error {
 	if err != nil && err != git.NoErrAlreadyUpToDate {
 		return fmt.Errorf("failed to fetch from remote: %w", err)
 	}
+
+	// 成功または既に最新の場合
 	return nil
 }
 
 // GetCodeDiff は指定された2つのリモートブランチ間の差分を取得します。
+// 'git diff baseBranch...featureBranch' に相当する差分を生成します。
 func (c *GitClient) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch string) (string, error) {
-	w, err := repo.Worktree()
-	if err != nil {
-		// リポジトリがベアでないことを確認するため
-		return "", fmt.Errorf("failed to get worktree: %w", err)
-	}
-	_ = w
+	// Worktreeの取得は今回は不要なため削除（差分はコミットオブジェクト間で取得するため）
 
 	// 1. ベースブランチのコミットを取得 (リモートトラッキング参照を使用)
-	baseRef := plumbing.Revision(fmt.Sprintf("refs/remotes/origin/%s", baseBranch))
-	baseCommitHash, err := repo.ResolveRevision(baseRef)
+	// 例: refs/remotes/origin/main
+	baseRefName := fmt.Sprintf("refs/remotes/origin/%s", baseBranch)
+	baseCommitHash, err := repo.ResolveRevision(plumbing.Revision(baseRefName))
 	if err != nil {
-		return "", fmt.Errorf("base branch '%s' not found: %w", baseBranch, err)
+		return "", fmt.Errorf("base branch ref '%s' not found: %w", baseRefName, err)
 	}
 	baseCommit, err := repo.CommitObject(*baseCommitHash)
 	if err != nil {
-		return "", fmt.Errorf("failed to get base commit: %w", err)
+		return "", fmt.Errorf("failed to get base commit %s: %w", baseCommitHash.String(), err)
 	}
 
 	// 2. フィーチャーブランチのコミットを取得 (リモートトラッキング参照を使用)
-	featureRef := plumbing.Revision(fmt.Sprintf("refs/remotes/origin/%s", featureBranch))
-	featureCommitHash, err := repo.ResolveRevision(featureRef)
+	// 例: refs/remotes/origin/feature/new-feature
+	featureRefName := fmt.Sprintf("refs/remotes/origin/%s", featureBranch)
+	featureCommitHash, err := repo.ResolveRevision(plumbing.Revision(featureRefName))
 	if err != nil {
-		return "", fmt.Errorf("feature branch '%s' not found: %w", featureBranch, err)
+		return "", fmt.Errorf("feature branch ref '%s' not found: %w", featureRefName, err)
 	}
 	featureCommit, err := repo.CommitObject(*featureCommitHash)
 	if err != nil {
-		return "", fmt.Errorf("failed to get feature commit: %w", err)
+		return "", fmt.Errorf("failed to get feature commit %s: %w", featureCommitHash.String(), err)
 	}
 
 	// 3. 差分を取得
-	patch, err := baseCommit.Patch(featureCommit)
+	// 💡 修正: 一般的な 'git diff base..feature' は featureCommit.Patch(baseCommit) の形で取得されます。
+	// これは featureCommit にあるが baseCommit にはない変更を表します。
+	patch, err := baseCommit.Patch(featureCommit) // baseCommit から featureCommit への変更
 	if err != nil {
-		return "", fmt.Errorf("failed to generate patch (diff): %w", err)
+		return "", fmt.Errorf("failed to generate patch (diff) between %s and %s: %w", baseBranch, featureBranch, err)
 	}
 
 	return patch.String(), nil
