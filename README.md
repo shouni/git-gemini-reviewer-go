@@ -1,26 +1,16 @@
 # 🤖 Git Gemini Reviewer Go
 
 [![Language](https://img.shields.io/badge/Language-Go-blue)](https://golang.org/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[Go ダウンロードページ](https://go.dev/dl/)
+[GitHub](https://github.com)
+[MITライセンス](https://opensource.org/licenses/MIT)
 
-## 🚀 概要 (About) - 開発チームの生産性を高めるAIパートナー
 
-**`git-gemini-reviewer-go`** は、**Google Gemini の強力なAI**を活用し、**コードレビューを自動でお手伝い**するコマンドラインツールです
+**Gemini AI を利用して Git の差分をレビューし、その結果を標準出力または Backlog にコメント投稿するコマンドラインツールです。**
 
-このツールを導入することで、開発チームは単なる作業の効率化を超え、より**創造的で価値の高い業務**に集中できるようになります。AIは煩雑な初期チェックを担う、**チームの優秀な新しいパートナー**のような存在です。
-
-### 🌸 導入がもたらすポジティブな変化
-
-| メリット | チームへの影響 | 期待される効果 |
-| :--- | :--- | :--- |
-| **レビューの質とスピードアップ** | **「細かい見落とし」の心配が減ります。** AIがまず基本的なバグやコード規約をチェックしてくれるため、人間のレビュアーは設計やロジックといった**人間ならではの高度な判断**に集中できます。 | レビュー時間が短縮され、**新しい機能の開発に使える時間**が増えます。 |
-| **チーム内の知識共有** | **ベテランも若手も、フィードバックの水準が一定になります。** 誰がレビューしても同じように質の高いフィードバックが得られるため、チーム全体の**コーディングスキル向上**を裏側からサポートします。 | チーム内の知識レベルが底上げされ、**属人性のリスク**が解消に向かいます。 |
-| **Backlog連携でストレスフリー** | **「レビュー結果の転記」という地味な作業がなくなります。** AIがレビューコメントを自動でBacklogに投稿するため、開発者は**レビュー依頼からフィードバック確認までをスムーズに行えます**。 | **間接業務の負荷が大幅に軽減**され、チームの心理的なストレスが減ります。 |
-| **導入のハードルの低さ** | **「大がかりな準備」は不要です。** 既存のGitやBacklog環境に、コマンドラインツールとして**静かに、素早く導入**できます。 | 新しい試みを**スモールスタート**で始められ、効果をすぐに実感できます。 |
+このツールは、GitHub や GitLab など、SSH アクセスが可能な任意の Git リポジトリで動作し、コードレビューのプロセスを自動化・高速化します。
 
 -----
-
-
 
 ## ✨ 技術スタック (Technology Stack)
 
@@ -44,18 +34,32 @@
     [Go の公式サイト](https://go.dev/dl/)から、お使いのOSに合ったインストーラーをダウンロードし、実行してください。
 
 2.  **インストールの確認:**
-    ターミナルを再起動し、以下のコマンドでGoが正しくインストールされたか確認します。
+    ターミナル（またはコマンドプロモンプト）を再起動し、以下のコマンドでGoが正しくインストールされ、PATHが通っているか確認します。
 
     ```bash
+    # バージョンの確認
     go version
-    # 例: go version go1.22.0 darwin/amd64
+    # 例: go version go1.22.4 darwin/amd64
+
+    # Goの環境変数が設定されているか確認 (オプション)
+    go env GOROOT
+    go env GOPATH
     ```
 
-### 2\. プロジェクトのビルド
+### 2\. プロジェクトのセットアップ
+
+以下のコマンドで、このリポジトリをローカル環境にクローン（ダウンロード）します。
+
+```bash
+git clone git@github.com:shouni/git-gemini-reviewer-go.git
+cd git-gemini-reviewer-go
+```
+
+### 3\. プロジェクトのビルド
 
 プロジェクトのルートディレクトリで以下のコマンドを実行し、実行可能ファイルを生成します。
 
-  * **Mac / Linux:**
+  * **macOS / Linux:**
     ```bash
     go build -o git-gemini-reviewer-go
     ```
@@ -67,11 +71,11 @@
 
 -----
 
-### 3\. 環境変数の設定 (必須)
+### 4\. 環境変数の設定 (必須)
 
 Gemini API を利用するために、API キーを環境変数に設定する必要があります。Backlog 連携を使用する場合は、Backlog の情報も設定してください。
 
-#### Mac / Linux
+#### macOS / Linux (bash/zsh)
 
 ```bash
 # Gemini API キー (必須)
@@ -93,9 +97,11 @@ $env:BACKLOG_API_KEY="YOUR_BACKLOG_API_KEY"
 $env:BACKLOG_SPACE_URL="https://your-space.backlog.jp"
 ```
 
+> **Note:** 環境変数を恒久的に設定するには、シェルの設定ファイル (`.zshrc`, `.bash_profile` など) や、Windowsの「環境変数」設定画面で編集してください。
+
 -----
 
-### 4\. プロンプトファイルの準備 (必須)
+### 5\. プロンプトファイルの準備 (必須)
 
 プロジェクトのルートディレクトリに、Gemini にレビューを依頼する際の指示を記述した **`review_prompt.md`** ファイルを作成してください。
 
@@ -112,7 +118,7 @@ Git Diff:
 ---
 ```
 
-**`%s`** は、取得したコード差分が挿入されるプレースホルダーです。必ず含めてください。
+**`%s`** は、取得したコード差分が挿入されるプレースホルダーです。**必ず含めてください。**
 
 -----
 
@@ -126,7 +132,7 @@ Git Diff:
 
 #### 実行コマンド例
 
-  * **Mac / Linux:**
+  * **macOS / Linux:**
     ```bash
     ./git-gemini-reviewer-go generic \
       --git-clone-url "git@github.com:your-org/your-repo.git" \
@@ -146,7 +152,7 @@ Git Diff:
 | `--git-clone-url` | レビュー対象のGitリポジトリURL（SSH形式推奨） | ✅ | なし |
 | `--base-branch` | 差分比較の基準ブランチ | ✅ | なし |
 | `--feature-branch` | レビュー対象のフィーチャーブランチ | ✅ | なし |
-| `--ssh-key-path` | SSH認証用の秘密鍵パス | ❌ | `C:\Users\shouni\.ssh\id_ed25519` |
+| `--ssh-key-path` | SSH認証用の秘密鍵パス | ❌ | `~/.ssh/id_ed25519` |
 | `--prompt-file` | プロンプトファイルのパス | ❌ | `review_prompt.md` |
 | `--local-path` | リポジトリのクローン先 | ❌ | OSの一時ディレクトリ |
 
@@ -158,7 +164,7 @@ Git Diff:
 
 #### 実行コマンド例
 
-  * **Mac / Linux:**
+  * **macOS / Linux:**
     ```bash
     ./git-gemini-reviewer-go backlog \
       --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
@@ -180,8 +186,6 @@ Git Diff:
 | `--issue-id` | コメントを投稿するBacklog課題ID（例: PROJECT-123） | ✅ | なし |
 | `--no-post` | Backlogへのコメント投稿をスキップし、結果を標準出力する | ❌ | `false` |
 | **その他のフラグ** | **`generic` モードと同じ** | | |
-
------
 
 ### 📜 ライセンス (License)
 
