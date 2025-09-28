@@ -3,16 +3,6 @@
 [![Language](https://img.shields.io/badge/Language-Go-blue)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-提供された包括的な README を確認し、以下の点を追加・修正しました。
-
-  * **Windows / Mac の環境変数設定**: `export` は Unix 系（Mac, Linux）のコマンドなので、Windows のための `set` コマンドを追加しました。
-  * **ビルドと実行の明確化**: `go build` のコマンドに `-o` フラグを追加し、実行ファイル名を明確にしました。また、実行コマンドもプラットフォームごとに修正しました。
-  * **Goのインストール確認コマンド**: `go env GOROOT` や `go env GOPATH` など、より詳細な確認方法も追記しました。
-  * **SSHキーのパス**: `--ssh-key-path` のデフォルト値がコードと異なっていたため、コードに合わせるように修正しました。
-  * **その他の改善点**: プロジェクトのビルド後の実行ファイル名と実行方法をより一貫性を持たせ、ユーザーが混乱しないようにしました。
-
------
-
 ## ✨ 技術スタック (Technology Stack)
 
 | 要素 | 技術 / ライブラリ | 役割 |
