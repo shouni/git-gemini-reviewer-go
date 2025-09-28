@@ -80,7 +80,6 @@ export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
 # Backlog 連携を使用する場合 (`backlog` コマンド利用時のみ)
 export BACKLOG_API_KEY="YOUR_BACKLOG_API_KEY"
 export BACKLOG_SPACE_URL="https://your-space.backlog.jp"
-export BACKLOG_SPACE_URL="https://your-space.backlog.jp"
 export PROJECT_ID="YOUR_PROJECT_ID"
 ```
 
