@@ -171,23 +171,11 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 			}
 		}
 
-		// git clone コマンドを構築
-		cmd := exec.Command(
-			"git",
-			"clone",
-			"--branch",
-			c.GetEffectiveBaseBranch(),
-			repositoryURL,
-			localPath,
-		)
-		cmd.Env = env
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		if runErr := cmd.Run(); runErr != nil {
-			return nil, fmt.Errorf("git clone コマンドの実行に失敗しました: %w", runErr)
+		fmt.Printf("Re-cloning %s into %s...\n", repositoryURL, localPath)
+		if err := c.cloneRepository(repositoryURL, localPath, c.GetEffectiveBaseBranch(), env); err != nil {
+			return nil, fmt.Errorf("再クローンコマンドの実行に失敗しました: %w", err)
 		}
-		fmt.Println("Repository cloned successfully using exec.Command.")
+		fmt.Println("Repository re-cloned successfully using exec.Command.")
 	}
 
 	// 3. go-git でリポジトリを開く（URLチェックのため）
@@ -219,18 +207,8 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 
 		// 再度 git clone を実行 (CloneOrUpdateWithExec の中で行っているクローンロジックを再利用)
 		fmt.Printf("Re-cloning %s into %s...\n", repositoryURL, localPath)
-		cmd := exec.Command(
-			"git",
-			"clone",
-			repositoryURL,
-			localPath,
-		)
-		cmd.Env = env // GIT_SSH_COMMAND を引き継ぐ
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		if runErr := cmd.Run(); runErr != nil {
-			return nil, fmt.Errorf("再クローンコマンドの実行に失敗しました: %w", runErr)
+		if err := c.cloneRepository(repositoryURL, localPath, c.GetEffectiveBaseBranch(), env); err != nil {
+			return nil, fmt.Errorf("再クローンコマンドの実行に失敗しました: %w", err)
 		}
 		fmt.Println("Repository re-cloned successfully using exec.Command.")
 
@@ -264,18 +242,8 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 
 		// 再度 git clone を実行
 		fmt.Printf("Re-cloning %s into %s...\n", repositoryURL, localPath)
-		cmd := exec.Command(
-			"git",
-			"clone",
-			repositoryURL,
-			localPath,
-		)
-		cmd.Env = env // GIT_SSH_COMMAND を引き継ぐ
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		if runErr := cmd.Run(); runErr != nil {
-			return nil, fmt.Errorf("再クローンコマンドの実行に失敗しました: %w", runErr)
+		if err := c.cloneRepository(repositoryURL, localPath, c.GetEffectiveBaseBranch(), env); err != nil {
+			return nil, fmt.Errorf("再クローンコマンドの実行に失敗しました: %w", err)
 		}
 		fmt.Println("Repository re-cloned successfully using exec.Command.")
 
