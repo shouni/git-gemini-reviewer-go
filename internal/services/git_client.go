@@ -60,16 +60,28 @@ func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) 
 	return nil, nil
 }
 
-// CloneWithExec は外部の 'git' コマンドを使用してリポジトリをクローンします。
-func (c *GitClient) CloneWithExec(repositoryURL string, localPath string) error {
-	// 1. GIT_SSH_COMMAND を設定
+// getGitSSHCommand は、外部gitコマンドで使用するための GIT_SSH_COMMAND の値を返します。
+// SSHキーの存在チェックと StrictHostKeyChecking=no オプションの設定を行います。
+func (c *GitClient) getGitSSHCommand() (string, error) {
 	sshKeyPath := expandTilde(c.SSHKeyPath)
+
+	// SSHキーファイルの存在チェック
 	if _, err := os.Stat(sshKeyPath); os.IsNotExist(err) {
-		return fmt.Errorf("SSHキーファイルが見つかりません: %s", sshKeyPath)
+		return "", fmt.Errorf("SSHキーファイルが見つかりません: %s", sshKeyPath)
 	}
 
 	// ssh -i <鍵のパス> -o StrictHostKeyChecking=no を設定
 	gitSSHCommand := fmt.Sprintf("ssh -i %s -o StrictHostKeyChecking=no", sshKeyPath)
+	return gitSSHCommand, nil
+}
+
+// CloneWithExec は外部の 'git' コマンドを使用してリポジトリをクローンします。
+func (c *GitClient) CloneWithExec(repositoryURL string, localPath string) error {
+	// 1. GIT_SSH_COMMAND を設定
+	gitSSHCommand, err := c.getGitSSHCommand()
+	if err != nil {
+		return err
+	}
 	fmt.Printf("SSH Command set: %s\n", gitSSHCommand)
 
 	// 2. git clone コマンドを構築
@@ -90,9 +102,9 @@ func (c *GitClient) CloneWithExec(repositoryURL string, localPath string) error 
 
 	// 5. コマンドを実行
 	fmt.Printf("Executing git clone: %s %s %s\n", cmd.Args[0], cmd.Args[1], repositoryURL)
-	err := cmd.Run()
-	if err != nil {
-		return fmt.Errorf("git clone コマンドの実行に失敗しました: %w", err)
+	runErr := cmd.Run()
+	if runErr != nil {
+		return fmt.Errorf("git clone コマンドの実行に失敗しました: %w", runErr)
 	}
 
 	fmt.Println("Repository cloned successfully using exec.Command.")
