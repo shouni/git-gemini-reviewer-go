@@ -3,6 +3,7 @@ package services
 import (
 	"fmt"
 	"os"
+	"os/exec" // exec.Command を使用するために必要
 	"strings"
 
 	"github.com/go-git/go-git/v5"
@@ -59,7 +60,46 @@ func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) 
 	return nil, nil
 }
 
-// CloneOrOpen はリポジトリをクローンするか、既に存在する場合は開き、認証情報を保持します。
+// CloneWithExec は外部の 'git' コマンドを使用してリポジトリをクローンします。
+func (c *GitClient) CloneWithExec(repositoryURL string, localPath string) error {
+	// 1. GIT_SSH_COMMAND を設定
+	sshKeyPath := expandTilde(c.SSHKeyPath)
+	if _, err := os.Stat(sshKeyPath); os.IsNotExist(err) {
+		return fmt.Errorf("SSHキーファイルが見つかりません: %s", sshKeyPath)
+	}
+
+	// ssh -i <鍵のパス> -o StrictHostKeyChecking=no を設定
+	gitSSHCommand := fmt.Sprintf("ssh -i %s -o StrictHostKeyChecking=no", sshKeyPath)
+	fmt.Printf("SSH Command set: %s\n", gitSSHCommand)
+
+	// 2. git clone コマンドを構築
+	cmd := exec.Command(
+		"git",
+		"clone",
+		repositoryURL,
+		localPath,
+	)
+
+	// 3. 環境変数 GIT_SSH_COMMAND を設定に追加
+	cmd.Env = os.Environ()
+	cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_SSH_COMMAND=%s", gitSSHCommand))
+
+	// 4. 標準出力と標準エラー出力を現在のプロセスに接続
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	// 5. コマンドを実行
+	fmt.Printf("Executing git clone: %s %s %s\n", cmd.Args[0], cmd.Args[1], repositoryURL)
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("git clone コマンドの実行に失敗しました: %w", err)
+	}
+
+	fmt.Println("Repository cloned successfully using exec.Command.")
+	return nil
+}
+
+// CloneOrOpen はリポジトリをクローンするか、既に存在する場合は開き、認証情報を保持します。（既存の go-git を利用した実装）
 func (c *GitClient) CloneOrOpen(url string) (*git.Repository, error) {
 	// 認証情報を取得し、GitClient構造体に保持
 	auth, err := c.getAuthMethod(url)
