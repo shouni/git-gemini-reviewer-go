@@ -138,6 +138,40 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 		fmt.Println("Repository cloned successfully using exec.Command.")
 	}
 
+	// 3. go-git でリポジトリを開く（URLチェックのため）
+	repo, err := git.PlainOpen(localPath)
+	if err != nil {
+		// クローン/プル後にリポジトリが開けないのは致命的
+		return fmt.Errorf("クローン/更新後、リポジトリを開けませんでした: %w", err)
+	}
+
+	// 4. 既存のリポジトリURLをチェックする
+	remote, err := repo.Remote("origin")
+	if err != nil {
+		// リモート'origin'がない、またはエラーの場合、再クローンが安全
+		fmt.Printf("Warning: Remote 'origin' not found or failed to read: %v. Re-cloning...\n", err)
+
+		// 【重要】recloneRepository は *git.Repository を返すため、ここではエラー処理のみを考慮
+		if _, recloneErr := c.recloneRepository(repositoryURL); recloneErr != nil {
+			return recloneErr
+		}
+		return nil
+	}
+
+	// Fetch URLを取得し、渡されたURLと一致するか確認
+	remoteURLs := remote.Config().URLs
+	if len(remoteURLs) == 0 || remoteURLs[0] != repositoryURL {
+		// URLが一致しない場合、古いリポジトリなので削除してクローンし直す
+		fmt.Printf("Warning: Existing repository remote URL (%s) does not match the requested URL (%s). Re-cloning...\n", remoteURLs[0], repositoryURL)
+
+		// 【重要】再クローンし、エラーがあればそれを返す
+		if _, recloneErr := c.recloneRepository(repositoryURL); recloneErr != nil {
+			return recloneErr
+		}
+		return nil
+	}
+
+	// URLチェックOK
 	return nil
 }
 
