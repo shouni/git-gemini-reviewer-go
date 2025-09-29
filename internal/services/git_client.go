@@ -101,6 +101,28 @@ func (c *GitClient) getGitSSHCommand() (string, error) {
 	return sshCommand, nil
 }
 
+// クローン処理をカプセル化したヘルパー関数
+func (c *GitClient) cloneRepository(repositoryURL, localPath, branch string, env []string) error {
+	parentDir := filepath.Dir(localPath)
+	if _, err := os.Stat(parentDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(parentDir, 0755); err != nil {
+			return fmt.Errorf("親ディレクトリの作成に失敗しました: %w", err)
+		}
+	}
+
+	fmt.Printf("Cloning %s into %s...\n", repositoryURL, localPath)
+	cmd := exec.Command("git", "clone", "--branch", branch, repositoryURL, localPath)
+	cmd.Env = env
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if runErr := cmd.Run(); runErr != nil {
+		return fmt.Errorf("git clone コマンドの実行に失敗しました: %w", runErr)
+	}
+	fmt.Println("Repository cloned successfully using exec.Command.")
+	return nil
+}
+
 // CloneOrUpdateWithExec は、リポジトリをクローンするか、既に存在する場合は pull で更新します。
 func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string) (*git.Repository, error) {
 
@@ -154,7 +176,7 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 			"git",
 			"clone",
 			"--branch",
-			c.BaseBranch,
+			c.GetEffectiveBaseBranch(),
 			repositoryURL,
 			localPath,
 		)
