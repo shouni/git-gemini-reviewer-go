@@ -77,12 +77,12 @@ func (c *GitClient) getGitSSHCommand() (string, error) {
 }
 
 // CloneOrUpdateWithExec は、リポジトリをクローンするか、既に存在する場合は pull で更新します。
-func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string) error {
+func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string) (*git.Repository, error) {
 
 	// 1. GIT_SSH_COMMAND を設定
 	gitSSHCommand, err := c.getGitSSHCommand()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// SSH環境変数を設定（後の git pull でも使用するため）
@@ -105,7 +105,7 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 		cmd.Stderr = os.Stderr
 
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("git pull コマンドの実行に失敗しました: %w", err)
+			return nil, fmt.Errorf("git pull コマンドの実行に失敗しました: %w", err)
 		}
 		fmt.Println("Repository updated successfully using exec.Command.")
 
@@ -117,7 +117,7 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 		parentDir := filepath.Dir(localPath)
 		if _, err := os.Stat(parentDir); os.IsNotExist(err) {
 			if err := os.MkdirAll(parentDir, 0755); err != nil {
-				return fmt.Errorf("親ディレクトリの作成に失敗しました: %w", err)
+				return nil, fmt.Errorf("親ディレクトリの作成に失敗しました: %w", err)
 			}
 		}
 
@@ -133,7 +133,7 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 		cmd.Stderr = os.Stderr
 
 		if runErr := cmd.Run(); runErr != nil {
-			return fmt.Errorf("git clone コマンドの実行に失敗しました: %w", runErr)
+			return nil, fmt.Errorf("git clone コマンドの実行に失敗しました: %w", runErr)
 		}
 		fmt.Println("Repository cloned successfully using exec.Command.")
 	}
@@ -142,7 +142,7 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 	repo, err := git.PlainOpen(localPath)
 	if err != nil {
 		// クローン/プル後にリポジトリが開けないのは致命的
-		return fmt.Errorf("クローン/更新後、リポジトリを開けませんでした: %w", err)
+		return nil, fmt.Errorf("クローン/更新後、リポジトリを開けませんでした: %w", err)
 	}
 
 	// 4. 既存のリポジトリURLをチェックする
@@ -153,9 +153,10 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 
 		// 【重要】recloneRepository は *git.Repository を返すため、ここではエラー処理のみを考慮
 		if _, recloneErr := c.recloneRepository(repositoryURL); recloneErr != nil {
-			return recloneErr
+			return nil, recloneErr
 		}
-		return nil
+		// URLチェックOKの場合、既存のrepoを返す
+		return repo, nil
 	}
 
 	// Fetch URLを取得し、渡されたURLと一致するか確認
@@ -165,14 +166,15 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 		fmt.Printf("Warning: Existing repository remote URL (%s) does not match the requested URL (%s). Re-cloning...\n", remoteURLs[0], repositoryURL)
 
 		// 【重要】再クローンし、エラーがあればそれを返す
-		if _, recloneErr := c.recloneRepository(repositoryURL); recloneErr != nil {
-			return recloneErr
+		newRepo, recloneErr := c.CloneOrOpen(repositoryURL)
+		if recloneErr != nil {
+			return nil, fmt.Errorf("古いリポジトリの削除に失敗しました: %w", err)
 		}
-		return nil
+		return newRepo, nil // 新しくクローンしたリポジトリを返す
 	}
 
-	// URLチェックOK
-	return nil
+	// URLチェックOKの場合、既存のrepoを返す
+	return repo, nil
 }
 
 // CloneOrOpen はリポジトリをクローンするか、既に存在する場合は開き、認証情報を保持します。（既存の go-git を利用した実装）

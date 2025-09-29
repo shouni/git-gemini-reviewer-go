@@ -7,8 +7,6 @@ import (
 	// services パッケージは、一つ上の階層の git-gemini-reviewer-go から見た相対パスでインポート。
 	// 実際のプロジェクト構造に合わせて調整が必要です。
 	"git-gemini-reviewer-go/internal/services"
-
-	"github.com/go-git/go-git/v5"
 )
 
 // ReviewParams はレビューを実行するために必要な設定パラメータを保持します。
@@ -41,16 +39,10 @@ func RunReviewer(ctx context.Context, params ReviewParams) (*ReviewResult, error
 	gitClient := services.NewGitClient(params.LocalPath, params.SSHKeyPath)
 	gitClient.BaseBranch = params.BaseBranch
 
-	// 1.1. 外部コマンドでクローンを実行
-	err := gitClient.CloneOrUpdateWithExec(params.RepoURL, params.LocalPath)
+	// 1.1. 外部コマンドでクローンを実行し、リポジトリインスタンスを取得
+	repo, err := gitClient.CloneOrUpdateWithExec(params.RepoURL, params.LocalPath)
 	if err != nil {
 		return nil, fmt.Errorf("Gitリポジトリのセットアップに失敗しました: %w", err)
-	}
-
-	// 1.1.5. 外部コマンドでクローンしたリポジトリを go-git で開く
-	repo, err := git.PlainOpen(params.LocalPath)
-	if err != nil {
-		return nil, fmt.Errorf("クローン後、リポジトリを開けませんでした: %w", err)
 	}
 
 	// 1.2. 最新の変更をフェッチ
