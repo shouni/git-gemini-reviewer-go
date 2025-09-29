@@ -208,7 +208,7 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 		// 再度 git clone を実行 (CloneOrUpdateWithExec の中で行っているクローンロジックを再利用)
 		fmt.Printf("Re-cloning %s into %s...\n", repositoryURL, localPath)
 		if err := c.cloneRepository(repositoryURL, localPath, c.GetEffectiveBaseBranch(), env); err != nil {
-			return nil, fmt.Errorf("再クローンコマンドの実行に失敗しました: %w", err)
+			return nil, fmt.Errorf("リモート'origin'が見つからないための再クローンコマンドの実行に失敗しました: %w", err)
 		}
 		fmt.Println("Repository re-cloned successfully using exec.Command.")
 
@@ -236,21 +236,21 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 		parentDir := filepath.Dir(localPath)
 		if _, err := os.Stat(parentDir); os.IsNotExist(err) {
 			if err := os.MkdirAll(parentDir, 0755); err != nil {
-				return nil, fmt.Errorf("再クローン用の親ディレクトリの作成に失敗しました: %w", err)
+				return nil, fmt.Errorf("リモートURL不一致による再クローンコマンドの実行に失敗しました: %w", err)
 			}
 		}
 
 		// 再度 git clone を実行
-		fmt.Printf("Re-cloning %s into %s...\n", repositoryURL, localPath)
+		fmt.Printf("Cloning %s into %s (initial clone)...\n", repositoryURL, localPath)
 		if err := c.cloneRepository(repositoryURL, localPath, c.GetEffectiveBaseBranch(), env); err != nil {
-			return nil, fmt.Errorf("再クローンコマンドの実行に失敗しました: %w", err)
+			return nil, fmt.Errorf("初期クローンコマンドの実行に失敗しました: %w", err)
 		}
-		fmt.Println("Repository re-cloned successfully using exec.Command.")
+		fmt.Println("Repository cloned successfully using exec.Command.")
 
 		// 新しくクローンしたリポジトリを go-git で開く
 		repo, err = git.PlainOpen(localPath)
 		if err != nil {
-			return nil, fmt.Errorf("再クローン後、リポジトリを開けませんでした: %w", err)
+			return nil, fmt.Errorf("クローン後、リポジトリを開けませんでした: %w", err)
 		}
 		return repo, nil
 	}
