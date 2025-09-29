@@ -1,6 +1,7 @@
 # 🤖 Git Gemini Reviewer Go
 
 [![Language](https://img.shields.io/badge/Language-Go-blue)](https://golang.org/)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/shouni/git-gemini-reviewer-go)](https://golang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 🚀 概要 (About) - 開発チームの生産性を高めるAIパートナー
