@@ -174,11 +174,43 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 		// リモート'origin'がない、またはエラーの場合、再クローンが安全
 		fmt.Printf("Warning: Remote 'origin' not found or failed to read: %v. Re-cloning...\n", err)
 
-		if _, recloneErr := c.CloneOrOpen(repositoryURL); recloneErr != nil {
-			return nil, recloneErr
+		// 既存リポジトリを削除 (CloneOrUpdateWithExec の中で一度削除し、再クローンするロジックに合わせる)
+		if err := os.RemoveAll(localPath); err != nil {
+			return nil, fmt.Errorf("既存リポジトリディレクトリ (%s) の削除に失敗しました: %w", localPath, err)
 		}
-		// URLチェックOKの場合、既存のrepoを返す
-		return repo, nil
+		fmt.Printf("Existing repository at %s removed.\n", localPath)
+
+		// 親ディレクトリが存在しない場合は作成（再クローンのため）
+		parentDir := filepath.Dir(localPath)
+		if _, err := os.Stat(parentDir); os.IsNotExist(err) {
+			if err := os.MkdirAll(parentDir, 0755); err != nil {
+				return nil, fmt.Errorf("再クローン用の親ディレクトリの作成に失敗しました: %w", err)
+			}
+		}
+
+		// 再度 git clone を実行 (CloneOrUpdateWithExec の中で行っているクローンロジックを再利用)
+		fmt.Printf("Re-cloning %s into %s...\n", repositoryURL, localPath)
+		cmd := exec.Command(
+			"git",
+			"clone",
+			repositoryURL,
+			localPath,
+		)
+		cmd.Env = env // GIT_SSH_COMMAND を引き継ぐ
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if runErr := cmd.Run(); runErr != nil {
+			return nil, fmt.Errorf("再クローンコマンドの実行に失敗しました: %w", runErr)
+		}
+		fmt.Println("Repository re-cloned successfully using exec.Command.")
+
+		// 新しくクローンしたリポジトリを go-git で開く
+		repo, err = git.PlainOpen(localPath)
+		if err != nil {
+			return nil, fmt.Errorf("再クローン後、リポジトリを開けませんでした: %w", err)
+		}
+		return repo, nil // 処理をここで終了
 	}
 
 	// Fetch URLを取得し、渡されたURLと一致するか確認
