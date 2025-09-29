@@ -72,6 +72,8 @@ func (c *GitClient) getGitSSHCommand() (string, error) {
 	}
 
 	// ssh -i <鍵のパス> -o StrictHostKeyChecking=no を設定
+	// StrictHostKeyChecking=no は、初回接続時のホストキーの検証をスキップします。
+	// これはCI/CD環境など、対話なしでの自動化を目的としていますが、中間者攻撃 (Man-in-the-Middle) のリスクがある点に留意が必要です。
 	gitSSHCommand := fmt.Sprintf("ssh -i %s -o StrictHostKeyChecking=no", sshKeyPath)
 	return gitSSHCommand, nil
 }
