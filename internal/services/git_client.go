@@ -115,9 +115,6 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 		// 存在する: git pull を実行して更新する
 		fmt.Printf("Repository already exists at %s. Running 'git pull' to update...\n", localPath)
 
-		// 存在する: git pull を実行して更新する
-		fmt.Printf("Repository already exists at %s. Running 'git pull' to update...\n", localPath)
-
 		// 存在するリポジトリを開く（作業ディレクトリを localPath に変更）
 		// BaseBranchが空の場合のフォールバックを考慮
 		branchToPull := c.GetEffectiveBaseBranch() // 上記修正案で追加したヘルパー関数を使用
