@@ -92,7 +92,8 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 	env = append(env, fmt.Sprintf("GIT_SSH_COMMAND=%s", gitSSHCommand))
 
 	// 2. クローン先ディレクトリの存在チェック
-	_, err = os.Stat(localPath)
+	gitDir := filepath.Join(localPath, ".git")
+	_, err = os.Stat(gitDir)
 	repoExists := !os.IsNotExist(err)
 
 	if repoExists {
