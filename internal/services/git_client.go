@@ -18,10 +18,11 @@ import (
 
 // GitClient はGitリポジトリ操作を管理します。
 type GitClient struct {
-	LocalPath  string
-	SSHKeyPath string
-	BaseBranch string
-	auth       transport.AuthMethod
+	LocalPath                string
+	SSHKeyPath               string
+	BaseBranch               string
+	auth                     transport.AuthMethod
+	InsecureSkipHostKeyCheck bool
 }
 
 // NewGitClient はGitClientを初期化します。
@@ -81,16 +82,23 @@ func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) 
 func (c *GitClient) getGitSSHCommand() (string, error) {
 	sshKeyPath := expandTilde(c.SSHKeyPath)
 
-	// SSHキーファイルの存在チェック
-	if _, err := os.Stat(sshKeyPath); os.IsNotExist(err) {
-		return "", fmt.Errorf("SSHキーファイルが見つかりません: %s", sshKeyPath)
+	// SSHキーパスを絶対パスに解決
+	absSSHKeyPath, err := filepath.Abs(sshKeyPath)
+	if err != nil {
+		return "", fmt.Errorf("SSHキーパスの解決に失敗しました: %w", err)
 	}
 
-	// ssh -i <鍵のパス> -o StrictHostKeyChecking=no を設定
-	// StrictHostKeyChecking=no は、初回接続時のホストキーの検証をスキップします。
-	// これはCI/CD環境など、対話なしでの自動化を目的としていますが、中間者攻撃 (Man-in-the-Middle) のリスクがある点に留意が必要です。
-	gitSSHCommand := fmt.Sprintf("ssh -i %s -o StrictHostKeyChecking=no", sshKeyPath)
-	return gitSSHCommand, nil
+	if _, err := os.Stat(absSSHKeyPath); os.IsNotExist(err) {
+		return "", fmt.Errorf("SSHキーファイルが見つかりません: %s", absSSHKeyPath)
+	}
+
+	// ssh -i <鍵の絶対パス> ...
+	sshCommand := fmt.Sprintf("ssh -i %s", absSSHKeyPath)
+	// (上記のInsecureSkipHostKeyCheckのロジックをここに追加)
+	if c.InsecureSkipHostKeyCheck {
+		sshCommand += " -o StrictHostKeyChecking=no"
+	}
+	return sshCommand, nil
 }
 
 // CloneOrUpdateWithExec は、リポジトリをクローンするか、既に存在する場合は pull で更新します。
@@ -145,6 +153,8 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 		cmd := exec.Command(
 			"git",
 			"clone",
+			"--branch",
+			c.BaseBranch,
 			repositoryURL,
 			localPath,
 		)
