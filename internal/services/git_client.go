@@ -132,38 +132,55 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 		return nil, err
 	}
 
-	// SSH環境変数を設定（後の git pull でも使用するため）
 	env := os.Environ()
 	env = append(env, fmt.Sprintf("GIT_SSH_COMMAND=%s", gitSSHCommand))
 
-	// 2. クローン先ディレクトリの存在チェック
-	gitDir := filepath.Join(localPath, ".git")
-	_, err = os.Stat(gitDir)
-	repoExists := !os.IsNotExist(err)
-
-	if repoExists {
-		// 存在する: git pull を実行して更新する
-		fmt.Printf("Repository already exists at %s. Running 'git pull' to update...\n", localPath)
-
-		// 存在するリポジトリを開く（作業ディレクトリを localPath に変更）
-		// BaseBranchが空の場合のフォールバックを考慮
-		branchToPull := c.GetEffectiveBaseBranch() // 上記修正案で追加したヘルパー関数を使用
-		cmd := exec.Command("git", "pull", "origin", branchToPull)
-		cmd.Dir = localPath
-		cmd.Env = env
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		if err := cmd.Run(); err != nil {
-			return nil, fmt.Errorf("git pull コマンドの実行に失敗しました: %w", err)
+	// リポジトリがクローン済みで、かつリモートURLが一致するかをチェックするヘルパー関数
+	// trueを返す場合、再クローンが必要。falseの場合、pullで更新可能。
+	repoNeedsReclone := func() bool {
+		gitDir := filepath.Join(localPath, ".git")
+		if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+			// .git ディレクトリが存在しないので、クローンが必要
+			fmt.Printf("Info: .git directory not found at %s. Cloning needed.\n", localPath)
+			return true
 		}
-		fmt.Println("Repository updated successfully using exec.Command.")
 
-	} else {
-		// 存在しない: git clone を実行する
-		fmt.Printf("Cloning %s into %s...\n", repositoryURL, localPath)
+		repo, err := git.PlainOpen(localPath)
+		if err != nil {
+			// リポジトリを開けない、または壊れている可能性があるので再クローン
+			fmt.Printf("Warning: Existing repository at %s could not be opened: %v. Re-cloning...\n", localPath, err)
+			return true
+		}
 
-		// クローン先の親ディレクトリが存在しない場合は作成 (Cloneが失敗するのを防ぐ)
+		remote, err := repo.Remote("origin")
+		if err != nil {
+			// リモート'origin'がないので再クローン
+			fmt.Printf("Warning: Remote 'origin' not found in %s: %v. Re-cloning...\n", localPath, err)
+			return true
+		}
+
+		remoteURLs := remote.Config().URLs
+		if len(remoteURLs) == 0 || remoteURLs[0] != repositoryURL {
+			// リモートURLが一致しないので再クローン
+			fmt.Printf("Warning: Existing repository remote URL (%v) does not match the requested URL (%s). Re-cloning...\n", remoteURLs, repositoryURL)
+			return true
+		}
+
+		return false // 再クローンは不要、pullで更新可能
+	}
+
+	if repoNeedsReclone() {
+		fmt.Printf("Repository at %s needs to be cloned or re-cloned for %s.\n", localPath, repositoryURL)
+
+		// 既存のディレクトリが存在する場合のみ削除を試みる
+		if _, err := os.Stat(localPath); err == nil {
+			if err := os.RemoveAll(localPath); err != nil {
+				return nil, fmt.Errorf("既存リポジトリディレクトリ (%s) の削除に失敗しました: %w", localPath, err)
+			}
+			fmt.Printf("Existing repository at %s removed.\n", localPath)
+		}
+
+		// 親ディレクトリの作成
 		parentDir := filepath.Dir(localPath)
 		if _, err := os.Stat(parentDir); os.IsNotExist(err) {
 			if err := os.MkdirAll(parentDir, 0755); err != nil {
@@ -171,91 +188,34 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 			}
 		}
 
-		fmt.Printf("Re-cloning %s into %s...\n", repositoryURL, localPath)
+		// クローン実行
 		if err := c.cloneRepository(repositoryURL, localPath, c.GetEffectiveBaseBranch(), env); err != nil {
-			return nil, fmt.Errorf("再クローンコマンドの実行に失敗しました: %w", err)
-		}
-		fmt.Println("Repository re-cloned successfully using exec.Command.")
-	}
-
-	// 3. go-git でリポジトリを開く（URLチェックのため）
-	repo, err := git.PlainOpen(localPath)
-	if err != nil {
-		// クローン/プル後にリポジトリが開けないのは致命的
-		return nil, fmt.Errorf("クローン/更新後、リポジトリを開けませんでした: %w", err)
-	}
-
-	// 4. 既存のリポジトリURLをチェックする
-	remote, err := repo.Remote("origin")
-	if err != nil {
-		// リモート'origin'がない、またはエラーの場合、再クローンが安全
-		fmt.Printf("Warning: Remote 'origin' not found or failed to read: %v. Re-cloning...\n", err)
-
-		// 既存リポジトリを削除 (CloneOrUpdateWithExec の中で一度削除し、再クローンするロジックに合わせる)
-		if err := os.RemoveAll(localPath); err != nil {
-			return nil, fmt.Errorf("既存リポジトリディレクトリ (%s) の削除に失敗しました: %w", localPath, err)
-		}
-		fmt.Printf("Existing repository at %s removed.\n", localPath)
-
-		// 親ディレクトリが存在しない場合は作成（再クローンのため）
-		parentDir := filepath.Dir(localPath)
-		if _, err := os.Stat(parentDir); os.IsNotExist(err) {
-			if err := os.MkdirAll(parentDir, 0755); err != nil {
-				return nil, fmt.Errorf("再クローン用の親ディレクトリの作成に失敗しました: %w", err)
-			}
-		}
-
-		// 再度 git clone を実行 (CloneOrUpdateWithExec の中で行っているクローンロジックを再利用)
-		fmt.Printf("Re-cloning %s into %s...\n", repositoryURL, localPath)
-		if err := c.cloneRepository(repositoryURL, localPath, c.GetEffectiveBaseBranch(), env); err != nil {
-			return nil, fmt.Errorf("リモート'origin'が見つからないための再クローンコマンドの実行に失敗しました: %w", err)
-		}
-		fmt.Println("Repository re-cloned successfully using exec.Command.")
-
-		// 新しくクローンしたリポジトリを go-git で開く
-		repo, err = git.PlainOpen(localPath)
-		if err != nil {
-			return nil, fmt.Errorf("再クローン後、リポジトリを開けませんでした: %w", err)
-		}
-		return repo, nil // 処理をここで終了
-	}
-
-	// Fetch URLを取得し、渡されたURLと一致するか確認
-	remoteURLs := remote.Config().URLs
-	if len(remoteURLs) == 0 || remoteURLs[0] != repositoryURL {
-		fmt.Printf("Warning: Existing repository remote URL (%s) does not match the requested URL (%s). Removing and re-cloning...\n", remoteURLs[0], repositoryURL)
-
-		// 既存リポジトリを削除
-		if err := os.RemoveAll(localPath); err != nil {
-			// ディレクトリ削除失敗は致命的
-			return nil, fmt.Errorf("既存リポジトリディレクトリ (%s) の削除に失敗しました: %w", localPath, err)
-		}
-		fmt.Printf("Existing repository at %s removed.\n", localPath)
-
-		// 親ディレクトリが存在しない場合は作成（再クローンのため）
-		parentDir := filepath.Dir(localPath)
-		if _, err := os.Stat(parentDir); os.IsNotExist(err) {
-			if err := os.MkdirAll(parentDir, 0755); err != nil {
-				return nil, fmt.Errorf("リモートURL不一致による再クローンコマンドの実行に失敗しました: %w", err)
-			}
-		}
-
-		// 再度 git clone を実行
-		fmt.Printf("Cloning %s into %s (initial clone)...\n", repositoryURL, localPath)
-		if err := c.cloneRepository(repositoryURL, localPath, c.GetEffectiveBaseBranch(), env); err != nil {
-			return nil, fmt.Errorf("初期クローンコマンドの実行に失敗しました: %w", err)
+			return nil, fmt.Errorf("リポジトリのクローンに失敗しました: %w", err)
 		}
 		fmt.Println("Repository cloned successfully using exec.Command.")
 
-		// 新しくクローンしたリポジトリを go-git で開く
-		repo, err = git.PlainOpen(localPath)
-		if err != nil {
-			return nil, fmt.Errorf("クローン後、リポジトリを開けませんでした: %w", err)
+	} else {
+		// リポジトリが存在し、リモートURLも一致するので pull で更新
+		fmt.Printf("Repository already exists at %s with matching URL. Running 'git pull' to update...\n", localPath)
+		branchToPull := c.GetEffectiveBaseBranch()
+		cmd := exec.Command("git", "pull", "origin", branchToPull)
+		cmd.Dir = localPath
+		cmd.Env = env
+		// `os.Stdout`, `os.Stderr` への直接出力については別途ログポリシーに合わせて修正
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Run(); err != nil {
+			return nil, fmt.Errorf("git pull コマンドの実行に失敗しました: %w", err)
 		}
-		return repo, nil
+		fmt.Println("Repository updated successfully using exec.Command.")
 	}
 
-	// URLチェックOKの場合、既存のrepoを返す
+	// 最終的に go-git でリポジトリを開いて返す
+	repo, err := git.PlainOpen(localPath)
+	if err != nil {
+		return nil, fmt.Errorf("最終的なリポジトリのオープンに失敗しました: %w", err)
+	}
 	return repo, nil
 }
 
