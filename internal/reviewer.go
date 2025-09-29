@@ -38,11 +38,11 @@ func RunReviewer(ctx context.Context, params ReviewParams) (*ReviewResult, error
 	// 1. Gitクライアントの初期化とリポジトリのセットアップ
 	fmt.Println("--- 1. Gitリポジトリのセットアップと差分取得を開始 ---")
 
-	// リファクタリングされた services.NewGitClient を使用
 	gitClient := services.NewGitClient(params.LocalPath, params.SSHKeyPath)
+	gitClient.BaseBranch = params.BaseBranch
 
 	// 1.1. 外部コマンドでクローンを実行
-	err := gitClient.CloneWithExec(params.RepoURL, params.LocalPath)
+	err := gitClient.CloneOrUpdateWithExec(params.RepoURL, params.LocalPath)
 	if err != nil {
 		return nil, fmt.Errorf("Gitリポジトリのセットアップに失敗しました: %w", err)
 	}

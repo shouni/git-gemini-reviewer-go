@@ -3,7 +3,8 @@ package services
 import (
 	"fmt"
 	"os"
-	"os/exec" // exec.Command を使用するために必要
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
@@ -18,8 +19,8 @@ import (
 type GitClient struct {
 	LocalPath  string
 	SSHKeyPath string
-	// 認証メソッドを保持するフィールド
-	auth transport.AuthMethod
+	BaseBranch string
+	auth       transport.AuthMethod
 }
 
 // NewGitClient はGitClientを初期化します。
@@ -75,39 +76,68 @@ func (c *GitClient) getGitSSHCommand() (string, error) {
 	return gitSSHCommand, nil
 }
 
-// CloneWithExec は外部の 'git' コマンドを使用してリポジトリをクローンします。
-func (c *GitClient) CloneWithExec(repositoryURL string, localPath string) error {
+// CloneOrUpdateWithExec は、リポジトリをクローンするか、既に存在する場合は pull で更新します。
+func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string) error {
+
 	// 1. GIT_SSH_COMMAND を設定
 	gitSSHCommand, err := c.getGitSSHCommand()
 	if err != nil {
 		return err
 	}
-	fmt.Printf("SSH Command set: %s\n", gitSSHCommand)
 
-	// 2. git clone コマンドを構築
-	cmd := exec.Command(
-		"git",
-		"clone",
-		repositoryURL,
-		localPath,
-	)
+	// SSH環境変数を設定（後の git pull でも使用するため）
+	env := os.Environ()
+	env = append(env, fmt.Sprintf("GIT_SSH_COMMAND=%s", gitSSHCommand))
 
-	// 3. 環境変数 GIT_SSH_COMMAND を設定に追加
-	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_SSH_COMMAND=%s", gitSSHCommand))
+	// 2. クローン先ディレクトリの存在チェック
+	_, err = os.Stat(localPath)
+	repoExists := !os.IsNotExist(err)
 
-	// 4. 標準出力と標準エラー出力を現在のプロセスに接続
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	if repoExists {
+		// 存在する: git pull を実行して更新する
+		fmt.Printf("Repository already exists at %s. Running 'git pull' to update...\n", localPath)
 
-	// 5. コマンドを実行
-	fmt.Printf("Executing git clone: %s %s %s\n", cmd.Args[0], cmd.Args[1], repositoryURL)
-	runErr := cmd.Run()
-	if runErr != nil {
-		return fmt.Errorf("git clone コマンドの実行に失敗しました: %w", runErr)
+		// 存在するリポジトリを開く（作業ディレクトリを localPath に変更）
+		cmd := exec.Command("git", "pull", "origin", c.BaseBranch)
+		cmd.Dir = localPath
+		cmd.Env = env
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("git pull コマンドの実行に失敗しました: %w", err)
+		}
+		fmt.Println("Repository updated successfully using exec.Command.")
+
+	} else {
+		// 存在しない: git clone を実行する
+		fmt.Printf("Cloning %s into %s...\n", repositoryURL, localPath)
+
+		// クローン先の親ディレクトリが存在しない場合は作成 (Cloneが失敗するのを防ぐ)
+		parentDir := filepath.Dir(localPath)
+		if _, err := os.Stat(parentDir); os.IsNotExist(err) {
+			if err := os.MkdirAll(parentDir, 0755); err != nil {
+				return fmt.Errorf("親ディレクトリの作成に失敗しました: %w", err)
+			}
+		}
+
+		// git clone コマンドを構築
+		cmd := exec.Command(
+			"git",
+			"clone",
+			repositoryURL,
+			localPath,
+		)
+		cmd.Env = env
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+
+		if runErr := cmd.Run(); runErr != nil {
+			return fmt.Errorf("git clone コマンドの実行に失敗しました: %w", runErr)
+		}
+		fmt.Println("Repository cloned successfully using exec.Command.")
 	}
 
-	fmt.Println("Repository cloned successfully using exec.Command.")
 	return nil
 }
 
