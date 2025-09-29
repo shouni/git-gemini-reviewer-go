@@ -151,8 +151,7 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 		// リモート'origin'がない、またはエラーの場合、再クローンが安全
 		fmt.Printf("Warning: Remote 'origin' not found or failed to read: %v. Re-cloning...\n", err)
 
-		// 【重要】recloneRepository は *git.Repository を返すため、ここではエラー処理のみを考慮
-		if _, recloneErr := c.recloneRepository(repositoryURL); recloneErr != nil {
+		if _, recloneErr := c.CloneOrOpen(repositoryURL); recloneErr != nil {
 			return nil, recloneErr
 		}
 		// URLチェックOKの場合、既存のrepoを返す
