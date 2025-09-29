@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strings"
 
@@ -31,14 +32,28 @@ func NewGitClient(localPath string, sshKeyPath string) *GitClient {
 	}
 }
 
-// expandTilde はパスに含まれるチルダ(~)を展開します。
-func expandTilde(path string) string {
-	if strings.HasPrefix(path, "~/") {
-		if home, err := os.UserHomeDir(); err == nil {
-			return strings.Replace(path, "~", home, 1)
-		}
+// GetEffectiveBaseBranch NewGitClient などで、BaseBranchの初期値を設定するか、利用時にチェックする
+func (c *GitClient) GetEffectiveBaseBranch() string {
+	if c.BaseBranch == "" {
+		// 環境や設定に応じて、デフォルトのブランチ名を返す
+		// 例: return "main" または "master"
+		return "main" // 仮のデフォルト値
 	}
-	return path
+	return c.BaseBranch
+}
+
+// expandTilde はクロスプラットフォームなチルダ展開をサポートする
+func expandTilde(path string) string {
+	if !strings.HasPrefix(path, "~/") {
+		return path
+	}
+	currentUser, err := user.Current()
+	if err != nil {
+		// エラーハンドリング: チルダ展開に失敗した場合は元のパスを返すか、エラーをログに記録
+		fmt.Fprintf(os.Stderr, "Warning: Failed to get current user home directory: %v. Using original path.\n", err)
+		return path
+	}
+	return filepath.Join(currentUser.HomeDir, path[2:])
 }
 
 // getAuthMethod はリポジトリURLに基づいて適切な認証方法を返します。
@@ -100,8 +115,13 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 		// 存在する: git pull を実行して更新する
 		fmt.Printf("Repository already exists at %s. Running 'git pull' to update...\n", localPath)
 
+		// 存在する: git pull を実行して更新する
+		fmt.Printf("Repository already exists at %s. Running 'git pull' to update...\n", localPath)
+
 		// 存在するリポジトリを開く（作業ディレクトリを localPath に変更）
-		cmd := exec.Command("git", "pull", "origin", c.BaseBranch)
+		// BaseBranchが空の場合のフォールバックを考慮
+		branchToPull := c.GetEffectiveBaseBranch() // 上記修正案で追加したヘルパー関数を使用
+		cmd := exec.Command("git", "pull", "origin", branchToPull)
 		cmd.Dir = localPath
 		cmd.Env = env
 		cmd.Stdout = os.Stdout
