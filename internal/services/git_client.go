@@ -225,6 +225,16 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 	if err != nil {
 		return nil, fmt.Errorf("最終的なリポジトリのオープンに失敗しました: %w", err)
 	}
+
+	// 後続の go-git を使う処理 (Fetchなど) のために、認証情報を取得して構造体にセットする。
+	// これが欠けていたことがエラーの根本原因。
+	auth, err := c.getAuthMethod(repositoryURL)
+	if err != nil {
+		return nil, fmt.Errorf("go-git用の認証情報取得に失敗しました: %w", err)
+	}
+	c.auth = auth
+	fmt.Println("DEBUG: go-git authentication method has been set successfully.")
+
 	return repo, nil
 }
 
