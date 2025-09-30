@@ -60,10 +60,12 @@ func expandTilde(path string) string {
 // getAuthMethod はリポジトリURLに基づいて適切な認証方法を返します。
 // SSH URLの場合は、指定された鍵ファイルを直接読み込んで認証を設定します。
 func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) {
+	// ↓↓↓ このデバッグログを追加して、新しいコードが実行されているか確認する ↓↓↓
+	fmt.Println("DEBUG: getAuthMethod is called. Using direct key file reader method.")
+
 	if strings.HasPrefix(repoURL, "git@") || strings.HasPrefix(repoURL, "ssh://") {
 		sshKeyPath := expandTilde(c.SSHKeyPath)
 
-		// 鍵ファイルが存在するかチェック
 		if _, err := os.Stat(sshKeyPath); os.IsNotExist(err) {
 			return nil, fmt.Errorf("SSHキーファイルが見つかりません: %s", sshKeyPath)
 		}
@@ -75,14 +77,12 @@ func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) 
 		}
 
 		// 読み込んだ鍵データから認証情報を作成する
-		// これによりSSHエージェントへの依存がなくなる
-		auth, err := ssh.NewPublicKeys("git", sshKey, "") // 第2引数にファイルパスではなく、ファイルの内容を渡す
+		auth, err := ssh.NewPublicKeys("git", sshKey, "") // ssh.NewPublicKeysFromFile ではないことを確認
 		if err != nil {
 			return nil, fmt.Errorf("SSH認証キーのロードに失敗しました: %w", err)
 		}
 		return auth, nil
 	}
-	// HTTPSなど、認証不要な場合はnilを返す
 	return nil, nil
 }
 
