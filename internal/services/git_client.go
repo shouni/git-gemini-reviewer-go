@@ -85,7 +85,7 @@ func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) 
 
 		// 厳格なホストキーチェックを無効にするコールバックを設定する。
 		// これにより known_hosts ファイルが不要になる。
-		auth.HostKeyCallback = cryptossh.InsecureIgnoreHostKey
+		auth.HostKeyCallback = cryptossh.InsecureIgnoreHostKey()
 
 		return auth, nil
 	}
