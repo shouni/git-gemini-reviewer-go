@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/user"
@@ -65,6 +66,18 @@ func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) 
 	fmt.Println("DEBUG: getAuthMethod is called. Using direct key file reader method.")
 
 	if strings.HasPrefix(repoURL, "git@") || strings.HasPrefix(repoURL, "ssh://") {
+
+		// 2. URLをパースしてユーザー名を取得する
+		u, err := url.Parse(repoURL)
+		if err != nil {
+			return nil, fmt.Errorf("リポジトリURLのパースに失敗しました: %w", err)
+		}
+		username := "git" // デフォルトは "git"
+		if u.User != nil {
+			username = u.User.Username()
+		}
+		fmt.Printf("DEBUG: Using username '%s' for SSH authentication.\n", username)
+
 		sshKeyPath := expandTilde(c.SSHKeyPath)
 
 		if _, err := os.Stat(sshKeyPath); os.IsNotExist(err) {
@@ -78,14 +91,16 @@ func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) 
 		}
 
 		// 読み込んだ鍵データから認証情報を作成する
-		auth, err := ssh.NewPublicKeys("git", sshKey, "") // ssh.NewPublicKeysFromFile ではないことを確認
+		// ハードコードされた "git" の代わりに、取得した `username` を使用する
+//		auth, err := ssh.NewPublicKeys("git", sshKey, "") // ssh.NewPublicKeysFromFile ではないことを確認
+		auth, err := ssh.NewPublicKeys(username, sshKey, "")
 		if err != nil {
 			return nil, fmt.Errorf("SSH認証キーのロードに失敗しました: %w", err)
 		}
 
-		// 厳格なホストキーチェックを無効にするコールバックを設定する。
-		// これにより known_hosts ファイルが不要になる。
 		auth.HostKeyCallback = cryptossh.InsecureIgnoreHostKey()
+
+		return auth, nil
 
 		return auth, nil
 	}
