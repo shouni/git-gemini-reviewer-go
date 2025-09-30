@@ -81,6 +81,11 @@ func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) 
 		if err != nil {
 			return nil, fmt.Errorf("SSH認証キーのロードに失敗しました: %w", err)
 		}
+
+		// 厳格なホストキーチェックを無効にするコールバックを設定する。
+		// これにより known_hosts ファイルが不要になる。
+		auth.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+
 		return auth, nil
 	}
 	return nil, nil
