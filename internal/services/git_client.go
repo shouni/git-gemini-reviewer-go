@@ -14,6 +14,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
+	cryptossh "golang.org/x/crypto/ssh"
 )
 
 // GitClient はGitリポジトリ操作を管理します。
@@ -84,7 +85,7 @@ func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) 
 
 		// 厳格なホストキーチェックを無効にするコールバックを設定する。
 		// これにより known_hosts ファイルが不要になる。
-		auth.HostKeyCallback = ssh.InsecureIgnoreHostKey()
+		auth.HostKeyCallback = cryptossh.InsecureIgnoreHostKey
 
 		return auth, nil
 	}
