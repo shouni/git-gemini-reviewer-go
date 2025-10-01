@@ -29,11 +29,11 @@
 Thumbs.db
 
 # app
-/bin/
 git-gemini-reviewer-go
 gemini-reviewer-go
 gemini-reviewer
 reviewer-go
 # Temporary testing directories/files
-/var/tmp/
+/bin/
+/var/
 /.env

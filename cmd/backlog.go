@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	// 💡 共通ロジックと設定を利用するために internal パッケージ群をインポート
+	// 共通ロジックと設定を利用するために internal パッケージ群をインポート
 	"git-gemini-reviewer-go/internal"
 	"git-gemini-reviewer-go/internal/config"
 	"git-gemini-reviewer-go/internal/services"
@@ -15,7 +15,7 @@ import (
 
 // BacklogConfig は Backlog 連携のための設定を保持します。
 type BacklogConfig struct {
-	config.ReviewConfig // 💡 ReviewConfig を埋め込み、設定の重複を排除
+	config.ReviewConfig // ReviewConfig を埋め込み、設定の重複を排除
 	IssueID             string
 	NoPost              bool
 }
@@ -70,7 +70,7 @@ var backlogCmd = &cobra.Command{
 
 		log.Println("--- 3. Backlogコメント投稿を開始 ---")
 
-		// 💡 Backlogクライアントの初期化
+		// Backlogクライアントの初期化
 		backlogClient, err := services.NewBacklogClient(os.Getenv("BACKLOG_SPACE_URL"), os.Getenv("BACKLOG_API_KEY"))
 		if err != nil {
 			return fmt.Errorf("Backlogクライアントの初期化エラー: %w", err)
@@ -88,7 +88,7 @@ var backlogCmd = &cobra.Command{
 }
 
 func init() {
-	// 💡 フラグの定義を backlogCfg のフィールドに関連付け
+	// フラグの定義を backlogCfg のフィールドに関連付け
 	backlogCmd.Flags().StringVar(&backlogCfg.GitCloneURL, "git-clone-url", "", "The SSH URL of the Git repository to review.")
 	backlogCmd.Flags().StringVar(&backlogCfg.BaseBranch, "base-branch", "main", "The base branch for diff comparison.")
 	backlogCmd.Flags().StringVar(&backlogCfg.FeatureBranch, "feature-branch", "", "The feature branch to review.")
@@ -100,6 +100,10 @@ func init() {
 	// Backlog 固有のフラグ
 	backlogCmd.Flags().StringVar(&backlogCfg.IssueID, "issue-id", "", "The Backlog issue ID to post the comment to (e.g., PROJECT-123).")
 	backlogCmd.Flags().BoolVar(&backlogCfg.NoPost, "no-post", false, "If true, skips posting to Backlog and prints to stdout.")
+	// 必須フラグのマーク
+	backlogCmd.MarkFlagRequired("git-clone-url")
+	backlogCmd.MarkFlagRequired("feature-branch")
+	backlogCmd.MarkFlagRequired("issue-id") // issue-idもBacklog連携では必須
 
 	RootCmd.AddCommand(backlogCmd)
 }

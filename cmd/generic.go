@@ -6,14 +6,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	// 💡 共通ロジックを呼び出すために internal パッケージをインポート
 	"git-gemini-reviewer-go/internal"
-	// 💡 共通設定構造体を利用するために internal/config パッケージをインポート
 	"git-gemini-reviewer-go/internal/config"
 )
 
 // localCfg は generic コマンド固有の設定を保持します。
-// 💡 config.ReviewConfig を利用することで、設定の重複を排除します。
 var localCfg config.ReviewConfig
 
 // genericCmd は、レビュー結果を標準出力するコマンドです。
@@ -38,7 +35,6 @@ var genericCmd = &cobra.Command{
 		}
 
 		// 2. 共通ロジック (internal.RunReviewer) を呼び出す
-		// 💡 Git操作と Gemini レビューのロジックが RunReviewer にカプセル化されました。
 		reviewResult, err := internal.RunReviewer(ctx, params)
 		if err != nil {
 			return err
@@ -50,7 +46,7 @@ var genericCmd = &cobra.Command{
 		}
 
 		// 3. 結果を標準出力
-		fmt.Println("\n--- 📝 Gemini Code Review Result ---")
+		fmt.Println("\n--- Gemini Code Review Result ---")
 		fmt.Println(reviewResult.ReviewComment)
 		fmt.Println("------------------------------------")
 
@@ -59,7 +55,6 @@ var genericCmd = &cobra.Command{
 }
 
 func init() {
-	// 💡 フラグ定義を localCfg のフィールドに関連付け
 	// フラグのバリデーション（必須チェックなど）は root.go または Cobra の機能に依存
 	genericCmd.Flags().StringVar(&localCfg.GitCloneURL, "git-clone-url", "", "The SSH URL of the Git repository to review.")
 	genericCmd.Flags().StringVar(&localCfg.BaseBranch, "base-branch", "main", "The base branch for diff comparison (e.g., 'main').")
@@ -68,6 +63,10 @@ func init() {
 	genericCmd.Flags().StringVar(&localCfg.PromptFilePath, "prompt-file", "review_prompt.md", "Path to the Markdown file containing the review prompt template.")
 	genericCmd.Flags().StringVar(&localCfg.LocalPath, "local-path", os.TempDir()+"/git-reviewer-repos/tmp", "Local path to clone the repository.")
 	genericCmd.Flags().StringVar(&localCfg.GeminiModelName, "model", "gemini-2.5-flash", "Gemini model name to use for review (e.g., 'gemini-2.5-flash').")
+
+	// 必須フラグのマーク
+	genericCmd.MarkFlagRequired("git-clone-url")
+	genericCmd.MarkFlagRequired("feature-branch")
 
 	RootCmd.AddCommand(genericCmd)
 }
