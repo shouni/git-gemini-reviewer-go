@@ -101,8 +101,6 @@ func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) 
 		auth.HostKeyCallback = cryptossh.InsecureIgnoreHostKey()
 
 		return auth, nil
-
-		return auth, nil
 	}
 	return nil, nil
 }
