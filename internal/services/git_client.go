@@ -35,16 +35,6 @@ func NewGitClient(localPath string, sshKeyPath string) *GitClient {
 	}
 }
 
-// GetEffectiveBaseBranch NewGitClient などで、BaseBranchの初期値を設定するか、利用時にチェックする
-func (c *GitClient) GetEffectiveBaseBranch() string {
-	if c.BaseBranch == "" {
-		// 環境や設定に応じて、デフォルトのブランチ名を返す
-		// 例: return "main" または "master"
-		return "main" // 仮のデフォルト値
-	}
-	return c.BaseBranch
-}
-
 // expandTilde はクロスプラットフォームなチルダ展開をサポートする
 func expandTilde(path string) string {
 	if !strings.HasPrefix(path, "~/") {
@@ -91,16 +81,12 @@ func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) 
 		}
 
 		// 読み込んだ鍵データから認証情報を作成する
-		// ハードコードされた "git" の代わりに、取得した `username` を使用する
-//		auth, err := ssh.NewPublicKeys("git", sshKey, "") // ssh.NewPublicKeysFromFile ではないことを確認
-		auth, err := ssh.NewPublicKeys(username, sshKey, "")
+		auth, err := ssh.NewPublicKeys(username, sshKey, "") // ハードコードされた "git" を username に変更
 		if err != nil {
 			return nil, fmt.Errorf("SSH認証キーのロードに失敗しました: %w", err)
 		}
 
 		auth.HostKeyCallback = cryptossh.InsecureIgnoreHostKey()
-
-		return auth, nil
 
 		return auth, nil
 	}
@@ -210,16 +196,8 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 			fmt.Printf("Existing repository at %s removed.\n", localPath)
 		}
 
-		// 親ディレクトリの作成
-		parentDir := filepath.Dir(localPath)
-		if _, err := os.Stat(parentDir); os.IsNotExist(err) {
-			if err := os.MkdirAll(parentDir, 0755); err != nil {
-				return nil, fmt.Errorf("親ディレクトリの作成に失敗しました: %w", err)
-			}
-		}
-
 		// クローン実行
-		if err := c.cloneRepository(repositoryURL, localPath, c.GetEffectiveBaseBranch(), env); err != nil {
+		if err := c.cloneRepository(repositoryURL, localPath, c.BaseBranch, env); err != nil {
 			return nil, fmt.Errorf("リポジトリのクローンに失敗しました: %w", err)
 		}
 		fmt.Println("Repository cloned successfully using exec.Command.")
@@ -227,7 +205,7 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 	} else {
 		// リポジトリが存在し、リモートURLも一致するので pull で更新
 		fmt.Printf("Repository already exists at %s with matching URL. Running 'git pull' to update...\n", localPath)
-		branchToPull := c.GetEffectiveBaseBranch()
+		branchToPull := c.BaseBranch
 		cmd := exec.Command("git", "pull", "origin", branchToPull)
 		cmd.Dir = localPath
 		cmd.Env = env
@@ -256,76 +234,6 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 	c.auth = auth
 	fmt.Println("DEBUG: go-git authentication method has been set successfully.")
 
-	return repo, nil
-}
-
-// CloneOrOpen はリポジトリをクローンするか、既に存在する場合は開き、認証情報を保持します。（既存の go-git を利用した実装）
-func (c *GitClient) CloneOrOpen(url string) (*git.Repository, error) {
-	// 認証情報を取得し、GitClient構造体に保持
-	auth, err := c.getAuthMethod(url)
-	if err != nil {
-		return nil, err
-	}
-	c.auth = auth
-
-	// 1. クローン先ディレクトリが存在しない場合は、単純にクローン
-	if _, err := os.Stat(c.LocalPath); os.IsNotExist(err) {
-		fmt.Printf("Cloning %s into %s...\n", url, c.LocalPath)
-		repo, err := git.PlainClone(c.LocalPath, false, &git.CloneOptions{
-			URL:      url,
-			Auth:     c.auth, // 保持した認証情報を使用
-			Progress: os.Stdout,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to clone repository %s: %w", url, err)
-		}
-		return repo, nil
-	}
-
-	// 2. 既に存在する場合は開く
-	fmt.Printf("Opening repository at %s...\n", c.LocalPath)
-	repo, err := git.PlainOpen(c.LocalPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open existing repository at %s: %w", c.LocalPath, err)
-	}
-
-	// 3. 既存のリポジトリURLをチェックする
-	remote, err := repo.Remote("origin")
-	if err != nil {
-		// リモート'origin'がない、またはエラーの場合、再クローンが安全
-		fmt.Printf("Warning: Remote 'origin' not found or failed to read: %v. Re-cloning...\n", err)
-		return c.recloneRepository(url)
-	}
-
-	// Fetch URLを取得し、渡されたURLと一致するか確認
-	remoteURLs := remote.Config().URLs
-	if len(remoteURLs) == 0 || remoteURLs[0] != url {
-		// URLが一致しない場合、古いリポジトリなので削除してクローンし直す
-		fmt.Printf("Warning: Existing repository remote URL (%s) does not match the requested URL (%s). Re-cloning...\n", remoteURLs[0], url)
-		return c.recloneRepository(url)
-	}
-
-	// 4. URLが一致する場合は、そのままリポジトリを返す
-	return repo, nil
-}
-
-// recloneRepository は、既存のディレクトリを削除して新しいURLでクローンし直すヘルパー関数です。
-func (c *GitClient) recloneRepository(url string) (*git.Repository, error) {
-	// 既存のディレクトリを削除
-	if err := os.RemoveAll(c.LocalPath); err != nil {
-		return nil, fmt.Errorf("failed to remove old repository directory %s: %w", c.LocalPath, err)
-	}
-
-	// 新しいURLで再クローン
-	fmt.Printf("Re-cloning %s into %s...\n", url, c.LocalPath)
-	repo, err := git.PlainClone(c.LocalPath, false, &git.CloneOptions{
-		URL:      url,
-		Auth:     c.auth, // 保持した認証情報 c.auth を利用
-		Progress: os.Stdout,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to clone repository %s after cleanup: %w", url, err)
-	}
 	return repo, nil
 }
 
@@ -358,7 +266,7 @@ func (c *GitClient) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch 
 	getRemoteCommit := func(branch string) (*object.Commit, error) {
 		// 例: refs/remotes/origin/main
 		refName := plumbing.NewRemoteReferenceName(remoteName, branch)
-		ref, err := repo.Reference(refName, true)
+		ref, err := repo.Reference(refName, false)
 		if err != nil {
 			return nil, fmt.Errorf("リモートリファレンス '%s/%s' の取得に失敗しました: %w", remoteName, branch, err)
 		}

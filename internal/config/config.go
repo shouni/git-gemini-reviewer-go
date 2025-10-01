@@ -11,4 +11,5 @@ type ReviewConfig struct {
 	GeminiModelName string
 	SSHKeyPath      string
 	PromptFilePath  string
+	InsecureSkipHostKeyCheck bool
 }

@@ -45,7 +45,7 @@ func (c *GeminiClient) Close() {
 
 // ReviewCodeDiff はコード差分を基にGeminiにレビューを依頼します。
 // プロンプトファイルは、コード差分(%s)を埋め込むための Go 標準の fmt.Sprintf 形式のプレースホルダを持っている必要があります。
-func (c *GeminiClient) ReviewCodeDiff(ctx context.Context, codeDiff string, promptFilePath string) (string, error) {
+func (c *GeminiClient) ReviewCodeDiff(ctx context.Context, diffContent string, promptFilePath string) (string, error) {
 	// 1. プロンプトファイルの読み込み
 	// ioutil.ReadFile は非推奨なので os.ReadFile に置き換え
 	promptTemplateBytes, err := os.ReadFile(promptFilePath)
@@ -56,7 +56,7 @@ func (c *GeminiClient) ReviewCodeDiff(ctx context.Context, codeDiff string, prom
 
 	// 2. プロンプトの構成
 	// プロンプトファイルの内容をテンプレートとして使用し、コード差分を埋め込む
-	prompt := fmt.Sprintf(promptTemplate, codeDiff)
+	prompt := fmt.Sprintf(promptTemplate, diffContent)
 
 	// 3. API呼び出し
 	model := c.client.GenerativeModel(c.modelName)
@@ -75,7 +75,6 @@ func (c *GeminiClient) ReviewCodeDiff(ctx context.Context, codeDiff string, prom
 	// 応答がブロックされた場合（セキュリティフィルタなど）のチェック
 	if candidate.Content == nil || len(candidate.Content.Parts) == 0 {
 		// 応答がブロックされた詳細情報を確認
-		// 💡 修正: genai.FinishReasonUnspecified と比較
 		if candidate.FinishReason != genai.FinishReasonUnspecified {
 			// String() メソッドを使用して FinishReason を文字列化
 			return "", fmt.Errorf("API response was blocked or finished prematurely. Reason: %s", candidate.FinishReason.String())
