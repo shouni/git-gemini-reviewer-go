@@ -28,7 +28,6 @@ func RunReviewAndGetResult(ctx context.Context, cfg ReviewConfig) (string, error
 	fmt.Println("🔍 Gitリポジトリを準備し、差分を取得中...")
 
 	// 2. Gitクライアントの初期化とセットアップ
-	// services パッケージ内なので、services.NewGitClient ではなく NewGitClient で呼び出し
 	gitClient := NewGitClient(cfg.LocalPath, cfg.SSHKeyPath)
 	if cfg.SkipHostKeyCheck {
 		log.Println("!!! SECURITY ALERT !!! SSH host key checking has been explicitly disabled. This makes connections vulnerable to Man-in-the-Middle attacks. Ensure this is intentional and NOT used in production.")
@@ -66,8 +65,6 @@ func RunReviewAndGetResult(ctx context.Context, cfg ReviewConfig) (string, error
 
 	// --- 3. AIレビュー（Gemini） ---
 	fmt.Println("🚀 Gemini AIによるコードレビューを開始します...")
-
-	// services パッケージ内なので、NewGeminiClient で呼び出し
 	geminiClient, err := NewGeminiClient(cfg.GeminiModel)
 	if err != nil {
 		log.Printf("ERROR: Geminiクライアントの初期化エラー: %v", err)

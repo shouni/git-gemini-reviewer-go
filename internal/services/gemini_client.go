@@ -46,18 +46,17 @@ func (c *GeminiClient) Close() {
 // promptTemplateString には、コード差分(%s)を埋め込むための fmt.Sprintf 形式のプレースホルダが含まれている必要があります。
 func (c *GeminiClient) ReviewCodeDiff(ctx context.Context, diffContent string, promptTemplateString string) (string, error) {
 
-	// 1. プロンプトの構成
-	// promptTemplateString をテンプレートとして使用し、コード差分を埋め込む
+	// プロンプトの構成
 	prompt := fmt.Sprintf(promptTemplateString, diffContent)
 
-	// 2. API呼び出し
+	// API呼び出し
 	model := c.client.GenerativeModel(c.modelName)
 	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
 		return "", fmt.Errorf("GenerateContent failed with model %s: %w", c.modelName, err)
 	}
 
-	// 3. レスポンスの処理
+	// レスポンスの処理
 	if resp == nil || len(resp.Candidates) == 0 {
 		return "", fmt.Errorf("received empty or invalid response from Gemini API")
 	}
@@ -71,16 +70,11 @@ func (c *GeminiClient) ReviewCodeDiff(ctx context.Context, diffContent string, p
 		return "", fmt.Errorf("Gemini response candidate is empty or lacks content parts")
 	}
 
-	// 4. テキスト内容の抽出
+	// テキスト内容の抽出
 	reviewText, ok := candidate.Content.Parts[0].(genai.Text)
 	if !ok {
 		return "", fmt.Errorf("API returned non-text part in response")
 	}
 
-	result := string(reviewText)
-	if result == "" {
-		return "", fmt.Errorf("API returned an empty text review result")
-	}
-
-	return result, nil
+	return string(reviewText), nil
 }
