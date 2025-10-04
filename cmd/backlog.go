@@ -123,54 +123,22 @@ func init() {
 	backlogCmd.Flags().StringVar(&issueID, "issue-id", "", "コメントを投稿するBacklog課題ID（例: PROJECT-123）")
 	backlogCmd.Flags().BoolVar(&noPost, "no-post", false, "投稿をスキップし、結果を標準出力する")
 
-	// Git連携フラグ (genericCmd から移植)
+	// Backlog 固有のフラグ
+	backlogCmd.Flags().StringVar(&issueID, "issue-id", "", "コメントを投稿するBacklog課題ID（例: PROJECT-123）")
+	backlogCmd.Flags().BoolVar(&noPost, "no-post", false, "投稿をスキップし、結果を標準出力する")
+
+	// 共通フラグは PersistentFlags を利用するため、ここで再定義しない。
+	// ただし、local-path のようにサブコマンド固有のデフォルト値を設定したい場合は、
+	// RootCmdで定義された変数をバインドし直すことで上書きできる。
 	backlogCmd.Flags().StringVar(
-		&gitCloneURL,
-		"git-clone-url",
-		"",
-		"The SSH URL of the Git repository to review.",
-	)
-	backlogCmd.Flags().StringVar(
-		&baseBranch,
-		"base-branch",
-		"main",
-		"The base branch for diff comparison (e.g., 'main').",
-	)
-	backlogCmd.Flags().StringVar(
-		&featureBranch,
-		"feature-branch",
-		"",
-		"The feature branch to review (e.g., 'feature/my-branch').",
-	)
-	backlogCmd.Flags().StringVar(
-		&sshKeyPath,
-		"ssh-key-path",
-		"~/.ssh/id_rsa",
-		"Path to the SSH private key for Git authentication.",
-	)
-	backlogCmd.Flags().StringVar(
-		&localPath,
+		&localPath, // cmd/root.go で定義された変数にバインドし、デフォルト値を上書き
 		"local-path",
-		os.TempDir() + "/git-reviewer-repos/tmp-backlog", // Backlog用に別のパスを使用
+		os.TempDir()+"/git-reviewer-repos/tmp-backlog",
 		"Local path to clone the repository.",
 	)
-	backlogCmd.Flags().BoolVar(
-		&skipHostKeyCheck,
-		"skip-host-key-check",
-		false,
-		"If set, skips SSH host key checking (StrictHostKeyChecking=no). Use with caution.",
-	)
 
-	// モデルフラグ (既存)
-	backlogCmd.Flags().StringVar(
-		&backlogGeminiModel,
-		"model",
-		"gemini-2.5-flash",
-		"Gemini model name to use for review (e.g., 'gemini-2.5-flash').",
-	)
-
-	// 必須フラグの設定（Backlog連携には issue-id 以外に Git連携フラグも必須に）
+	// 必須フラグの設定（RootCmdの変数を参照するが、このコマンドで必須であることを明示）
+	// NOTE: MarkFlagRequired は RootCmd.PersistentFlags() ではなく、backlogCmd.Flags() に対して実行する必要があります。
 	backlogCmd.MarkFlagRequired("git-clone-url")
 	backlogCmd.MarkFlagRequired("feature-branch")
-	// issue-id は --no-post の場合は不要なので、あえて MarkFlagRequired にしません
 }

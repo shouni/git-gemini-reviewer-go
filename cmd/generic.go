@@ -73,26 +73,17 @@ var genericCmd = &cobra.Command{
 func init() {
 	RootCmd.AddCommand(genericCmd)
 
-	// NOTE: Git関連のフラグ (gitCloneURL, baseBranch, featureBranchなど) は
-	// root.go の PersistentFlags で定義済みのため、ここでは model と local-path のデフォルト値上書きのみを定義します。
-
-	// genericCmd の場合、一時クローンパスを backlog と分ける
+	// NOTE: Git関連のフラグ (gitCloneURL, baseBranch, featureBranchなど) および
+	// model は root.go の PersistentFlags で定義済みのため、ここでは定義しない。
+	// local-path のデフォルト値上書きのみを定義する。
 	genericCmd.Flags().StringVar(
-		&localPath,
+		&localPath, // cmd/root.go で定義された変数にバインドし、デフォルト値を上書き
 		"local-path",
 		os.TempDir()+"/git-reviewer-repos/tmp-generic", // generic 用の専用パス
 		"Local path to clone the repository.",
 	)
 
-	// モデルフラグ (既存)
-	genericCmd.Flags().StringVar(
-		&geminiModel,
-		"model",
-		"gemini-2.5-flash",
-		"Gemini model name to use for review (e.g., 'gemini-2.5-flash').",
-	)
-
-	// 必須フラグの設定（PersistentFlags に設定された変数を MarkFlagRequired で必須化）
+	// 必須フラグの設定（RootCmdの変数を参照するが、このコマンドで必須であることを明示）
 	genericCmd.MarkFlagRequired("git-clone-url")
 	genericCmd.MarkFlagRequired("feature-branch")
 }
