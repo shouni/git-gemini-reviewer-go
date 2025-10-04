@@ -28,7 +28,7 @@ var slackCmd = &cobra.Command{
 	Short: "コードレビューを実行し、その結果をSlackの指定されたチャンネルに投稿します。",
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		// 1. レビューモードの取得と確認 (指摘 #1: グローバル変数ではなくフラグから取得)
+		// 1. レビューモードの取得と確認
 		currentReviewMode, err := cmd.Flags().GetString("mode")
 		if err != nil {
 			return fmt.Errorf("review-mode フラグの取得に失敗しました: %w", err)
