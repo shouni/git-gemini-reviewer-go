@@ -1,15 +1,13 @@
 package cmd
 
-package cmd
-
 import (
-_ "embed"
-"fmt"
-"log"
-"os"
+	_ "embed"
+	"fmt"
+	"log"
+	"os"
 
-"git-gemini-reviewer-go/internal/services"
-"github.com/spf13/cobra"
+	"git-gemini-reviewer-go/internal/services"
+	"github.com/spf13/cobra"
 )
 
 //go:embed prompts/release_review_prompt.md
@@ -82,7 +80,6 @@ var slackCmd = &cobra.Command{
 
 		fmt.Printf("📤 Slack Webhook URL にレビュー結果を投稿します...\n")
 
-		// NOTE: ここでは channelID は WebhookURL に含まれるため、空文字列を渡します。
 		err = slackService.PostMessage("", reviewResult)
 		if err != nil {
 			log.Printf("ERROR: Slack へのコメント投稿に失敗しました: %v\n", err)
@@ -118,4 +115,3 @@ func init() {
 	slackCmd.MarkFlagRequired("git-clone-url")
 	slackCmd.MarkFlagRequired("feature-branch")
 }
-

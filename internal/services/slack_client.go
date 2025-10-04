@@ -21,12 +21,8 @@ func NewSlackClient(webhookURL string) *SlackClient {
 
 // PostMessage は指定されたレビュー結果を Slack チャンネルに投稿します。
 func (c *SlackClient) PostMessage(channelID, text string) error {
-	// Slack Webhook URL はチャンネルに紐づくため、channelIDは不要な場合もありますが、
-	// ここでは、WebhookURLがチャンネル固有であると仮定して処理を進めます。
-
 	// レビュー結果をマークダウン形式のテキストとして整形
 	payload := map[string]string{
-		// Slack WebhookでMarkdownを有効にするには、textにメッセージを格納します。
 		"text": fmt.Sprintf("*🤖 Gemini AI Code Review Result:*\n\n%s", text),
 	}
 
@@ -47,3 +43,4 @@ func (c *SlackClient) PostMessage(channelID, text string) error {
 
 	return nil
 }
+
