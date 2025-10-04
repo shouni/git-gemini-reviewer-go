@@ -16,8 +16,8 @@
 | :--- | :--- | :--- |
 | **レビューの質とスピードアップ** | **「細かい見落とし」の心配が減ります。** AIがまず基本的なバグやコード規約をチェックしてくれるため、人間のレビュアーは設計やロジックといった**人間ならではの高度な判断**に集中できます。 | レビュー時間が短縮され、**新しい機能の開発に使える時間**が増えます。 |
 | **チーム内の知識共有** | **ベテランも若手も、フィードバックの水準が一定になります。** 誰がレビューしても同じように質の高いフィードバックが得られるため、チーム全体の**コーディングスキル向上**を裏側からサポートします。 | チーム内の知識レベルが底上げされ、**属人性のリスク**が解消に向かいます。 |
-| **Backlog連携でストレスフリー** | **「レビュー結果の転記」という地味な作業がなくなります。** AIがレビューコメントを自動でBacklogに投稿するため、開発者は**レビュー依頼からフィードバック確認までをスムーズに行えます**。 | **間接業務の負荷が大幅に軽減**され、チームの心理的なストレスが減ります。 |
-| **導入のハードルの低さ** | **「大がかりな準備」は不要です。** 既存のGitやBacklog環境に、コマンドラインツールとして**静かに、素早く導入**できます。 | 新しい試みを**スモールスタート**で始められ、効果をすぐに実感できます。 |
+| **連携の多様化と柔軟性** | **「フィードバックの場所」を自由に選べます。** Backlog、Slack、標準出力など、チームのワークフローに合わせて最適な場所に結果を届けられます。 | **間接業務の負荷が大幅に軽減**され、チームの心理的なストレスが減ります。 |
+| **導入のハードルの低さ** | **「大がかりな準備」は不要です。** 既存のGitや連携サービス環境に、コマンドラインツールとして**静かに、素早く導入**できます。 | 新しい試みを**スモールスタート**で始められ、効果をすぐに実感できます。 |
 
 このツールは、GitHub や GitLab など、**SSH アクセスが可能な任意の Git リポジトリ**で動作します。
 
@@ -28,10 +28,10 @@
 | 要素 | 技術 / ライブラリ | 役割 |
 | :--- | :--- | :--- |
 | **言語** | **Go (Golang)** | ツールの開発言語。クロスプラットフォームでの高速な実行を実現します。 |
-| **CLI フレームワーク** | **Cobra** | コマンドライン引数（フラグ）の解析とサブコマンド構造 (`generic`, `backlog`) の構築に使用します。 |
+| **CLI フレームワーク** | **Cobra** | コマンドライン引数（フラグ）の解析とサブコマンド構造 (`generic`, `backlog`, `slack`) の構築に使用します。 |
 | **Git 操作** | **go-git / os/exec (外部Git)** | **リモートリポジトリのブランチ間差分**の取得、クローン、フェッチに使用します。SSH認証に対応しています。 |
 | **AI モデル** | **Google Gemini API** | 取得したコード差分を分析し、レビューコメントを生成するために使用します。 |
-| **Backlog 連携** | **標準 `net/http`** | Backlog API (REST API) を使用して、生成されたレビュー結果を課題にコメントとして投稿します。 |
+| **連携サービス** | **標準 `net/http`** | Backlog API (REST API) および Slack Webhook を使用して、生成されたレビュー結果を投稿します。 |
 
 -----
 
@@ -58,7 +58,7 @@ go build -o bin/gemini_reviewer
 
 ### 3\. 環境変数の設定 (必須)
 
-Gemini API を利用するために、API キーを環境変数に設定する必要があります。
+Gemini API を利用するために、API キーを環境変数に設定する必要があります。また、連携サービスを使用する場合は、対応する環境変数を設定します。
 
 #### macOS / Linux (bash/zsh)
 
@@ -69,6 +69,9 @@ export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
 # Backlog 連携を使用する場合 (`backlog` コマンド利用時のみ)
 export BACKLOG_API_KEY="YOUR_BACKLOG_API_KEY"
 export BACKLOG_SPACE_URL="https://your-space.backlog.jp"
+
+# Slack 連携を使用する場合 (`slack` コマンド利用時のみ)
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 ```
 
 #### Windows (PowerShell)
@@ -80,15 +83,18 @@ $env:GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
 # Backlog 連携を使用する場合 (`backlog` コマンド利用時のみ)
 $env:BACKLOG_API_KEY="YOUR_BACKLOG_API_KEY"
 $env:BACKLOG_SPACE_URL="https://your-space.backlog.jp"
+
+# Slack 連携を使用する場合 (`slack` コマンド利用時のみ)
+$env:SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 ```
 
-> **Note:** 環境変数を恒久的に設定するには、シェルの設定ファイル (`.zshrc`, `.bash_profile` など) やシステム設定で編集してください。
+> **Note:** 環境変数を恒久的に設定するには、シェルの設定ファイルやシステム設定で編集してください。
 
 -----
 
 ### 4\. プロンプトファイルの準備
 
-現在、プロンプトはGoコード内に埋め込まれているため、外部ファイル (`review_prompt.md` 等) の準備は**不要**です。プロンプトの内容を変更したい場合は、Goコード内のファイルを直接修正してください。
+現在、プロンプトはGoコード内に埋め込まれているため、外部ファイルの準備は**不要**です。プロンプトの内容を変更したい場合は、Goコード内のファイルを直接修正してください。
 
 -----
 
@@ -98,7 +104,7 @@ $env:BACKLOG_SPACE_URL="https://your-space.backlog.jp"
 
 ### 🛠 共通フラグ (Persistent Flags)
 
-すべてのサブコマンド (`generic`, `backlog`) で使用可能なフラグです。
+すべてのサブコマンド (`generic`, `backlog`, `slack`) で使用可能なフラグです。
 
 | フラグ | 説明 | デフォルト値 |
 | :--- | :--- | :--- |
@@ -171,10 +177,45 @@ Git連携フラグ (`--git-clone-url` など) は `generic` モードと**共通
 
 -----
 
+### 3\. Slack 投稿モード (`slack`)
+
+リモートリポジトリのブランチ比較を行い、その結果を **Slack の Webhook URL** を通じてメッセージとして投稿します。
+
+#### 実行コマンド例
+
+```bash
+# feature/slack-notify の差分をレビューし、Slackチャンネルに投稿
+
+# Linux/macOS
+./bin/gemini_reviewer slack \
+  --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
+  --base-branch "main" \
+  --feature-branch "feature/slack-notify" 
+  # --slack-webhook-url は環境変数 SLACK_WEBHOOK_URL から取得されます
+
+# Windows (PowerShell)
+.\bin\gemini_reviewer.exe slack `
+  --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" `
+  --base-branch "main" `
+  --feature-branch "feature/slack-notify"
+  # --slack-webhook-url は環境変数 SLACK_WEBHOOK_URL から取得されます
+```
+
+#### 固有フラグ (Slack連携)
+
+Git連携フラグ (`--git-clone-url` など) は `generic` モードと**共通**です。
+
+| フラグ | 説明 | 必須 | デフォルト値 |
+| :--- | :--- | :--- | :--- |
+| `--slack-webhook-url` | レビュー結果を投稿する Slack Webhook URL | **投稿時のみ✅** | 環境変数 `SLACK_WEBHOOK_URL` |
+| `--no-post` | Slack への投稿をスキップし、結果を標準出力する | ❌ | `false` |
+
+-----
+
 ### 📜 ライセンス (License)
 
 このプロジェクトは [MIT License](https://opensource.org/licenses/MIT) の下で公開されています。
 
 -----
 
-これで、CLIツールの開発とドキュメントの整備は全て完了です！長い道のり、本当にお疲れ様でした。
+これで、Slack連携を含む全ての機能がドキュメントに反映されました。
