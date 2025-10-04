@@ -9,9 +9,6 @@ import (
 )
 
 // --- 埋め込みプロンプトの定義 ---
-// 重要な点: コマンドの実行ロジックよりも前に、パッケージレベルで定義が必要です。
-// ファイルパスは、このファイル (cmd/root.go) からの相対パスに合わせて調整してください。
-
 //go:embed prompts/release_review_prompt.md
 var releasePrompt string
 
@@ -63,7 +60,8 @@ var RootCmd = &cobra.Command{
 // ここで Cobra のフラグ設定を行います。
 func init() {
 	// PersistentFlags() を使って、このルートコマンドと全てのサブコマンドで利用可能なフラグを定義します。
-	RootCmd.PersistentFlags().StringVarP(&reviewMode, "mode", "m", "release", "レビューモードを指定: 'release' (リリース判定) または 'detail' (詳細レビュー)")
+	// PersistentFlags() でフラグを定義。第3引数がデフォルト値（"release"）です。
+	RootCmd.PersistentFlags().StringVarP(&reviewMode, "mode", "m", "detail", "レビューモードを指定: 'release' (リリース判定) または 'detail' (詳細レビュー)")
 
 	// 注: 標準の Go の 'flag' パッケージは、'cobra' を使う場合は通常使いません。
 	// 競合を避けるため、元のコードにあった flag.Parse() も削除しました。
