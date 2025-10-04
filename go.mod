@@ -2,6 +2,8 @@ module git-gemini-reviewer-go
 
 go 1.24.0
 
+replace git-gemini-reviewer-go => ./
+
 require (
 	github.com/go-git/go-git/v5 v5.16.2
 	github.com/google/generative-ai-go v0.20.1

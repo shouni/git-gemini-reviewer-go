@@ -1,23 +1,17 @@
 package cmd
 
 import (
-	_ "embed" // embed パッケージのインポート
+	_ "embed"
 	"context"
 	"fmt"
 	"os"
-	"os/exec" // Gitコマンド実行のために os/exec を追加
+	"os/exec"
 
-	"git-gemini-reviewer-go/services" // services パッケージをインポート
+	"git-gemini-reviewer-go/internal/services"
 
 	"github.com/spf13/cobra"
 )
 
-// --- 埋め込みプロンプトの定義 ---
-// プロジェクトルートからの相対パス: cmd/prompts/
-//
-// ★注意: ファイルパスは、必ず実際のディレクトリ構造に合わせてください。
-// (例: cmd/prompts/release_review_prompt.md)
-//
 //go:embed prompts/release_review_prompt.md
 var releasePrompt string
 
