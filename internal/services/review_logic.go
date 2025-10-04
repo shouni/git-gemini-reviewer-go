@@ -24,14 +24,6 @@ type ReviewConfig struct {
 // 以前の RunReviewer 関数と RunReviewAndGetResult 関数を統合したものです。
 func RunReviewAndGetResult(ctx context.Context, cfg ReviewConfig) (string, error) {
 
-	// 1. パラメータの検証
-	if cfg.GitCloneURL == "" {
-		return "", fmt.Errorf("--git-clone-url フラグは必須です")
-	}
-	if cfg.BaseBranch == "" || cfg.FeatureBranch == "" {
-		return "", fmt.Errorf("--base-branch と --feature-branch フラグは必須です")
-	}
-
 	log.Println("--- 1. Gitリポジトリのセットアップと差分取得を開始 ---")
 	fmt.Println("🔍 Gitリポジトリを準備し、差分を取得中...")
 
