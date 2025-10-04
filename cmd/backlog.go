@@ -1,109 +1,130 @@
 package cmd
 
 import (
+	_ "embed"
 	"fmt"
 	"log"
 	"os"
 
+	"git-gemini-reviewer-go/internal/services" // GitClient と Backlogサービスのため
 	"github.com/spf13/cobra"
-
-	// 共通ロジックと設定を利用するために internal パッケージ群をインポート
-	"git-gemini-reviewer-go/internal"
-	"git-gemini-reviewer-go/internal/config"
-	"git-gemini-reviewer-go/internal/services"
 )
 
-// BacklogConfig は Backlog 連携のための設定を保持します。
-type BacklogConfig struct {
-	config.ReviewConfig // ReviewConfig を埋め込み、設定の重複を排除
-	IssueID             string
-	NoPost              bool
-}
+//go:embed prompts/release_review_prompt.md
+var backlogReleasePrompt string
+//go:embed prompts/detail_review_prompt.md
+var backlogDetailPrompt string
 
-var backlogCfg BacklogConfig
+// backlogCmd 固有のフラグ変数のみを定義
+var (
+	issueID    string
+	noPost     bool
+)
 
-// backlogCmd は、レビュー結果を Backlog にコメント投稿するコマンドです。
+// backlogCmd は、レビュー結果を Backlog にコメントとして投稿するコマンドです。
 var backlogCmd = &cobra.Command{
 	Use:   "backlog",
 	Short: "コードレビューを実行し、その結果をBacklogにコメントとして投稿します。",
-	Long:  `このコマンドは、Gitリポジトリの差分をAIでレビューし、結果を指定されたBacklog課題にコメントとして投稿します。`,
+	Long:  `このコマンドは、指定されたGitリポジトリのブランチ間の差分をAIでレビューし、その結果をBacklogの指定された課題にコメントとして自動で投稿します。これにより、手動でのレビュー結果転記の手間を省きます。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx := cmd.Context()
 
-		// 1. internal.ReviewParams に変換 (IssueID は RunReviewer の責務外のため除外)
-		params := internal.ReviewParams{
-			RepoURL:        backlogCfg.GitCloneURL,
-			LocalPath:      backlogCfg.LocalPath,
-			SSHKeyPath:     backlogCfg.SSHKeyPath,
-			BaseBranch:     backlogCfg.BaseBranch,
-			FeatureBranch:  backlogCfg.FeatureBranch,
-			ModelName:      backlogCfg.GeminiModelName,
-			PromptFilePath: backlogCfg.PromptFilePath,
+		// 1. 環境変数の確認
+		backlogAPIKey := os.Getenv("BACKLOG_API_KEY")
+		backlogSpaceURL := os.Getenv("BACKLOG_SPACE_URL")
+
+		if backlogAPIKey == "" || backlogSpaceURL == "" {
+			return fmt.Errorf("Backlog連携には環境変数 BACKLOG_API_KEY および BACKLOG_SPACE_URL が必須です")
 		}
 
-		// 2. 共通ロジック (internal.RunReviewer) を呼び出す
-		// Git操作と Gemini レビューのロジックが RunReviewer にカプセル化されました。
-		reviewResult, err := internal.RunReviewer(ctx, params)
+		// 2. レビューモードに基づいたプロンプトの選択
+		var selectedPrompt string
+		// reviewMode は cmd/root.go の Persistent Flag の変数を使用
+		switch reviewMode {
+		case "release":
+			selectedPrompt = backlogReleasePrompt
+			fmt.Println("✅ リリースレビューモードが選択されました。")
+		case "detail":
+			selectedPrompt = backlogDetailPrompt
+			fmt.Println("✅ 詳細レビューモードが選択されました。（デフォルト）")
+		default:
+			return fmt.Errorf("無効なレビューモードが指定されました: '%s'。'release' または 'detail' を選択してください。", reviewMode)
+		}
+
+		// 3. 共通ロジックのための設定構造体を作成
+		// すべて cmd/root.go で定義された共通変数を使用
+		cfg := services.ReviewConfig{
+			GeminiModel:      geminiModel,
+			PromptContent:    selectedPrompt,
+			GitCloneURL:      gitCloneURL,
+			BaseBranch:       baseBranch,
+			FeatureBranch:    featureBranch,
+			SSHKeyPath:       sshKeyPath,
+			LocalPath:        localPath,
+			SkipHostKeyCheck: skipHostKeyCheck,
+		}
+
+		// 4. 共通ロジックを実行し、結果を取得
+		reviewResult, err := services.RunReviewAndGetResult(cmd.Context(), cfg)
 		if err != nil {
 			return err
 		}
 
-		if reviewResult == nil { // 差分がない場合
-			log.Println("No diff found. Backlog comment skipped.")
+		if reviewResult == "" {
+			return nil // Diffなしでスキップされた場合
+		}
+
+		// 5. レビュー結果の出力または Backlog への投稿 (Backlog固有の処理)
+		if noPost {
+			fmt.Println("\n--- Gemini AI レビュー結果 (投稿スキップ) ---")
+			fmt.Println(reviewResult)
+			fmt.Println("--------------------------------------------")
 			return nil
 		}
 
-		// 投稿するコメント本文を構築
-		finalComment := fmt.Sprintf("## AIコードレビュー結果 (Model: %s)\n\n%s",
-			reviewResult.ModelName,
-			reviewResult.ReviewComment,
-		)
-
-		// 3. Backlogへの投稿処理
-		if backlogCfg.NoPost {
-			// NoPost フラグが設定されている場合は標準出力
-			fmt.Println("\n--- 📝 Backlog Comment (Skipped Posting) ---")
-			fmt.Println(finalComment)
-			fmt.Println("-------------------------------------------")
-			return nil
+		if issueID == "" {
+			return fmt.Errorf("--issue-id フラグが指定されていません。Backlogに投稿するには必須です。")
 		}
 
-		log.Println("--- 3. Backlogコメント投稿を開始 ---")
-
-		// Backlogクライアントの初期化
-		backlogClient, err := services.NewBacklogClient(os.Getenv("BACKLOG_SPACE_URL"), os.Getenv("BACKLOG_API_KEY"))
+		// Backlog サービスを使用して投稿
+		backlogService, err := services.NewBacklogClient(backlogSpaceURL, backlogAPIKey)
 		if err != nil {
-			return fmt.Errorf("Backlogクライアントの初期化エラー: %w", err)
+			return fmt.Errorf("Backlogクライアントの初期化に失敗しました: %w", err)
 		}
 
-		// 投稿の実行
-		if err := backlogClient.PostComment(backlogCfg.IssueID, finalComment); err != nil {
-			return fmt.Errorf("Backlog課題 %s へのコメント投稿に失敗しました: %w", backlogCfg.IssueID, err)
+		fmt.Printf("📤 Backlog 課題 ID: %s にレビュー結果を投稿します...\n", issueID)
+
+		err = backlogService.PostComment(issueID, reviewResult)
+		if err != nil {
+			log.Printf("ERROR: Backlog へのコメント投稿に失敗しました (課題ID: %s): %v\n", issueID, err)
+			fmt.Println("\n--- Gemini AI レビュー結果 (Backlog投稿失敗) ---")
+			fmt.Println(reviewResult)
+			fmt.Println("----------------------------------------")
+			return fmt.Errorf("Backlog課題 %s へのコメント投稿に失敗しました。詳細は上記レビュー結果を確認してください。", issueID)
 		}
 
-		log.Printf("Backlog課題 %s へのコメント投稿を完了しました。", backlogCfg.IssueID)
-
+		fmt.Printf("✅ レビュー結果を Backlog 課題 ID: %s に投稿しました。\n", issueID)
 		return nil
 	},
 }
 
+// init 関数が二重に定義されていた問題を解消し、一つに統合
 func init() {
-	// フラグの定義を backlogCfg のフィールドに関連付け
-	backlogCmd.Flags().StringVar(&backlogCfg.GitCloneURL, "git-clone-url", "", "The SSH URL of the Git repository to review.")
-	backlogCmd.Flags().StringVar(&backlogCfg.BaseBranch, "base-branch", "main", "The base branch for diff comparison.")
-	backlogCmd.Flags().StringVar(&backlogCfg.FeatureBranch, "feature-branch", "", "The feature branch to review.")
-	backlogCmd.Flags().StringVar(&backlogCfg.SSHKeyPath, "ssh-key-path", "~/.ssh/id_rsa", "Path to the SSH private key for Git authentication.")
-	backlogCmd.Flags().StringVar(&backlogCfg.PromptFilePath, "prompt-file", "review_prompt.md", "Path to the Markdown file containing the review prompt template.")
-	backlogCmd.Flags().StringVar(&backlogCfg.LocalPath, "local-path", os.TempDir()+"/git-reviewer-repos/tmp", "Local path to clone the repository.")
-	backlogCmd.Flags().StringVar(&backlogCfg.GeminiModelName, "model", "gemini-2.5-flash", "Gemini model name to use for review.")
+	RootCmd.AddCommand(backlogCmd)
 
-	// Backlog 固有のフラグ
-	backlogCmd.Flags().StringVar(&backlogCfg.IssueID, "issue-id", "", "The Backlog issue ID to post the comment to (e.g., PROJECT-123).")
-	backlogCmd.Flags().BoolVar(&backlogCfg.NoPost, "no-post", false, "If true, skips posting to Backlog and prints to stdout.")
-	// 必須フラグのマーク
+	// Backlog 固有のフラグのみをここで定義する
+	backlogCmd.Flags().StringVar(&issueID, "issue-id", "", "コメントを投稿するBacklog課題ID（例: PROJECT-123）")
+	backlogCmd.Flags().BoolVar(&noPost, "no-post", false, "投稿をスキップし、結果を標準出力する")
+
+	// local-path のデフォルト値上書き
+	// localPath は cmd/root.go で定義された変数にバインドし、デフォルト値を上書き
+	backlogCmd.Flags().StringVar(
+		&localPath,
+		"local-path",
+		os.TempDir()+"/git-reviewer-repos/tmp-backlog",
+		"Local path to clone the repository.",
+	)
+
+	// 必須フラグの設定
 	backlogCmd.MarkFlagRequired("git-clone-url")
 	backlogCmd.MarkFlagRequired("feature-branch")
-	backlogCmd.MarkFlagRequired("issue-id") // issue-idもBacklog連携では必須
-
-	RootCmd.AddCommand(backlogCmd)
 }

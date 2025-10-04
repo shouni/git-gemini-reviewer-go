@@ -1,72 +1,86 @@
 package cmd
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 
+	"git-gemini-reviewer-go/internal/services"
 	"github.com/spf13/cobra"
-
-	"git-gemini-reviewer-go/internal"
-	"git-gemini-reviewer-go/internal/config"
 )
 
-// localCfg は generic コマンド固有の設定を保持します。
-var localCfg config.ReviewConfig
+//go:embed prompts/release_review_prompt.md
+var releasePrompt string
+//go:embed prompts/detail_review_prompt.md
+var detailPrompt string
 
-// genericCmd は、レビュー結果を標準出力するコマンドです。
+// genericCmd は、リモートリポジトリのブランチ比較を Gemini AI に依頼し、結果を標準出力に出力するコマンドです。
 var genericCmd = &cobra.Command{
 	Use:   "generic",
 	Short: "コードレビューを実行し、その結果を標準出力に出力します。",
-	Long:  `このコマンドは、Gitリポジトリの差分をAIでレビューし、結果をターミナルに直接出力します。`,
+	Long:  `このコマンドは、指定されたGitリポジトリのブランチ間の差分をAIでレビューし、その結果を標準出力に直接表示します。Backlogなどの外部サービスとの連携は行いません。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Cobraの context を使用
-		ctx := cmd.Context()
 
-		// 1. internal.ReviewParams に変換
-		// RunReviewer の引数に必要な情報のみを渡します。
-		params := internal.ReviewParams{
-			RepoURL:        localCfg.GitCloneURL,
-			LocalPath:      localCfg.LocalPath,
-			SSHKeyPath:     localCfg.SSHKeyPath,
-			BaseBranch:     localCfg.BaseBranch,
-			FeatureBranch:  localCfg.FeatureBranch,
-			ModelName:      localCfg.GeminiModelName,
-			PromptFilePath: localCfg.PromptFilePath,
+		// 1. レビューモードの選択
+		var selectedPrompt string
+		switch reviewMode {
+		case "release":
+			selectedPrompt = releasePrompt
+			fmt.Println("✅ リリースレビューモードが選択されました。")
+		case "detail":
+			selectedPrompt = detailPrompt
+			fmt.Println("✅ 詳細レビューモードが選択されました。（デフォルト）")
+		default:
+			return fmt.Errorf("無効なレビューモードが指定されました: '%s'。'release' または 'detail' を選択してください。", reviewMode)
 		}
 
-		// 2. 共通ロジック (internal.RunReviewer) を呼び出す
-		reviewResult, err := internal.RunReviewer(ctx, params)
+		// 2. 共通ロジックのための設定構造体を作成
+		// root.go で定義されたグローバル変数 (gitCloneURL, baseBranchなど) を使用
+		cfg := services.ReviewConfig{
+			GeminiModel:      geminiModel,
+			PromptContent:    selectedPrompt,
+			GitCloneURL:      gitCloneURL,
+			BaseBranch:       baseBranch,
+			FeatureBranch:    featureBranch,
+			SSHKeyPath:       sshKeyPath,
+			LocalPath:        localPath,
+			SkipHostKeyCheck: skipHostKeyCheck,
+		}
+
+		// 3. 共通ロジックを実行し、結果を取得
+		reviewResult, err := services.RunReviewAndGetResult(cmd.Context(), cfg)
 		if err != nil {
 			return err
 		}
 
-		// 差分がない場合は処理を終了
-		if reviewResult == nil {
-			return nil
+		if reviewResult == "" {
+			return nil // Diffなしでスキップされた場合
 		}
 
-		// 3. 結果を標準出力
-		fmt.Println("\n--- Gemini Code Review Result ---")
-		fmt.Println(reviewResult.ReviewComment)
-		fmt.Println("------------------------------------")
+		// 4. レビュー結果の出力 (generic 固有の処理)
+		fmt.Println("\n--- Gemini AI レビュー結果 ---")
+		fmt.Println(reviewResult)
+		fmt.Println("------------------------------")
 
 		return nil
 	},
 }
 
 func init() {
-	// フラグのバリデーション（必須チェックなど）は root.go または Cobra の機能に依存
-	genericCmd.Flags().StringVar(&localCfg.GitCloneURL, "git-clone-url", "", "The SSH URL of the Git repository to review.")
-	genericCmd.Flags().StringVar(&localCfg.BaseBranch, "base-branch", "main", "The base branch for diff comparison (e.g., 'main').")
-	genericCmd.Flags().StringVar(&localCfg.FeatureBranch, "feature-branch", "", "The feature branch to review (e.g., 'feature/my-branch').")
-	genericCmd.Flags().StringVar(&localCfg.SSHKeyPath, "ssh-key-path", "~/.ssh/id_rsa", "Path to the SSH private key for Git authentication.")
-	genericCmd.Flags().StringVar(&localCfg.PromptFilePath, "prompt-file", "review_prompt.md", "Path to the Markdown file containing the review prompt template.")
-	genericCmd.Flags().StringVar(&localCfg.LocalPath, "local-path", os.TempDir()+"/git-reviewer-repos/tmp", "Local path to clone the repository.")
-	genericCmd.Flags().StringVar(&localCfg.GeminiModelName, "model", "gemini-2.5-flash", "Gemini model name to use for review (e.g., 'gemini-2.5-flash').")
+	RootCmd.AddCommand(genericCmd)
 
-	// 必須フラグのマーク
+	// NOTE: Git関連のフラグ (gitCloneURL, baseBranch, featureBranchなど) および
+	// model は root.go の PersistentFlags で定義済みのため、ここでは定義しない。
+	// local-path のデフォルト値上書きのみを定義する。
+	genericCmd.Flags().StringVar(
+		&localPath, // cmd/root.go で定義された変数にバインドし、デフォルト値を上書き
+		"local-path",
+		os.TempDir()+"/git-reviewer-repos/tmp-generic", // generic 用の専用パス
+		"Local path to clone the repository.",
+	)
+
+	// genericCmd 固有の必須フラグはないため、ここでは MarkFlagRequired は不要
+	// 共通の必須フラグは root.go でマークされている
 	genericCmd.MarkFlagRequired("git-clone-url")
 	genericCmd.MarkFlagRequired("feature-branch")
-
-	RootCmd.AddCommand(genericCmd)
 }

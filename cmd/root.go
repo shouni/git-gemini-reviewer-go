@@ -1,13 +1,25 @@
+// cmd/root.go
+
 package cmd
 
 import (
-	"fmt"
+	"log"
 	"os"
 
 	"github.com/spf13/cobra"
 )
 
-// RootCmd はアプリケーションのベースコマンド（"git-gemini-reviewer-go" 本体）です。
+// --- パッケージレベル変数の定義 ---
+var reviewMode string
+var gitCloneURL string
+var baseBranch string
+var featureBranch string
+var sshKeyPath string
+var localPath string
+var skipHostKeyCheck bool
+var geminiModel string
+
+// RootCmd はアプリケーションのベースコマンド（ディスパッチャ）です。
 var RootCmd = &cobra.Command{
 	Use:   "git-gemini-reviewer-go",
 	Short: "Gemini AIを使ってGitの差分をレビューするCLIツール",
@@ -16,16 +28,69 @@ var RootCmd = &cobra.Command{
 利用可能なサブコマンド:
   generic  (Backlog連携なし)
   backlog  (Backlog連携あり)`,
-	// ベースコマンド自体にロジックを持たせないため、Run は nil にします。
-	// サブコマンドが存在する場合、引数なしで実行すると Cobra が自動でヘルプを表示します。
-	Run: nil,
+
+	// AIレビューの指摘に従い、Git Diff/AIレビューロジックを削除し、RunEをnilに戻します。
+	// これにより、サブコマンドが指定されない場合、Cobraはヘルプを表示します。
+	RunE: nil,
+}
+
+func init() {
+	// PersistentFlags() でフラグを定義。第3引数がデフォルト値（"detail"）です。
+	RootCmd.PersistentFlags().StringVarP(&reviewMode, "mode", "m", "detail", "レビューモードを指定: 'release' (リリース判定) または 'detail' (詳細レビュー)")
+
+	// Git 関連のフラグを PersistentFlags として定義（サブコマンドすべてで使用可能に）
+	RootCmd.PersistentFlags().StringVar(
+		&gitCloneURL,
+		"git-clone-url",
+		"",
+		"The SSH URL of the Git repository to review.",
+	)
+	RootCmd.PersistentFlags().StringVar(
+		&baseBranch,
+		"base-branch",
+		"main",
+		"The base branch for diff comparison (e.g., 'main').",
+	)
+	RootCmd.PersistentFlags().StringVar(
+		&featureBranch,
+		"feature-branch",
+		"",
+		"The feature branch to review (e.g., 'feature/my-branch').",
+	)
+	RootCmd.PersistentFlags().StringVar(
+		&sshKeyPath,
+		"ssh-key-path",
+		"~/.ssh/id_rsa",
+		"Path to the SSH private key for Git authentication.",
+	)
+	RootCmd.PersistentFlags().StringVar(
+		&localPath,
+		"local-path",
+		os.TempDir() + "/git-reviewer-repos/tmp", // デフォルトの一時パス
+		"Local path to clone the repository.",
+	)
+	RootCmd.PersistentFlags().BoolVar(
+		&skipHostKeyCheck,
+		"skip-host-key-check",
+		false,
+		"CRITICAL WARNING: Disables SSH host key verification. This dramatically increases the risk of Man-in-the-Middle attacks. NEVER USE IN PRODUCTION. Only for controlled development/testing environments.",
+	)
+	RootCmd.PersistentFlags().StringVar(
+		&geminiModel,
+		"model",
+		"gemini-2.5-flash",
+		"Gemini model name to use for review (e.g., 'gemini-2.5-flash').",
+	)
+	// 共通で必須となるフラグをルートコマンドでマーク
+	RootCmd.MarkPersistentFlagRequired("git-clone-url")
+	RootCmd.MarkPersistentFlagRequired("feature-branch")
+
+	// NOTE: os.TempDir() を使うため、root.go に "os" をインポートする必要があります。
 }
 
 // Execute はルートコマンドを実行し、アプリケーションを起動します。
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {
-		// エラー発生時にエラーメッセージを出力し、終了コード1で終了
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 }
