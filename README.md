@@ -71,7 +71,18 @@ export BACKLOG_API_KEY="YOUR_BACKLOG_API_KEY"
 export BACKLOG_SPACE_URL="https://your-space.backlog.jp"
 ```
 
-> **Note:** 環境変数を恒久的に設定するには、シェルの設定ファイル (`.zshrc`, `.bash_profile` など) で編集してください。
+#### Windows (PowerShell)
+
+```powershell
+# Gemini API キー (必須)
+$env:GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
+
+# Backlog 連携を使用する場合 (`backlog` コマンド利用時のみ)
+$env:BACKLOG_API_KEY="YOUR_BACKLOG_API_KEY"
+$env:BACKLOG_SPACE_URL="https://your-space.backlog.jp"
+```
+
+> **Note:** 環境変数を恒久的に設定するには、シェルの設定ファイル (`.zshrc`, `.bash_profile` など) やシステム設定で編集してください。
 
 -----
 
@@ -83,36 +94,25 @@ export BACKLOG_SPACE_URL="https://your-space.backlog.jp"
 
 ## 🚀 使い方 (Usage) と実行例
 
-このツールは、**ローカルリポジトリのクイックレビュー**と、**リモートリポジトリのブランチ間レビュー**の2つの主要なユースケースに対応しています。
+このツールは、**リモートリポジトリのブランチ間比較**に特化しており、**サブコマンド**を使用します。
 
 ### 🛠 共通フラグ (Persistent Flags)
 
-すべてのコマンド (`generic`, `backlog`, およびルートコマンド) で使用可能なフラグです。
+すべてのサブコマンド (`generic`, `backlog`) で使用可能なフラグです。
 
 | フラグ | 説明 | デフォルト値 |
 | :--- | :--- | :--- |
 | `-m`, `--mode` | レビューモードを指定します: `'release'` (リリース判定) または `'detail'` (詳細レビュー) | `detail` |
 | `--model` | 使用する Gemini モデル名 (例: `gemini-2.5-flash`) | `gemini-2.5-flash` |
+| `--git-clone-url` | レビュー対象の Git リポジトリの **SSH URL** | **なし (必須)** |
+| `--feature-branch` | レビュー対象のフィーチャーブランチ | **なし (必須)** |
+| `--base-branch` | 差分比較の基準ブランチ | `main` |
+| `--ssh-key-path` | Git 認証用の SSH 秘密鍵のパス | `~/.ssh/id_rsa` |
+| `--skip-host-key-check` | SSHホストキーチェックをスキップする (**非推奨**) | `false` |
 
 -----
 
-### 1\. ローカルの Git 差分をレビュー (Root Command: `bin/gemini_reviewer`)
-
-**現在作業中のローカルリポジトリ**の直前のコミット (`HEAD^`) と現在のコミット (`HEAD`) の差分をレビューします。リモート連携のフラグは無視されます。
-
-#### 実行コマンド例
-
-```bash
-# 直前のコミットと現在のHEADの差分を詳細レビューモードで実行
-./bin/gemini_reviewer
-
-# リリース判定レビューモードで実行
-./bin/gemini_reviewer --mode release
-```
-
------
-
-### 2\. リモートリポジトリの比較をレビュー (Subcommand: `generic`)
+### 1\. 標準出力モード (Subcommand: `generic`)
 
 リモートリポジトリの任意の2つのブランチ間の差分を取得し、レビュー結果を**標準出力**に出力します。
 
@@ -120,26 +120,23 @@ export BACKLOG_SPACE_URL="https://your-space.backlog.jp"
 
 ```bash
 # main と develop の差分を詳細レビューモードで実行
+
+# Linux/macOS
 ./bin/gemini_reviewer generic \
   --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
   --base-branch "main" \
   --feature-branch "develop"
+
+# Windows (PowerShell)
+.\bin\gemini_reviewer.exe generic `
+  --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" `
+  --base-branch "main" `
+  --feature-branch "develop"
 ```
-
-#### 固有フラグ (リモートレビューに必須)
-
-| フラグ | 説明 | 必須 | デフォルト値 |
-| :--- | :--- | :--- | :--- |
-| `--git-clone-url` | レビュー対象の Git リポジトリの **SSH URL** | **✅** | なし |
-| `--feature-branch` | レビュー対象のフィーチャーブランチ | **✅** | なし |
-| `--base-branch` | 差分比較の基準ブランチ | ❌ | `main` |
-| `--ssh-key-path` | Git 認証用の SSH 秘密鍵のパス | ❌ | `~/.ssh/id_rsa` |
-| `--local-path` | リポジトリのクローン先ローカルパス | ❌ | OSの一時ディレクトリ |
-| `--skip-host-key-check` | SSHホストキーチェックをスキップする (非推奨) | ❌ | `false` |
 
 -----
 
-### 3\. Backlog 投稿モード (`backlog`)
+### 2\. Backlog 投稿モード (`backlog`)
 
 リモートリポジトリのブランチ比較を行い、その結果を Backlog の指定された課題に**コメントとして投稿**します。
 
@@ -147,11 +144,20 @@ export BACKLOG_SPACE_URL="https://your-space.backlog.jp"
 
 ```bash
 # bugfix/issue-456 の差分をレビューし、PROJECT-123 に投稿
+
+# Linux/macOS
 ./bin/gemini_reviewer backlog \
   --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
   --base-branch "main" \
   --feature-branch "bugfix/issue-456" \
   --issue-id "PROJECT-123" 
+
+# Windows (PowerShell)
+.\bin\gemini_reviewer.exe backlog `
+  --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" `
+  --base-branch "main" `
+  --feature-branch "bugfix/issue-456" `
+  --issue-id "PROJECT-123"
 ```
 
 #### 固有フラグ (Backlog連携)
@@ -168,3 +174,7 @@ Git連携フラグ (`--git-clone-url` など) は `generic` モードと**共通
 ### 📜 ライセンス (License)
 
 このプロジェクトは [MIT License](https://opensource.org/licenses/MIT) の下で公開されています。
+
+-----
+
+これで、CLIツールの開発とドキュメントの整備は全て完了です！長い道のり、本当にお疲れ様でした。
