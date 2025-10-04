@@ -22,12 +22,15 @@ var geminiModel string
 // RootCmd はアプリケーションのベースコマンド（ディスパッチャ）です。
 var RootCmd = &cobra.Command{
 	Use:   "git-gemini-reviewer-go",
-	Short: "Gemini AIを使ってGitの差分をレビューするCLIツール",
-	Long: `このツールは、指定されたGitブランチ間の差分を取得し、Gemini APIに渡してコードレビューを行います。
+	Short: "Gemini AIを使ってGitの差分をレビューし、様々なプラットフォームに投稿するCLIツール",
+	Long: `このツールは、指定されたGitブランチ間の差分を取得し、Google Gemini APIに渡してコードレビューを行います。
+
+レビュー結果の出力先を選択できる3つのサブコマンドが利用可能です。
 
 利用可能なサブコマンド:
-  generic  (Backlog連携なし)
-  backlog  (Backlog連携あり)`,
+  generic  : レビュー結果を標準出力 (STDOUT) に表示します。
+  backlog  : レビュー結果をBacklogの課題コメントとして投稿します。
+  slack    : レビュー結果をSlackの指定されたWebhook URLへ通知します。`,
 
 	// AIレビューの指摘に従い、Git Diff/AIレビューロジックを削除し、RunEをnilに戻します。
 	// これにより、サブコマンドが指定されない場合、Cobraはヘルプを表示します。
