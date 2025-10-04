@@ -69,7 +69,7 @@ func init() {
 		&skipHostKeyCheck,
 		"skip-host-key-check",
 		false,
-		"If set, skips SSH host key checking (StrictHostKeyChecking=no). Use with caution.",
+		"CRITICAL WARNING: Disables SSH host key verification. This dramatically increases the risk of Man-in-the-Middle attacks. NEVER USE IN PRODUCTION. Only for controlled development/testing environments.",
 	)
 
 	// NOTE: os.TempDir() を使うため、root.go に "os" をインポートする必要があります。

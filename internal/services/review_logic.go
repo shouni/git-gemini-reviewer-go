@@ -38,6 +38,10 @@ func RunReviewAndGetResult(ctx context.Context, cfg ReviewConfig) (string, error
 	// 2. Gitクライアントの初期化とセットアップ
 	// services パッケージ内なので、services.NewGitClient ではなく NewGitClient で呼び出し
 	gitClient := NewGitClient(cfg.LocalPath, cfg.SSHKeyPath)
+	if cfg.SkipHostKeyCheck {
+		log.Println("!!! SECURITY ALERT !!! SSH host key checking has been explicitly disabled. This makes connections vulnerable to Man-in-the-Middle attacks. Ensure this is intentional and NOT used in production.")
+		gitClient.InsecureSkipHostKeyCheck = true
+	}
 	gitClient.BaseBranch = cfg.BaseBranch
 	gitClient.InsecureSkipHostKeyCheck = cfg.SkipHostKeyCheck
 
