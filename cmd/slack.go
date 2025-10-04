@@ -2,11 +2,10 @@ package cmd
 
 import (
 	_ "embed"
-	"errors" // errors パッケージを追加 (エラーチェックのため)
 	"fmt"
 	"log"
 	"os"
-	"strings" // strings パッケージを追加 (一時ディレクトリチェックのため)
+	"strings"
 
 	"git-gemini-reviewer-go/internal/services"
 	"github.com/spf13/cobra"
