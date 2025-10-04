@@ -1,5 +1,3 @@
-// internal/services/backlog.go
-
 package services
 
 import (

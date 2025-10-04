@@ -1,5 +1,3 @@
-// cmd/backlog.go
-
 package cmd
 
 import (
@@ -7,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
 	"git-gemini-reviewer-go/internal/services" // GitClient と Backlogサービスのため
 	"github.com/spf13/cobra"
@@ -41,7 +38,7 @@ var backlogCmd = &cobra.Command{
 	Short: "コードレビューを実行し、その結果をBacklogにコメントとして投稿します。",
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		// 1. 環境変数の確認 (Backlog連携に必須)
+		// 1. 環境変数の確認
 		backlogAPIKey := os.Getenv("BACKLOG_API_KEY")
 		backlogSpaceURL := os.Getenv("BACKLOG_SPACE_URL")
 
@@ -62,62 +59,29 @@ var backlogCmd = &cobra.Command{
 			return fmt.Errorf("無効なレビューモードが指定されました: '%s'。'release' または 'detail' を選択してください。", reviewMode)
 		}
 
-		// ----------------------------------------------------
-		// 3. Git Diff の取得 ( GitClient を使ったリモートリポジトリ比較に置き換え)
-		// ----------------------------------------------------
-
-		if gitCloneURL == "" {
-			return fmt.Errorf("--git-clone-url フラグは必須です")
+		// 3. 共通ロジックのための設定構造体を作成
+		cfg := services.ReviewConfig{
+			GeminiModel:     backlogGeminiModel,
+			PromptContent:   selectedPrompt,
+			GitCloneURL:     gitCloneURL,
+			BaseBranch:      baseBranch,
+			FeatureBranch:   featureBranch,
+			SSHKeyPath:      sshKeyPath,
+			LocalPath:       localPath,
+			SkipHostKeyCheck: skipHostKeyCheck,
 		}
-		if baseBranch == "" || featureBranch == "" {
-			return fmt.Errorf("--base-branch と --feature-branch フラグは必須です")
-		}
 
-		fmt.Println("🔍 Gitリポジトリを準備し、差分を取得中...")
-
-		// 3-1. GitClientの初期化
-		gitClient := services.NewGitClient(localPath, sshKeyPath)
-		gitClient.BaseBranch = baseBranch
-		gitClient.InsecureSkipHostKeyCheck = skipHostKeyCheck
-
-		// 3-2. クローン/アップデート
-		repo, err := gitClient.CloneOrUpdateWithExec(gitCloneURL, localPath)
+		// 4. 共通ロジックを実行し、結果を取得
+		reviewResult, err := services.RunReviewAndGetResult(cmd.Context(), cfg)
 		if err != nil {
-			return fmt.Errorf("リポジトリのクローン/更新に失敗しました: %w", err)
+			return err
 		}
 
-		// 3-3. フェッチ
-		if err := gitClient.Fetch(repo); err != nil {
-			return fmt.Errorf("リモートからの最新情報取得 (fetch) に失敗しました: %w", err)
+		if reviewResult == "" {
+			return nil // Diffなしでスキップされた場合
 		}
 
-		// 3-4. Diffの取得 (3点比較)
-		diffContent, err := gitClient.GetCodeDiff(repo, baseBranch, featureBranch)
-		if err != nil {
-			return fmt.Errorf("リモートブランチ間のDiff取得に失敗しました: %w", err)
-		}
-
-		if strings.TrimSpace(diffContent) == "" {
-			fmt.Println("ℹ️ 差分が見つかりませんでした。レビューをスキップします。")
-			return nil
-		}
-		// ----------------------------------------------------
-
-		// 4. Gemini クライアントの初期化
-		client, err := services.NewGeminiClient(backlogGeminiModel)
-		if err != nil {
-			return fmt.Errorf("Geminiクライアントの初期化に失敗しました: %w", err)
-		}
-		defer client.Close()
-
-		// 5. Gemini AIにレビューを依頼
-		fmt.Println("🚀 Gemini AIによるコードレビューを開始します...")
-		reviewResult, err := client.ReviewCodeDiff(cmd.Context(), diffContent, selectedPrompt)
-		if err != nil {
-			return fmt.Errorf("コードレビュー中にエラーが発生しました: %w", err)
-		}
-
-		// 6. レビュー結果の出力または Backlog への投稿
+		// 5. レビュー結果の出力または Backlog への投稿 (Backlog固有の処理)
 		if noPost {
 			fmt.Println("\n--- Gemini AI レビュー結果 (投稿スキップ) ---")
 			fmt.Println(reviewResult)
@@ -129,6 +93,7 @@ var backlogCmd = &cobra.Command{
 			return fmt.Errorf("--issue-id フラグが指定されていません。Backlogに投稿するには必須です。")
 		}
 
+		// Backlog サービスを使用して投稿
 		backlogService, err := services.NewBacklogClient(backlogSpaceURL, backlogAPIKey)
 		if err != nil {
 			return fmt.Errorf("Backlogクライアントの初期化に失敗しました: %w", err)
@@ -140,7 +105,6 @@ var backlogCmd = &cobra.Command{
 		if err != nil {
 			log.Printf("⚠️ Backlog への投稿に失敗しました: %v\n", err)
 
-			// 失敗した場合でも、結果をターミナルに表示してユーザーに通知します
 			fmt.Println("\n--- Gemini AI レビュー結果 (投稿失敗) ---")
 			fmt.Println(reviewResult)
 			fmt.Println("----------------------------------------")
