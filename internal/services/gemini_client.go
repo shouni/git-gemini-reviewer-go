@@ -38,20 +38,16 @@ func NewGeminiClient(modelName string) (*GeminiClient, error) {
 // Close はクライアントを閉じ、リソースを解放します。
 func (c *GeminiClient) Close() {
 	if c.client != nil {
-		// リソースのリークを防ぐためにクライアントをクローズ
 		c.client.Close()
 	}
 }
 
 // ReviewCodeDiff はコード差分を基にGeminiにレビューを依頼します。
-//
-// 修正点: promptTemplateString を引数として受け取るように変更しました。
-// これにより、呼び出し元（cmd/root.go）で埋め込まれたプロンプトを直接渡せます。
+// promptTemplateString には、コード差分(%s)を埋め込むための fmt.Sprintf 形式のプレースホルダが含まれている必要があります。
 func (c *GeminiClient) ReviewCodeDiff(ctx context.Context, diffContent string, promptTemplateString string) (string, error) {
 
 	// 1. プロンプトの構成
 	// promptTemplateString をテンプレートとして使用し、コード差分を埋め込む
-	// diffContentが %s のプレースホルダに確実に埋め込まれることを前提とします。
 	prompt := fmt.Sprintf(promptTemplateString, diffContent)
 
 	// 2. API呼び出し
@@ -61,7 +57,7 @@ func (c *GeminiClient) ReviewCodeDiff(ctx context.Context, diffContent string, p
 		return "", fmt.Errorf("GenerateContent failed with model %s: %w", c.modelName, err)
 	}
 
-	// 3. レスポンスの処理 (元のロジックを維持)
+	// 3. レスポンスの処理
 	if resp == nil || len(resp.Candidates) == 0 {
 		return "", fmt.Errorf("received empty or invalid response from Gemini API")
 	}
