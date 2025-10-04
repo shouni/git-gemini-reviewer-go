@@ -1,12 +1,10 @@
 package services
 
-package services
-
 import (
-"bytes"
-"encoding/json"
-"fmt"
-"net/http"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
 )
 
 // SlackClient は Slack API と連携するためのクライアントです。
@@ -28,6 +26,7 @@ func (c *SlackClient) PostMessage(channelID, text string) error {
 
 	// レビュー結果をマークダウン形式のテキストとして整形
 	payload := map[string]string{
+		// Slack WebhookでMarkdownを有効にするには、textにメッセージを格納します。
 		"text": fmt.Sprintf("*🤖 Gemini AI Code Review Result:*\n\n%s", text),
 	}
 
@@ -43,8 +42,6 @@ func (c *SlackClient) PostMessage(channelID, text string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		// Slack APIの戻り値によっては、エラー本文を読み込むこともできますが、
-		// 簡単のためステータスコードのみでエラーとします。
 		return fmt.Errorf("Slack API returned non-OK status code: %s", resp.Status)
 	}
 
