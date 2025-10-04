@@ -14,11 +14,6 @@ var releasePrompt string
 //go:embed prompts/detail_review_prompt.md
 var detailPrompt string
 
-// genericCmd 固有のフラグ変数を定義
-var (
-	geminiModel string
-)
-
 // genericCmd は、リモートリポジトリのブランチ比較を Gemini AI に依頼し、結果を標準出力に出力するコマンドです。
 var genericCmd = &cobra.Command{
 	Use:   "generic",

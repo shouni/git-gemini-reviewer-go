@@ -11,6 +11,13 @@ import (
 
 // --- パッケージレベル変数の定義 ---
 var reviewMode string
+var gitCloneURL string
+var baseBranch string
+var featureBranch string
+var sshKeyPath string
+var localPath string
+var skipHostKeyCheck bool
+var geminiModel string
 
 // RootCmd はアプリケーションのベースコマンド（ディスパッチャ）です。
 var RootCmd = &cobra.Command{
