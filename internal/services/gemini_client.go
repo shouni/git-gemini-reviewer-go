@@ -44,48 +44,40 @@ func (c *GeminiClient) Close() {
 }
 
 // ReviewCodeDiff はコード差分を基にGeminiにレビューを依頼します。
-// プロンプトファイルは、コード差分(%s)を埋め込むための Go 標準の fmt.Sprintf 形式のプレースホルダを持っている必要があります。
-func (c *GeminiClient) ReviewCodeDiff(ctx context.Context, diffContent string, promptFilePath string) (string, error) {
-	// 1. プロンプトファイルの読み込み
-	// ioutil.ReadFile は非推奨なので os.ReadFile に置き換え
-	promptTemplateBytes, err := os.ReadFile(promptFilePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read prompt file %s: %w", promptFilePath, err)
-	}
-	promptTemplate := string(promptTemplateBytes)
+//
+// 修正点: promptTemplateString を引数として受け取るように変更しました。
+// これにより、呼び出し元（cmd/root.go）で埋め込まれたプロンプトを直接渡せます。
+func (c *GeminiClient) ReviewCodeDiff(ctx context.Context, diffContent string, promptTemplateString string) (string, error) {
 
-	// 2. プロンプトの構成
-	// プロンプトファイルの内容をテンプレートとして使用し、コード差分を埋め込む
-	prompt := fmt.Sprintf(promptTemplate, diffContent)
+	// 1. プロンプトの構成
+	// promptTemplateString をテンプレートとして使用し、コード差分を埋め込む
+	// diffContentが %s のプレースホルダに確実に埋め込まれることを前提とします。
+	prompt := fmt.Sprintf(promptTemplateString, diffContent)
 
-	// 3. API呼び出し
+	// 2. API呼び出し
 	model := c.client.GenerativeModel(c.modelName)
 	resp, err := model.GenerateContent(ctx, genai.Text(prompt))
 	if err != nil {
 		return "", fmt.Errorf("GenerateContent failed with model %s: %w", c.modelName, err)
 	}
 
-	// 4. レスポンスの処理
+	// 3. レスポンスの処理 (元のロジックを維持)
 	if resp == nil || len(resp.Candidates) == 0 {
 		return "", fmt.Errorf("received empty or invalid response from Gemini API")
 	}
 
 	candidate := resp.Candidates[0]
 
-	// 応答がブロックされた場合（セキュリティフィルタなど）のチェック
 	if candidate.Content == nil || len(candidate.Content.Parts) == 0 {
-		// 応答がブロックされた詳細情報を確認
 		if candidate.FinishReason != genai.FinishReasonUnspecified {
-			// String() メソッドを使用して FinishReason を文字列化
 			return "", fmt.Errorf("API response was blocked or finished prematurely. Reason: %s", candidate.FinishReason.String())
 		}
 		return "", fmt.Errorf("Gemini response candidate is empty or lacks content parts")
 	}
 
-	// 5. テキスト内容の抽出
+	// 4. テキスト内容の抽出
 	reviewText, ok := candidate.Content.Parts[0].(genai.Text)
 	if !ok {
-		// テキスト以外のデータ型が返された場合（予期しないケース）
 		return "", fmt.Errorf("API returned non-text part in response")
 	}
 
