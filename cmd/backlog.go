@@ -121,28 +121,28 @@ var backlogCmd = &cobra.Command{
 func init() {
 	RootCmd.AddCommand(backlogCmd)
 
-	// Backlog 固有のフラグ
-	backlogCmd.Flags().StringVar(&issueID, "issue-id", "", "コメントを投稿するBacklog課題ID（例: PROJECT-123）")
-	backlogCmd.Flags().BoolVar(&noPost, "no-post", false, "投稿をスキップし、結果を標準出力する")
+	// cmd/backlog.go の init 関数全体
 
-	// Backlog 固有のフラグ
-	backlogCmd.Flags().StringVar(&issueID, "issue-id", "", "コメントを投稿するBacklog課題ID（例: PROJECT-123）")
-	backlogCmd.Flags().BoolVar(&noPost, "no-post", false, "投稿をスキップし、結果を標準出力する")
+	func init() {
+		RootCmd.AddCommand(backlogCmd)
 
-	// 共通フラグは PersistentFlags を利用するため、ここで再定義しない。
-	// ただし、local-path のようにサブコマンド固有のデフォルト値を設定したい場合は、
-	// RootCmdで定義された変数をバインドし直すことで上書きできる。
-	backlogCmd.Flags().StringVar(
-		&localPath, // cmd/root.go で定義された変数にバインドし、デフォルト値を上書き
-		"local-path",
-		os.TempDir()+"/git-reviewer-repos/tmp-backlog",
-		"Local path to clone the repository.",
-	)
+		// Backlog 固有のフラグのみをここで定義する
+		backlogCmd.Flags().StringVar(&issueID, "issue-id", "", "コメントを投稿するBacklog課題ID（例: PROJECT-123）")
+		backlogCmd.Flags().BoolVar(&noPost, "no-post", false, "投稿をスキップし、結果を標準出力する")
 
-	// 必須フラグの設定（RootCmdの変数を参照するが、このコマンドで必須であることを明示）
-	// NOTE: MarkFlagRequired は RootCmd.PersistentFlags() ではなく、backlogCmd.Flags() に対して実行する必要があります。
-	backlogCmd.MarkFlagRequired("git-clone-url")
-	backlogCmd.MarkFlagRequired("feature-branch")
-	// issue-id は Backlog 投稿モードで必須
-	backlogCmd.MarkFlagRequired("issue-id")
+		// 共通フラグは root.go の PersistentFlags を利用するため、ここで再定義しない。
+		// ただし、local-path のようにサブコマンド固有のデフォルト値を設定したい場合は、
+		// RootCmdで定義された変数にバインドし直すことで上書きできる。
+		backlogCmd.Flags().StringVar(
+			&localPath, // cmd/root.go で定義された変数にバインドし、デフォルト値を上書き
+			"local-path",
+			os.TempDir()+"/git-reviewer-repos/tmp-backlog",
+			"Local path to clone the repository.",
+		)
+
+		// 必須フラグの設定
+		// MarkFlagRequired は RootCmdの変数を参照するが、このコマンドで必須であることを明示
+		backlogCmd.MarkFlagRequired("git-clone-url")
+		backlogCmd.MarkFlagRequired("feature-branch")
+	}
 }
