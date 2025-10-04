@@ -3,7 +3,6 @@
 package cmd
 
 import (
-	_ "embed" // ルートコマンドでは未使用ですが、一時的に残すことでサブコマンドへの移設がスムーズになります
 	"log"
 	"os"
 
@@ -12,8 +11,6 @@ import (
 
 // --- パッケージレベル変数の定義 ---
 var reviewMode string
-
-
 
 // RootCmd はアプリケーションのベースコマンド（ディスパッチャ）です。
 var RootCmd = &cobra.Command{
@@ -71,6 +68,9 @@ func init() {
 		false,
 		"CRITICAL WARNING: Disables SSH host key verification. This dramatically increases the risk of Man-in-the-Middle attacks. NEVER USE IN PRODUCTION. Only for controlled development/testing environments.",
 	)
+	// 共通で必須となるフラグをルートコマンドでマーク
+	RootCmd.MarkPersistentFlagRequired("git-clone-url")
+	RootCmd.MarkPersistentFlagRequired("feature-branch")
 
 	// NOTE: os.TempDir() を使うため、root.go に "os" をインポートする必要があります。
 }

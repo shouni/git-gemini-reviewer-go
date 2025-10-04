@@ -23,6 +23,7 @@ var (
 var genericCmd = &cobra.Command{
 	Use:   "generic",
 	Short: "コードレビューを実行し、その結果を標準出力に出力します。",
+	Long:  `このコマンドは、指定されたGitリポジトリのブランチ間の差分をAIでレビューし、その結果を標準出力に直接表示します。Backlogなどの外部サービスとの連携は行いません。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// 1. レビューモードの選択
@@ -83,7 +84,8 @@ func init() {
 		"Local path to clone the repository.",
 	)
 
-	// 必須フラグの設定（RootCmdの変数を参照するが、このコマンドで必須であることを明示）
+	// genericCmd 固有の必須フラグはないため、ここでは MarkFlagRequired は不要
+	// 共通の必須フラグは root.go でマークされている
 	genericCmd.MarkFlagRequired("git-clone-url")
 	genericCmd.MarkFlagRequired("feature-branch")
 }

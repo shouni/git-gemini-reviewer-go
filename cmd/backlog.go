@@ -36,6 +36,7 @@ var (
 var backlogCmd = &cobra.Command{
 	Use:   "backlog",
 	Short: "コードレビューを実行し、その結果をBacklogにコメントとして投稿します。",
+	Long:  `このコマンドは、指定されたGitリポジトリのブランチ間の差分をAIでレビューし、その結果をBacklogの指定された課題にコメントとして自動で投稿します。これにより、手動でのレビュー結果転記の手間を省きます。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// 1. 環境変数の確認
@@ -103,12 +104,13 @@ var backlogCmd = &cobra.Command{
 
 		err = backlogService.PostComment(issueID, reviewResult)
 		if err != nil {
-			log.Printf("⚠️ Backlog への投稿に失敗しました: %v\n", err)
-
-			fmt.Println("\n--- Gemini AI レビュー結果 (投稿失敗) ---")
+			// 投稿失敗時に詳細なログを出力し、ユーザーには簡潔なメッセージとレビュー結果のみを表示
+			log.Printf("ERROR: Backlog へのコメント投稿に失敗しました (課題ID: %s): %v\n", issueID, err)
+			fmt.Println("\n--- Gemini AI レビュー結果 (Backlog投稿失敗) ---")
 			fmt.Println(reviewResult)
 			fmt.Println("----------------------------------------")
-			return fmt.Errorf("Backlog への投稿に失敗しましたが、レビュー結果は上記に出力されています。")
+			// ユーザーに表示されるエラーは簡潔に
+			return fmt.Errorf("Backlog課題 %s へのコメント投稿に失敗しました。詳細は上記レビュー結果を確認してください。", issueID)
 		}
 
 		fmt.Printf("✅ レビュー結果を Backlog 課題 ID: %s に投稿しました。\n", issueID)
@@ -141,4 +143,6 @@ func init() {
 	// NOTE: MarkFlagRequired は RootCmd.PersistentFlags() ではなく、backlogCmd.Flags() に対して実行する必要があります。
 	backlogCmd.MarkFlagRequired("git-clone-url")
 	backlogCmd.MarkFlagRequired("feature-branch")
+	// issue-id は Backlog 投稿モードで必須
+	backlogCmd.MarkFlagRequired("issue-id")
 }
