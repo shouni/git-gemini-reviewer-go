@@ -2,9 +2,8 @@ package cmd
 
 import (
 	_ "embed"
-	"context"
 	"fmt"
-	"os"
+	"log"
 	"os/exec"
 
 	"git-gemini-reviewer-go/internal/services"
@@ -54,17 +53,13 @@ var RootCmd = &cobra.Command{
 		diffCmd := exec.Command("git", "diff", "HEAD^", "HEAD")
 		output, err := diffCmd.Output()
 		if err != nil {
-			// git diff が差分を見つけられなかった場合の特殊なエラー処理
-			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
-				// 差分がない場合、Git diff は終了コード1を返すことがある
-				fmt.Println("ℹ️ 差分が見つかりませんでした。レビューをスキップします。")
-				return nil
-			}
+			// Git diff コマンド自体の実行に失敗した場合（例: git が見つからない、リポジトリではない、権限不足など）
 			return fmt.Errorf("Git diff の実行に失敗しました: %w", err)
 		}
 		diffContent := string(output)
 
 		if len(diffContent) == 0 {
+			// コマンド実行は成功したが、出力（差分）が空だった場合
 			fmt.Println("ℹ️ 差分が見つかりませんでした。レビューをスキップします。")
 			return nil
 		}
@@ -80,8 +75,8 @@ var RootCmd = &cobra.Command{
 
 		// 4. Gemini AIにレビューを依頼
 		fmt.Println("🚀 Gemini AIによるコードレビューを開始します...")
-		// 以前修正した services.ReviewCodeDiff のシグネチャに合わせる
-		reviewResult, err := client.ReviewCodeDiff(context.Background(), diffContent, selectedPrompt)
+		// context.Background() ではなく cmd.Context() を使用
+		reviewResult, err := client.ReviewCodeDiff(cmd.Context(), diffContent, selectedPrompt)
 		if err != nil {
 			return fmt.Errorf("コードレビュー中にエラーが発生しました: %w", err)
 		}
@@ -95,18 +90,14 @@ var RootCmd = &cobra.Command{
 	},
 }
 
-// init() 関数は、パッケージがインポートされたときに自動的に実行されます。
-// ここで Cobra のフラグ設定を行います。
 func init() {
-	// PersistentFlags() を使って、ルートコマンドと全てのサブコマンドで利用可能なフラグを定義します。
-	// デフォルトを 'detail' に設定します。
+	// PersistentFlags() でフラグを定義。第3引数がデフォルト値（"detail"）です。 ★★★ コメント修正 ★★★
 	RootCmd.PersistentFlags().StringVarP(&reviewMode, "mode", "m", "detail", "レビューモードを指定: 'release' (リリース判定) または 'detail' (詳細レビュー)")
 }
 
 // Execute はルートコマンドを実行し、アプリケーションを起動します。
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		log.Fatal(err) // ★★★ log.Fatal を使用 ★★★
 	}
 }

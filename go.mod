@@ -2,6 +2,8 @@ module git-gemini-reviewer-go
 
 go 1.24.0
 
+// NOTE: 以下の replace ディレクティブは、ローカル開発環境でのビルドパス問題を解決するために使用します。
+// 外部のCI/CD環境や、他のプロジェクトからモジュールとして利用する際には、この行は削除またはコメントアウトする必要があります。
 replace git-gemini-reviewer-go => ./
 
 require (
