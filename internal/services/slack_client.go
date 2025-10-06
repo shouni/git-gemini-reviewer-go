@@ -31,12 +31,13 @@ func NewSlackClient(webhookURL string) *SlackClient {
 	}
 }
 
-// extractRepoPath は、SSH特殊形式およびURL形式のGit URLから 'owner/repo' 形式のパスを抽出します。
-func extractRepoPath(gitCloneURL string) string {
+// getRepoIdentifier は、Git URLから 'owner/repo' 形式のパスを抽出します。
+// 抽出に失敗した場合は空文字列 ("") を返します。デフォルト値の設定は呼び出し元が行います。
+func getRepoIdentifier(gitCloneURL string) string {
 
 	// 1. SSH特殊形式のURL (git@host:owner/repo.git) の処理
-	// 例: git@github.com:owner/repo.git
-	reSSH := regexp.MustCompile(`:([a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+)\.git$`)
+	// 修正1: 正規表現にピリオドを許容するよう調整 [a-zA-Z0-9_.-]+
+	reSSH := regexp.MustCompile(`:([a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)\.git$`)
 	if strings.HasPrefix(gitCloneURL, "git@") {
 		matches := reSSH.FindStringSubmatch(gitCloneURL)
 		if len(matches) == 2 {
@@ -48,7 +49,13 @@ func extractRepoPath(gitCloneURL string) string {
 	// 2. HTTP/HTTPS および SSH URL形式 (ssh://host/owner/repo.git) の処理
 	parsedURL, err := url.Parse(gitCloneURL)
 
-	if err == nil && parsedURL.Host != "" {
+	// 修正2: URLパースのエラーをログに記録
+	if err != nil {
+		log.Printf("WARNING: Failed to parse Git clone URL '%s': %v", gitCloneURL, err)
+		return "" // エラー発生時は空文字列を返す
+	}
+
+	if parsedURL.Host != "" {
 
 		// パスから '.git' サフィックスを削除
 		path := strings.TrimSuffix(parsedURL.Path, ".git")
@@ -69,8 +76,8 @@ func extractRepoPath(gitCloneURL string) string {
 		}
 	}
 
-	// どちらにもマッチしない場合は、"リポジトリ"というプレースホルダーを返す
-	return "リポジトリ"
+	// どちらにもマッチしない場合は空文字列を返す
+	return ""
 }
 
 // PostMessage は指定されたレビュー結果を Slack チャンネルに投稿します。
@@ -95,7 +102,11 @@ func (c *SlackClient) PostMessage(markdownText string, featureBranch string, git
 	}
 
 	// 1. 通知テキストの生成
-	repoPath := extractRepoPath(gitCloneURL)
+	// 修正3: getRepoIdentifier の結果をチェックし、デフォルト値を設定
+	repoPath := getRepoIdentifier(gitCloneURL)
+	if repoPath == "" {
+		repoPath = "リポジトリ" // デフォルト値を設定
+	}
 
 	notificationText := fmt.Sprintf(
 		"✅ Gemini AI レビュー完了: `%s` ブランチ (%s)",
@@ -109,6 +120,7 @@ func (c *SlackClient) PostMessage(markdownText string, featureBranch string, git
 	)
 
 	sectionBlock := slack.NewSectionBlock(
+		// 処理済みの postableText を使用
 		slack.NewTextBlockObject("mrkdwn", postableText, false, false),
 		nil, // Fields (列) は使用しない
 		nil, // Accessory (ボタンなど) は使用しない
