@@ -6,8 +6,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 	"time"
+
+	"github.com/slack-go/slack"
 )
 
 // SlackClient は Slack API と連携するためのクライアントです。
@@ -27,49 +28,45 @@ func NewSlackClient(webhookURL string) *SlackClient {
 	}
 }
 
-// slackEscapeText は、Slackのmrkdwn内で特別な意味を持つ文字 (&, <, >) をエスケープします。
-// その他のMarkdown文字（*, _, ~など）はSlackが自動で処理します。
-func slackEscapeText(text string) string {
-	// 参照: https://api.slack.com/reference/messaging/payload#markdown
-	text = strings.ReplaceAll(text, "&", "&amp;")
-	text = strings.ReplaceAll(text, "<", "&lt;")
-	text = strings.ReplaceAll(text, ">", "&gt;")
-	return text
-}
+// PostMessage は指定されたレビュー結果（Markdown）を Slack チャンネルに投稿します。
+// Block Kitを使用してリッチなメッセージを構築します。
+func (c *SlackClient) PostMessage(markdownText string) error {
+	// 1. Block Kitコンポーネントの構築
 
-// PostMessage は指定されたレビュー結果を Slack チャンネルに投稿します。
-func (c *SlackClient) PostMessage(text string) error {
-	// Slackのメッセージ制限に対応 (4000文字だが、安全のため余裕を持たせる)
-	const maxSlackMessageLength = 3500
-	const prefix = "*🤖 Gemini AI Code Review Result:*\n\n"
-	const suffix = "\n\n...(メッセージが長すぎたため一部省略されました)"
+	// メッセージのヘッダーブロック（タイトル）を作成
+	headerBlock := slack.NewHeaderBlock(
+		// plain_text を使用し、絵文字を有効にすることでタイトルを強調
+		slack.NewTextBlockObject("plain_text", "🤖 Gemini AI Code Review Result:", true, false),
+	)
 
-	// エスケープ処理を適用
-	escapedText := slackEscapeText(text)
+	// Markdown テキストを格納する Section ブロックを作成
+	// type: "mrkdwn" を指定することで、入力テキストのMarkdown記法が有効になります。
+	sectionBlock := slack.NewSectionBlock(
+		// mrkdwnオブジェクトは自動でエスケープ処理を行うため、手動エスケープは不要です
+		slack.NewTextBlockObject("mrkdwn", markdownText, false, false),
+		nil, // Fields (列) は使用しない
+		nil, // Accessory (ボタンなど) は使用しない
+	)
 
-	formattedText := prefix + escapedText
+	// 複数のブロックを配列にまとめる
+	blocks := []slack.Block{headerBlock, sectionBlock}
 
-	// メッセージが長すぎる場合の処理 (切り詰め)
-	if len(formattedText) > maxSlackMessageLength {
-		log.Printf("WARNING: Slack message length (%d chars) exceeds recommended limit (%d chars). Truncating message.", len(formattedText), maxSlackMessageLength)
-
-		// プレフィックスの長さ + サフィックスの長さを考慮して切り詰める位置を決定
-		truncateLength := maxSlackMessageLength - len(suffix)
-
-		// プレフィックスと切り詰められたテキスト本体、サフィックスを結合
-		formattedText = formattedText[:truncateLength] + suffix
+	// 2. Webhook用のペイロードを構築
+	msg := slack.WebhookMessage{
+		// 通知用の代替テキスト
+		Text: "新しい Gemini AI コードレビュー結果が届きました。",
+		Blocks: &slack.Blocks{
+			BlockSet: blocks,
+		},
 	}
 
-	payload := map[string]string{
-		"text": formattedText,
-	}
-
-	jsonPayload, err := json.Marshal(payload)
+	// 3. JSONペイロードに変換
+	jsonPayload, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal Slack payload: %w", err)
 	}
 
-	// HTTPリクエスト処理
+	// 4. HTTPリクエスト処理
 	resp, err := c.httpClient.Post(c.WebhookURL, "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return fmt.Errorf("failed to post to Slack: %w", err)

@@ -5,6 +5,7 @@ go 1.24.0
 require (
 	github.com/go-git/go-git/v5 v5.16.2
 	github.com/google/generative-ai-go v0.20.1
+	github.com/slack-go/slack v0.17.3
 	github.com/spf13/cobra v1.10.1
 	golang.org/x/crypto v0.42.0
 	google.golang.org/api v0.250.0
@@ -33,6 +34,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
 	github.com/googleapis/gax-go/v2 v2.15.0 // indirect
+	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
