@@ -60,8 +60,9 @@ func (c *SlackClient) PostMessage(text string) error {
 		formattedText = formattedText[:truncateLength] + suffix
 	}
 
-	payload := map[string]string{
-		"text": formattedText,
+	// ペイロードの型を修正
+	payload := map[string]interface{}{
+		"text":   formattedText,
 		"mrkdwn": true,
 	}
 
