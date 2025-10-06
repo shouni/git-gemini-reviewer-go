@@ -30,7 +30,7 @@
 | **CLI フレームワーク** | **Cobra** | コマンドライン引数（フラグ）の解析とサブコマンド構造 (`generic`, `backlog`, `slack`) の構築に使用します。 |
 | **Git 操作** | **go-git / os/exec (外部Git)** | **リモートリポジトリのブランチ間差分**の取得、クローン、フェッチに使用します。SSH認証に対応しています。 |
 | **AI モデル** | **Google Gemini API** | 取得したコード差分を分析し、レビューコメントを生成するために使用します。 |
-| **連携サービス** | **標準 `net/http`** | **Backlog API** および **Slack Webhook** を使用して、生成されたレビュー結果を投稿します。 |
+| **連携サービス** | **Slack 公式 Go SDK** / **標準 `net/http`** | **Slack Block Kit** を使用したリッチなメッセージングと、**Backlog API** への投稿に使用します。 |
 
 -----
 
@@ -174,9 +174,11 @@ $env:SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 
 -----
 
-### 3\. Slack 投稿モード (`slack`) 🌟
+### 3\. Slack 投稿モード (`slack`) 🌟 (Block Kit 対応済み)
 
 リモートリポジトリのブランチ比較を行い、その結果を **Slack の Webhook URL** を通じてメッセージとして投稿します。
+
+**【重要な変更点】** Slack 公式 Go SDK を使用した **Slack Block Kit 形式**で投稿されるようになりました。これにより、通知が構造化され、視認性が大幅に向上しました。さらに、プッシュ通知には**レビュー対象のブランチ名とリポジトリ名**が含められます。
 
 #### 実行コマンド例
 
@@ -185,14 +187,14 @@ $env:SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 
 # Linux/macOS
 ./bin/gemini_reviewer slack \
-  --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
+  --git-clone-url "https://github.com/owner/repo-name.git" \
   --base-branch "main" \
   --feature-branch "feature/slack-notify" 
   # --slack-webhook-url は環境変数 SLACK_WEBHOOK_URL から取得されます
 
 # Windows (PowerShell)
 .\bin\gemini_reviewer.exe slack `
-  --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" `
+  --git-clone-url "https://github.com/owner/repo-name.git" `
   --base-branch "main" `
   --feature-branch "feature/slack-notify"
   # --slack-webhook-url は環境変数 SLACK_WEBHOOK_URL から取得されます
