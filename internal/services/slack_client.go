@@ -31,11 +31,11 @@ func NewSlackClient(webhookURL string) *SlackClient {
 	}
 }
 
-// extractRepoPath は、HTTP/HTTPSまたはSSH形式のGit URLから 'owner/repo' 形式のパスを抽出します。
+// extractRepoPath は、SSH特殊形式およびURL形式のGit URLから 'owner/repo' 形式のパスを抽出します。
 func extractRepoPath(gitCloneURL string) string {
-	// 1. SSH形式のURL (git@host:owner/repo.git) の処理
-	// 例: git@github.com:nabeken/blackfriday-slack-block-kit.git
-	// 正規表現で `:owner/repo.git` の部分を抽出
+
+	// 1. SSH特殊形式のURL (git@host:owner/repo.git) の処理
+	// 例: git@github.com:owner/repo.git
 	reSSH := regexp.MustCompile(`:([a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+)\.git$`)
 	if strings.HasPrefix(gitCloneURL, "git@") {
 		matches := reSSH.FindStringSubmatch(gitCloneURL)
@@ -45,11 +45,12 @@ func extractRepoPath(gitCloneURL string) string {
 		}
 	}
 
-	// 2. HTTP/HTTPS形式のURLの処理
-	// 例: https://github.com/owner/repo.git または https://gitlab.com/owner/repo
+	// 2. HTTP/HTTPS および SSH URL形式 (ssh://host/owner/repo.git) の処理
 	parsedURL, err := url.Parse(gitCloneURL)
+
 	if err == nil && parsedURL.Host != "" {
-		// パスから '.git' サフィックスを削除し、空の要素をフィルタリング
+
+		// パスから '.git' サフィックスを削除
 		path := strings.TrimSuffix(parsedURL.Path, ".git")
 		parts := strings.Split(path, "/")
 
@@ -61,27 +62,41 @@ func extractRepoPath(gitCloneURL string) string {
 			}
 		}
 
-		if len(cleanParts) >= 2 {
-			// owner/repo の形式であれば、後ろ2つを結合
-			return cleanParts[len(cleanParts)-2] + "/" + cleanParts[len(cleanParts)-1]
-		}
-		if len(cleanParts) == 1 {
-			// /repo の形式であればそれを使用
-			return cleanParts[0]
+		// 一般的な owner/repo 形式 (つまり2つのセグメント) が確認できた場合のみ返す
+		if len(cleanParts) == 2 {
+			// cleanParts = [owner, repo] の場合
+			return cleanParts[0] + "/" + cleanParts[1]
 		}
 	}
 
-	// 3. どちらにもマッチしない場合は、単にブランチ名のみを通知に使うため、"リポジトリ"というプレースホルダーを返す
+	// どちらにもマッチしない場合は、"リポジトリ"というプレースホルダーを返す
 	return "リポジトリ"
 }
 
 // PostMessage は指定されたレビュー結果を Slack チャンネルに投稿します。
 func (c *SlackClient) PostMessage(markdownText string, featureBranch string, gitCloneURL string) error {
 
-	// 1. 通知テキストの生成 (extractRepoPath を利用)
+	// Slack Section Block内のmrkdwnテキストの最大文字数は3000文字
+	const maxMrkdwnLength = 3000
+	const suffix = "\n\n...(レビュー結果が長すぎたため、一部省略されました)"
+
+	// 処理対象となる Markdown テキスト
+	postableText := markdownText
+
+	// 文字数チェックと切り詰め
+	if len(postableText) > maxMrkdwnLength {
+		log.Printf("WARNING: Markdown text length (%d chars) exceeds Block Kit limit (%d chars). Truncating message.", len(postableText), maxMrkdwnLength)
+
+		// サフィックスの長さを考慮して切り詰める位置を決定
+		truncateLength := maxMrkdwnLength - len(suffix)
+
+		// テキストを切り詰め、サフィックスを結合
+		postableText = postableText[:truncateLength] + suffix
+	}
+
+	// 1. 通知テキストの生成
 	repoPath := extractRepoPath(gitCloneURL)
 
-	// 通知用の代替テキストを構築
 	notificationText := fmt.Sprintf(
 		"✅ Gemini AI レビュー完了: `%s` ブランチ (%s)",
 		featureBranch,
@@ -94,7 +109,7 @@ func (c *SlackClient) PostMessage(markdownText string, featureBranch string, git
 	)
 
 	sectionBlock := slack.NewSectionBlock(
-		slack.NewTextBlockObject("mrkdwn", markdownText, false, false),
+		slack.NewTextBlockObject("mrkdwn", postableText, false, false),
 		nil, // Fields (列) は使用しない
 		nil, // Accessory (ボタンなど) は使用しない
 	)
