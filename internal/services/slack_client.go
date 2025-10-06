@@ -62,6 +62,7 @@ func (c *SlackClient) PostMessage(text string) error {
 
 	payload := map[string]string{
 		"text": formattedText,
+		"mrkdwn": true,
 	}
 
 	jsonPayload, err := json.Marshal(payload)
