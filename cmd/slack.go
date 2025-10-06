@@ -8,11 +8,13 @@ import (
 	"strings"
 
 	"git-gemini-reviewer-go/internal/services"
+
 	"github.com/spf13/cobra"
 )
 
 //go:embed prompts/release_review_prompt.md
 var slackReleasePrompt string
+
 //go:embed prompts/detail_review_prompt.md
 var slackDetailPrompt string
 
@@ -100,8 +102,8 @@ var slackCmd = &cobra.Command{
 
 		fmt.Printf("📤 Slack Webhook URL にレビュー結果を投稿します...\n")
 
-		// PostMessage の呼び出しを修正 (指摘 #2: channelID 引数を削除)
-		err = slackService.PostMessage(reviewResult)
+		// PostMessage の呼び出しを修正 (cfgからブランチ名とURLを渡す)
+		err = slackService.PostMessage(reviewResult, cfg.FeatureBranch, cfg.GitCloneURL)
 		if err != nil {
 			log.Printf("ERROR: Slack へのコメント投稿に失敗しました: %v\n", err)
 			return fmt.Errorf("Slack へのメッセージ投稿に失敗しました。詳細はログを確認してください。")

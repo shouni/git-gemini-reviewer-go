@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/slack-go/slack"
@@ -30,37 +31,51 @@ func NewSlackClient(webhookURL string) *SlackClient {
 
 // PostMessage は指定されたレビュー結果（Markdown）を Slack チャンネルに投稿します。
 // Block Kitを使用してリッチなメッセージを構築します。
-func (c *SlackClient) PostMessage(markdownText string) error {
-	// 1. Block Kitコンポーネントの構築
+func (c *SlackClient) PostMessage(markdownText string, featureBranch string, gitCloneURL string) error {
 
-	// メッセージのヘッダーブロック（タイトル）を作成
+	// 1. 通知テキストの生成
+	// リポジトリ名 (例: owner/repo) を URL から抽出するシンプルなロジック
+	repoPath := gitCloneURL
+	if strings.Contains(repoPath, "/") {
+		// URLからホストと拡張子を除去
+		parts := strings.Split(strings.TrimSuffix(repoPath, ".git"), "/")
+		if len(parts) >= 2 {
+			repoPath = parts[len(parts)-2] + "/" + parts[len(parts)-1]
+		}
+	} else {
+		// URLが不完全な場合は、ブランチ名のみを使用
+		repoPath = "リポジトリ"
+	}
+
+	// 通知用の代替テキストを構築
+	notificationText := fmt.Sprintf(
+		"✅ Gemini AI レビュー完了: `%s` ブランチ (%s)",
+		featureBranch,
+		repoPath,
+	)
+
+	// 2. Block Kitコンポーネントの構築
 	headerBlock := slack.NewHeaderBlock(
-		// plain_text を使用し、絵文字を有効にすることでタイトルを強調
 		slack.NewTextBlockObject("plain_text", "🤖 Gemini AI Code Review Result:", true, false),
 	)
 
-	// Markdown テキストを格納する Section ブロックを作成
-	// type: "mrkdwn" を指定することで、入力テキストのMarkdown記法が有効になります。
 	sectionBlock := slack.NewSectionBlock(
-		// mrkdwnオブジェクトは自動でエスケープ処理を行うため、手動エスケープは不要です
 		slack.NewTextBlockObject("mrkdwn", markdownText, false, false),
-		nil, // Fields (列) は使用しない
-		nil, // Accessory (ボタンなど) は使用しない
+		nil,
+		nil,
 	)
 
 	// 複数のブロックを配列にまとめる
 	blocks := []slack.Block{headerBlock, sectionBlock}
 
-	// 2. Webhook用のペイロードを構築
+	// 3. Webhook用のペイロードを構築
 	msg := slack.WebhookMessage{
-		// 通知用の代替テキスト
-		Text: "新しい Gemini AI コードレビュー結果が届きました。",
+		Text: notificationText,
 		Blocks: &slack.Blocks{
 			BlockSet: blocks,
 		},
 	}
 
-	// 3. JSONペイロードに変換
 	jsonPayload, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal Slack payload: %w", err)
