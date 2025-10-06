@@ -60,10 +60,19 @@ func (c *SlackClient) PostMessage(text string) error {
 		formattedText = formattedText[:truncateLength] + suffix
 	}
 
-	// ペイロードの型を修正
+	// Markdownを有効にしたセクションブロックを作成
+	// "mrkdwn"タイプのテキストオブジェクトを指定する
+	sectionBlock := map[string]interface{}{
+		"type": "section",
+		"text": map[string]string{
+			"type": "mrkdwn",
+			"text": formattedText,
+		},
+	}
+
+	// "blocks"フィールドを持つペイロードを作成
 	payload := map[string]interface{}{
-		"text":   formattedText,
-		"mrkdwn": true,
+		"blocks": []interface{}{sectionBlock},
 	}
 
 	jsonPayload, err := json.Marshal(payload)
