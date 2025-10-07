@@ -70,55 +70,54 @@ func getRepoIdentifier(gitCloneURL string) string {
 	return ""
 }
 
-// PostMessage は、AIによるレビュー結果をSlackのBlock Kit形式で投稿します。
+// PostMessage は、汎用的なMarkdownテキストを解析し、SlackのBlock Kit形式で投稿します。
 func (c *SlackClient) PostMessage(markdownText string, featureBranch string, gitCloneURL string) error {
 	repoIdentifier := getRepoIdentifier(gitCloneURL)
 	if repoIdentifier == "" {
-		repoIdentifier = "不明なリポジトリ" // 識別子が取得できない場合のフォールバック
+		repoIdentifier = "不明なリポジトリ"
 	}
 
-	// --- 1. Block Kitコンポーネントの構築 ---
+	// --- 1. Block Kitの静的コンポーネントを構築 ---
+	blocks := []slack.Block{
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", "🤖 Gemini AI Code Review Result", true, false),
+		),
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("`%s` ブランチのレビューが完了しました。", featureBranch), false, false),
+			nil,
+			nil,
+		),
+		slack.NewDividerBlock(),
+	}
 
-	// ヘッダーブロック
-	headerBlock := slack.NewHeaderBlock(
-		slack.NewTextBlockObject("plain_text", "🤖 Gemini AI Code Review Result", true, false),
-	)
-
-	branchSectionBlock := slack.NewSectionBlock(
-		slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("✅ `%s` ブランチのレビューが完了しました。", featureBranch), false, false),
-		nil,
-		nil,
-	)
-
-	// メインのブロックリストを初期化
-	blocks := []slack.Block{headerBlock, branchSectionBlock, slack.NewDividerBlock()}
-
-	// --- 2. レビュー本文を動的にブロックへ変換 ---
-	const maxSectionLength = 2900 // Slackセクションブロックの文字数上限(3000)へのバッファ
-	const maxBlocks = 50          // メッセージが長くなりすぎないようにブロック数も制限 (Slack上限は100)
+	// --- 2. Markdownテキストを動的にブロックへ変換 ---
+	const maxSectionLength = 2900
+	const maxBlocks = 50
 	const truncationSuffix = "\n\n... (レビューが長すぎるため省略されました)"
 
-	// レビュー本文を水平線(---)で分割し、セクションごとのブロックを生成
+	// Markdownの変換ルールを定義
+	boldRegex := regexp.MustCompile(`\*\*(.*?)\*\*`)     // **text** -> *text*
+	headerRegex := regexp.MustCompile(`(?m)^##\s*(.*)$`) // ## Title -> *Title*
+	listItemRegex := regexp.MustCompile(`(?m)^\s*-\s+`) // - item -> • item
+
 	reviewSections := regexp.MustCompile(`\n---\n?`).Split(markdownText, -1)
-	headerRegex := regexp.MustCompile(`(?m)^##\s*(.*)$`)
 
 	for _, sectionText := range reviewSections {
-		// ブロック数が上限に近い場合、省略メッセージを追加して終了
 		if len(blocks) >= maxBlocks-2 {
 			log.Println("WARNING: Review has too many sections, truncating message.")
 			blocks = append(blocks, slack.NewSectionBlock(
 				slack.NewTextBlockObject("mrkdwn", truncationSuffix, false, false), nil, nil))
 			break
 		}
-
 		if strings.TrimSpace(sectionText) == "" {
 			continue
 		}
 
-		// Markdownの `## Title` を Slackの `*Title*` (太字) に変換
-		processedText := headerRegex.ReplaceAllString(sectionText, "*$1*")
+		processedText := sectionText
+		processedText = boldRegex.ReplaceAllString(processedText, "*$1*")
+		processedText = headerRegex.ReplaceAllString(processedText, "*$1*")
+		processedText = listItemRegex.ReplaceAllString(processedText, "• ") // "•" はビュレット(U+2022)
 
-		// セクションごとの文字数制限を超えた場合、そのセクションを切り詰める
 		if len(processedText) > maxSectionLength {
 			log.Printf("WARNING: A review section is too long (%d chars), truncating.", len(processedText))
 			processedText = processedText[:maxSectionLength-len(truncationSuffix)] + truncationSuffix
@@ -129,12 +128,12 @@ func (c *SlackClient) PostMessage(markdownText string, featureBranch string, git
 			slack.NewDividerBlock(),
 		)
 	}
-	// 最後の余分なDividerを削除
+
 	if len(blocks) > 0 {
-		blocks = blocks[:len(blocks)-1]
+		blocks = blocks[:len(blocks)-1] // 最後の余分なDividerを削除
 	}
 
-	// フッターとしてコンテキストブロックを追加
+	// フッターを追加
 	footerBlock := slack.NewContextBlock(
 		"review-context",
 		slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("リポジトリ: `%s`  |  レビュー時刻: %s",
@@ -144,7 +143,7 @@ func (c *SlackClient) PostMessage(markdownText string, featureBranch string, git
 
 	// --- 3. Webhookメッセージの作成と送信 ---
 	msg := slack.WebhookMessage{
-		Text: fmt.Sprintf("Gemini AI レビュー: %s (%s)", featureBranch, repoIdentifier), // 通知用のフォールバックテキスト
+		Text: fmt.Sprintf("Gemini AI レビュー: %s (%s)", featureBranch, repoIdentifier),
 		Blocks: &slack.Blocks{
 			BlockSet: blocks,
 		},
@@ -154,16 +153,14 @@ func (c *SlackClient) PostMessage(markdownText string, featureBranch string, git
 	if err != nil {
 		return fmt.Errorf("failed to marshal Slack payload: %w", err)
 	}
-
 	resp, err := c.httpClient.Post(c.WebhookURL, "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return fmt.Errorf("failed to post to Slack: %w", err)
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("Slack API returned non-OK status code: %d %s", resp.StatusCode, resp.Status)
 	}
-
 	return nil
 }
+
