@@ -4,6 +4,13 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/shouni/git-gemini-reviewer-go)](https://golang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+
+## 📢 [New\!] ずんだもんによる音声デモ
+
+このツールの機能概要と、強化された Slack 連携について、**ずんだもん**が音声で解説しています！
+
+## **🎶 [デモ音声を聴く (MP3形式)](https://www.google.com/url?sa=E&source=gmail&q=https://github.com/shouni/git-gemini-reviewer-go/assert/audio/zundamon_review_demo.wav)**
+
 ## 🚀 概要 (About) - 開発チームの生産性を高めるAIパートナー
 
 **`Git Gemini Reviewer Go`** は、**Google Gemini の強力なAI**を活用し、**コードレビューを自動でお手伝い**するコマンドラインツールです。
