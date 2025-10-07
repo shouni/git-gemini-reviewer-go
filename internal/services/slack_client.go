@@ -108,16 +108,19 @@ func (c *SlackClient) PostMessage(markdownText string, featureBranch string, git
 		repoPath = "リポジトリ" // デフォルト値を設定
 	}
 
-	headerText := fmt.Sprintf(
-		"🤖 Gemini AI Code Review Result: `%s` ブランチ (%s)",
-		featureBranch,
-		repoPath,
-	)
-
+	// headerBlockをシンプルにする
 	headerBlock := slack.NewHeaderBlock(
-		slack.NewTextBlockObject("plain_text", headerText, true, false),
+		slack.NewTextBlockObject("plain_text", "🤖 Gemini AI Code Review Result", true, false),
 	)
 
+	// ブランチ名を表示するためのセクションブロック（サブヘッダー）を追加
+	branchSectionBlock := slack.NewSectionBlock(
+		slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("`%s` ブランチ (%s) のレビューが完了しました。", featureBranch, repoPath), false, false),
+		nil,
+		nil,
+	)
+
+	// 処理済みの postableText を使用
 	contentSectionBlock := slack.NewSectionBlock(
 		slack.NewTextBlockObject("mrkdwn", postableText, false, false),
 		nil,
@@ -125,7 +128,7 @@ func (c *SlackClient) PostMessage(markdownText string, featureBranch string, git
 	)
 
 	// 複数のブロックを配列にまとめる
-	blocks := []slack.Block{headerBlock, contentSectionBlock}
+	blocks := []slack.Block{headerBlock, branchSectionBlock, contentSectionBlock}
 
 	// 3. Webhook用のペイロードを構築
 	msg := slack.WebhookMessage{
