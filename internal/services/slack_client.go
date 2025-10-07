@@ -25,140 +25,142 @@ func NewSlackClient(webhookURL string) *SlackClient {
 	return &SlackClient{
 		WebhookURL: webhookURL,
 		httpClient: &http.Client{
-			// ネットワークのハングアップを防ぐため、10秒のタイムアウトを設定
-			Timeout: 10 * time.Second,
+			Timeout: 10 * time.Second, // ネットワークのハングアップを防止
 		},
 	}
 }
 
-// getRepoIdentifier は、Git URLから 'owner/repo' 形式のパスを抽出します。
-// 抽出に失敗した場合は空文字列 ("") を返します。デフォルト値の設定は呼び出し元が行います。
+// getRepoIdentifier は、GitのクローンURLから 'owner/repo' 形式の識別子を抽出します。
+// HTTP(S)およびSSH形式のURLに対応し、抽出に失敗した場合は空文字列を返します。
 func getRepoIdentifier(gitCloneURL string) string {
-
-	// 1. SSH特殊形式のURL (git@host:owner/repo.git) の処理
-	// 修正1: 正規表現にピリオドを許容するよう調整 [a-zA-Z0-9_.-]+
-	reSSH := regexp.MustCompile(`:([a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)\.git$`)
+	// git@github.com:owner/repo.git のようなSSH形式のURLを処理
 	if strings.HasPrefix(gitCloneURL, "git@") {
-		matches := reSSH.FindStringSubmatch(gitCloneURL)
-		if len(matches) == 2 {
-			// matches[1] が 'owner/repo' に相当
-			return matches[1]
+		re := regexp.MustCompile(`:([a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)`)
+		matches := re.FindStringSubmatch(gitCloneURL)
+		if len(matches) > 1 {
+			return strings.TrimSuffix(matches[1], ".git")
 		}
 	}
 
-	// 2. HTTP/HTTPS および SSH URL形式 (ssh://host/owner/repo.git) の処理
+	// HTTP, HTTPS, SSH (ssh://) 形式のURLを処理
 	parsedURL, err := url.Parse(gitCloneURL)
-
-	// 修正2: URLパースのエラーをログに記録
 	if err != nil {
 		log.Printf("WARNING: Failed to parse Git clone URL '%s': %v", gitCloneURL, err)
-		return "" // エラー発生時は空文字列を返す
+		return ""
 	}
 
-	if parsedURL.Host != "" {
+	// パスから .git を削除し、/ で分割
+	path := strings.TrimSuffix(parsedURL.Path, ".git")
+	parts := strings.Split(path, "/")
 
-		// パスから '.git' サフィックスを削除
-		path := strings.TrimSuffix(parsedURL.Path, ".git")
-		parts := strings.Split(path, "/")
-
-		// 空の要素（先頭のスラッシュなど）を取り除く
-		var cleanParts []string
-		for _, part := range parts {
-			if part != "" {
-				cleanParts = append(cleanParts, part)
-			}
-		}
-
-		// 一般的な owner/repo 形式 (つまり2つのセグメント) が確認できた場合のみ返す
-		if len(cleanParts) == 2 {
-			// cleanParts = [owner, repo] の場合
-			return cleanParts[0] + "/" + cleanParts[1]
+	// 空の要素を除外
+	var cleanParts []string
+	for _, p := range parts {
+		if p != "" {
+			cleanParts = append(cleanParts, p)
 		}
 	}
 
-	// どちらにもマッチしない場合は空文字列を返す
+	// 最後の2つの要素を 'owner/repo' として結合
+	if len(cleanParts) >= 2 {
+		return strings.Join(cleanParts[len(cleanParts)-2:], "/")
+	}
+
+	log.Printf("WARNING: Could not determine 'owner/repo' from URL path: %s", parsedURL.Path)
 	return ""
 }
 
-// PostMessage は指定されたレビュー結果を Slack チャンネルに投稿します。
+// PostMessage は、汎用的なMarkdownテキストを解析し、SlackのBlock Kit形式で投稿します。
 func (c *SlackClient) PostMessage(markdownText string, featureBranch string, gitCloneURL string) error {
-
-	// Slack Section Block内のmrkdwnテキストの最大文字数は3000文字
-	const maxMrkdwnLength = 3000
-	const suffix = "\n\n...(レビュー結果が長すぎたため、一部省略されました)"
-
-	// 処理対象となる Markdown テキスト
-	postableText := markdownText
-
-	// 文字数チェックと切り詰め
-	if len(postableText) > maxMrkdwnLength {
-		log.Printf("WARNING: Markdown text length (%d chars) exceeds Block Kit limit (%d chars). Truncating message.", len(postableText), maxMrkdwnLength)
-
-		// サフィックスの長さを考慮して切り詰める位置を決定
-		truncateLength := maxMrkdwnLength - len(suffix)
-
-		// テキストを切り詰め、サフィックスを結合
-		postableText = postableText[:truncateLength] + suffix
+	repoIdentifier := getRepoIdentifier(gitCloneURL)
+	if repoIdentifier == "" {
+		repoIdentifier = "不明なリポジトリ"
 	}
 
-	// 1. 通知テキストの生成
-	// 修正3: getRepoIdentifier の結果をチェックし、デフォルト値を設定
-	repoPath := getRepoIdentifier(gitCloneURL)
-	if repoPath == "" {
-		repoPath = "リポジトリ" // デフォルト値を設定
+	// --- 1. Block Kitの静的コンポーネントを構築 ---
+	blocks := []slack.Block{
+		slack.NewHeaderBlock(
+			slack.NewTextBlockObject("plain_text", "🤖 Gemini AI Code Review Result", true, false),
+		),
+		slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("`%s` ブランチのレビューが完了しました。", featureBranch), false, false),
+			nil,
+			nil,
+		),
+		slack.NewDividerBlock(),
 	}
 
-	notificationText := fmt.Sprintf(
-		"✅ Gemini AI レビュー完了: `%s` ブランチ (%s)",
-		featureBranch,
-		repoPath,
+	// --- 2. Markdownテキストを動的にブロックへ変換 ---
+	const maxSectionLength = 2900
+	const maxBlocks = 50
+	const truncationSuffix = "\n\n... (レビューが長すぎるため省略されました)"
+
+	// Markdownの変換ルールを定義
+	boldRegex := regexp.MustCompile(`\*\*(.*?)\*\*`)     // **text** -> *text*
+	headerRegex := regexp.MustCompile(`(?m)^##\s*(.*)$`) // ## Title -> *Title*
+	listItemRegex := regexp.MustCompile(`(?m)^\s*-\s+`) // - item -> • item
+
+	reviewSections := regexp.MustCompile(`\n---\n?`).Split(markdownText, -1)
+
+	for _, sectionText := range reviewSections {
+		if len(blocks) >= maxBlocks-2 {
+			log.Println("WARNING: Review has too many sections, truncating message.")
+			blocks = append(blocks, slack.NewSectionBlock(
+				slack.NewTextBlockObject("mrkdwn", truncationSuffix, false, false), nil, nil))
+			break
+		}
+		if strings.TrimSpace(sectionText) == "" {
+			continue
+		}
+
+		processedText := sectionText
+		processedText = boldRegex.ReplaceAllString(processedText, "*$1*")
+		processedText = headerRegex.ReplaceAllString(processedText, "*$1*")
+		processedText = listItemRegex.ReplaceAllString(processedText, "• ") // "•" はビュレット(U+2022)
+
+		if len(processedText) > maxSectionLength {
+			log.Printf("WARNING: A review section is too long (%d chars), truncating.", len(processedText))
+			processedText = processedText[:maxSectionLength-len(truncationSuffix)] + truncationSuffix
+		}
+
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", processedText, false, false), nil, nil),
+			slack.NewDividerBlock(),
+		)
+	}
+
+	if len(blocks) > 0 {
+		blocks = blocks[:len(blocks)-1] // 最後の余分なDividerを削除
+	}
+
+	// フッターを追加
+	footerBlock := slack.NewContextBlock(
+		"review-context",
+		slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("リポジトリ: `%s`  |  レビュー時刻: %s",
+			repoIdentifier, time.Now().Format("2006-01-02 15:04")), false, false),
 	)
+	blocks = append(blocks, footerBlock)
 
-	// 2. Block Kitコンポーネントの構築
-	headerBlock := slack.NewHeaderBlock(
-		slack.NewTextBlockObject("plain_text", "🤖 Gemini AI Code Review Result:", true, false),
-	)
-
-	sectionBlock := slack.NewSectionBlock(
-		// 処理済みの postableText を使用
-		slack.NewTextBlockObject("mrkdwn", postableText, false, false),
-		nil, // Fields (列) は使用しない
-		nil, // Accessory (ボタンなど) は使用しない
-	)
-
-	// 複数のブロックを配列にまとめる
-	blocks := []slack.Block{headerBlock, sectionBlock}
-
-	// 3. Webhook用のペイロードを構築
+	// --- 3. Webhookメッセージの作成と送信 ---
 	msg := slack.WebhookMessage{
-		// 修正後の動的な通知テキストを設定
-		Text: notificationText,
+		Text: fmt.Sprintf("Gemini AI レビュー: %s (%s)", featureBranch, repoIdentifier),
 		Blocks: &slack.Blocks{
 			BlockSet: blocks,
 		},
 	}
 
-	// 4. JSONペイロードに変換
 	jsonPayload, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal Slack payload: %w", err)
 	}
-
-	// 5. HTTPリクエスト処理
 	resp, err := c.httpClient.Post(c.WebhookURL, "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return fmt.Errorf("failed to post to Slack: %w", err)
 	}
-
-	defer func() {
-		if closeErr := resp.Body.Close(); closeErr != nil {
-			log.Printf("WARNING: failed to close Slack API response body: %v", closeErr)
-		}
-	}()
-
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Slack API returned non-OK status code: %s", resp.Status)
+		return fmt.Errorf("Slack API returned non-OK status code: %d %s", resp.StatusCode, resp.Status)
 	}
-
 	return nil
 }
+
