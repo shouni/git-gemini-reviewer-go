@@ -84,21 +84,10 @@ func (c *SlackClient) PostMessage(markdownText string, featureBranch string, git
 		slack.NewTextBlockObject("plain_text", "🤖 Gemini AI Code Review Result", true, false),
 	)
 
-	// ブランチ情報とリポジトリへのボタンを配置するセクション
-	var branchAccessory *slack.Accessory
-	if gitCloneURL != "" {
-		branchAccessory = slack.NewAccessory(
-			slack.NewButtonBlockElement(
-				"view_repository_button", // Action ID
-				repoIdentifier,           // Value
-				slack.NewTextBlockObject("plain_text", "リポジトリを見る", true, false),
-			).WithURL(strings.TrimSuffix(gitCloneURL, ".git")),
-		)
-	}
 	branchSectionBlock := slack.NewSectionBlock(
 		slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("✅ `%s` ブランチのレビューが完了しました。", featureBranch), false, false),
 		nil,
-		branchAccessory,
+		nil,
 	)
 
 	// メインのブロックリストを初期化
