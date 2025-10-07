@@ -97,6 +97,17 @@ $env:SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 
 -----
 
+## 🤖 AIコードレビューの種類 (`--mode` オプション) 
+
+本ツールは、レビューの目的に応じて AI に与える指示（**プロンプト**）を切り替えることができます。これは共通フラグの **`-m`, `--mode`** で指定します。
+
+| モード (`-m`) | プロンプトファイル | 目的とレビュー観点 |
+| :--- | :--- | :--- |
+| **`detail`** | `prompts/detail_review_prompt.md` | **コード品質と保守性の向上**を目的とした詳細なレビュー。可読性、重複、命名規則、一般的なベストプラクティスからの逸脱など、広範囲な技術的側面に焦点を当てます。 |
+| **`release`** | `prompts/release_review_prompt.md` | **本番リリース可否の判定**を目的としたクリティカルなレビュー。致命的なバグ、セキュリティ脆弱性、サーバーダウンにつながる重大なパフォーマンス問題など、リリースをブロックする問題に限定して指摘します。 |
+
+-----
+
 ## 🚀 使い方 (Usage) と実行例
 
 このツールは、**リモートリポジトリのブランチ間比較**に特化しており、**サブコマンド**を使用します。
@@ -124,18 +135,11 @@ $env:SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 #### 実行コマンド例
 
 ```bash
-# main と develop の差分を詳細レビューモードで実行
-
-# Linux/macOS
+# main と develop の差分をリリース判定モードで実行
 ./bin/gemini_reviewer generic \
+  -m "release" \
   --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
   --base-branch "main" \
-  --feature-branch "develop"
-
-# Windows (PowerShell)
-.\bin\gemini_reviewer.exe generic `
-  --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" `
-  --base-branch "main" `
   --feature-branch "develop"
 ```
 
@@ -149,20 +153,11 @@ $env:SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 
 ```bash
 # bugfix/issue-456 の差分をレビューし、PROJECT-123 に投稿
-
-# Linux/macOS
 ./bin/gemini_reviewer backlog \
   --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
   --base-branch "main" \
   --feature-branch "bugfix/issue-456" \
   --issue-id "PROJECT-123" 
-
-# Windows (PowerShell)
-.\bin\gemini_reviewer.exe backlog `
-  --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" `
-  --base-branch "main" `
-  --feature-branch "bugfix/issue-456" `
-  --issue-id "PROJECT-123"
 ```
 
 #### 固有フラグ (Backlog連携)
@@ -183,20 +178,12 @@ $env:SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 #### 実行コマンド例
 
 ```bash
-# feature/slack-notify の差分をレビューし、Slackチャンネルに投稿
-
-# Linux/macOS
+# feature/slack-notify の差分を詳細レビューモードで実行し、Slackに投稿
 ./bin/gemini_reviewer slack \
+  -m "detail" \
   --git-clone-url "https://github.com/owner/repo-name.git" \
   --base-branch "main" \
   --feature-branch "feature/slack-notify" 
-  # --slack-webhook-url は環境変数 SLACK_WEBHOOK_URL から取得されます
-
-# Windows (PowerShell)
-.\bin\gemini_reviewer.exe slack `
-  --git-clone-url "https://github.com/owner/repo-name.git" `
-  --base-branch "main" `
-  --feature-branch "feature/slack-notify"
   # --slack-webhook-url は環境変数 SLACK_WEBHOOK_URL から取得されます
 ```
 
