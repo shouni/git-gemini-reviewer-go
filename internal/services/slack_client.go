@@ -108,39 +108,16 @@ func (c *SlackClient) PostMessage(markdownText string, featureBranch string, git
 		repoPath = "リポジトリ" // デフォルト値を設定
 	}
 
-	notificationText := fmt.Sprintf(
-		"✅ Gemini AI レビュー完了: `%s` ブランチ (%s)",
+	headerText := fmt.Sprintf(
+		"🤖 Gemini AI Code Review Result: `%s` ブランチ (%s)",
 		featureBranch,
 		repoPath,
 	)
 
-	//// 2. Block Kitコンポーネントの構築
-	//headerBlock := slack.NewHeaderBlock(
-	//	slack.NewTextBlockObject("plain_text", "🤖 Gemini AI Code Review Result:", true, false),
-	//)
-	//
-	//sectionBlock := slack.NewSectionBlock(
-	//	// 処理済みの postableText を使用
-	//	slack.NewTextBlockObject("mrkdwn", postableText, false, false),
-	//	nil, // Fields (列) は使用しない
-	//	nil, // Accessory (ボタンなど) は使用しない
-	//)
-	//
-	//// 複数のブロックを配列にまとめる
-	//blocks := []slack.Block{headerBlock, sectionBlock}
-
 	headerBlock := slack.NewHeaderBlock(
-		slack.NewTextBlockObject("plain_text", "🤖 Gemini AI Code Review Result:", true, false),
+		slack.NewTextBlockObject("plain_text", headerText, true, false),
 	)
 
-	// ブランチ名を表示するためのセクションブロックを追加
-	branchSectionBlock := slack.NewSectionBlock(
-		slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("✅ *Gemini AI レビュー完了*: `%s` ブランチ (%s)", featureBranch, repoPath), false, false),
-		nil,
-		nil,
-	)
-
-	// 処理済みの postableText を使用
 	contentSectionBlock := slack.NewSectionBlock(
 		slack.NewTextBlockObject("mrkdwn", postableText, false, false),
 		nil,
@@ -148,12 +125,11 @@ func (c *SlackClient) PostMessage(markdownText string, featureBranch string, git
 	)
 
 	// 複数のブロックを配列にまとめる
-	blocks := []slack.Block{headerBlock, branchSectionBlock, contentSectionBlock}
+	blocks := []slack.Block{headerBlock, contentSectionBlock}
 
 	// 3. Webhook用のペイロードを構築
 	msg := slack.WebhookMessage{
-		// 修正後の動的な通知テキストを設定
-		Text: notificationText,
+		Text: "",
 		Blocks: &slack.Blocks{
 			BlockSet: blocks,
 		},
