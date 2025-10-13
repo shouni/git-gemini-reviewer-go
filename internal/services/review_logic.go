@@ -9,13 +9,13 @@ import (
 
 // ReviewConfig はレビュー実行に必要な全てのパラメータを保持します。（以前定義したものを使用）
 type ReviewConfig struct {
-	GeminiModel     string
-	PromptContent   string
-	GitCloneURL     string
-	BaseBranch      string
-	FeatureBranch   string
-	SSHKeyPath      string
-	LocalPath       string
+	GeminiModel      string
+	PromptContent    string
+	GitCloneURL      string
+	BaseBranch       string
+	FeatureBranch    string
+	SSHKeyPath       string
+	LocalPath        string
 	SkipHostKeyCheck bool
 }
 
@@ -65,12 +65,11 @@ func RunReviewAndGetResult(ctx context.Context, cfg ReviewConfig) (string, error
 
 	// --- 3. AIレビュー（Gemini） ---
 	fmt.Println("🚀 Gemini AIによるコードレビューを開始します...")
-	geminiClient, err := NewGeminiClient(cfg.GeminiModel)
+	geminiClient, err := NewGeminiClient(ctx, cfg.GeminiModel)
 	if err != nil {
 		log.Printf("ERROR: Geminiクライアントの初期化エラー: %v", err)
 		return "", fmt.Errorf("Geminiクライアントの初期化エラー: %w", err)
 	}
-	defer geminiClient.Close()
 
 	// 3.1. レビューの依頼
 	reviewComment, err := geminiClient.ReviewCodeDiff(ctx, diffContent, cfg.PromptContent)
