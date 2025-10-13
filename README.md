@@ -30,7 +30,7 @@
 | **CLI フレームワーク** | **Cobra** | コマンドライン引数（フラグ）の解析とサブコマンド構造 (`generic`, `backlog`, `slack`) の構築に使用します。 |
 | **Git 操作** | **go-git / os/exec (外部Git)** | **リモートリポジトリのブランチ間差分**の取得、クローン、フェッチに使用します。SSH認証に対応しています。 |
 | **AI モデル** | **Google Gemini API** | 取得したコード差分を分析し、レビューコメントを生成するために使用します。 |
-| **連携サービス** | **Slack 公式 Go SDK** / **標準 `net/http`** | **Slack Block Kit** を使用したリッチなメッセージングと、**Backlog API** への投稿に使用します。 |
+| 連携サービス | Slack Go ライブラリ (slack-go/slack) / 標準 net/http | Slack Block Kit を使用したリッチなメッセージングと、Backlog API への投稿に使用します。 |
 
 -----
 
