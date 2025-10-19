@@ -1,22 +1,16 @@
 package cmd
 
 import (
-	_ "embed"
 	"fmt"
+	"git-gemini-reviewer-go/prompts"
 	"log"
 	"os"
 	"strings"
 
-	"git-gemini-reviewer-go/internal/services"
+	"git-gemini-reviewer-go/internal/services" // services パッケージからテンプレートを取得
 
 	"github.com/spf13/cobra"
 )
-
-//go:embed prompts/release_review_prompt.md
-var slackReleasePrompt string
-
-//go:embed prompts/detail_review_prompt.md
-var slackDetailPrompt string
 
 // slackCmd 固有のフラグ変数を定義
 var (
@@ -44,10 +38,12 @@ var slackCmd = &cobra.Command{
 		var selectedPrompt string
 		switch currentReviewMode {
 		case "release":
-			selectedPrompt = slackReleasePrompt
+			// 変更点: services.ReleasePromptTemplate を使用
+			selectedPrompt = prompts.ReleasePromptTemplate
 			fmt.Println("✅ リリースレビューモードが選択されました。")
 		case "detail":
-			selectedPrompt = slackDetailPrompt
+			// 変更点: services.DetailPromptTemplate を使用
+			selectedPrompt = prompts.DetailPromptTemplate
 			fmt.Println("✅ 詳細レビューモードが選択されました。（デフォルト）")
 		default:
 			return fmt.Errorf("無効なレビューモードが指定されました: '%s'。'release' または 'detail' を選択してください。", currentReviewMode)
@@ -65,7 +61,7 @@ var slackCmd = &cobra.Command{
 			SkipHostKeyCheck: skipHostKeyCheck,
 		}
 
-		// 4. 一時ディレクトリのクリーンアップ (指摘 #3: defer でクリーンアップ処理を追加)
+		// 4. 一時ディレクトリのクリーンアップ (defer でクリーンアップ処理を追加)
 		// デフォルトパスかつ一時ディレクトリである場合にのみクリーンアップを予約
 		if cfg.LocalPath != "" && strings.HasPrefix(cfg.LocalPath, os.TempDir()) {
 			defer func(path string) {
@@ -78,8 +74,6 @@ var slackCmd = &cobra.Command{
 		// 5. 共通ロジックを実行し、結果を取得
 		reviewResult, err := services.RunReviewAndGetResult(cmd.Context(), cfg)
 		if err != nil {
-			// 指摘 #2: Diffなしのエラーをチェックする処理を想定して、汎用エラーハンドリングを残します
-			// (ErrNoDiffのようなカスタムエラーは services/review.go の修正が必要なため、ここではロジックを残すのみ)
 			return err
 		}
 
@@ -102,7 +96,7 @@ var slackCmd = &cobra.Command{
 
 		fmt.Printf("📤 Slack Webhook URL にレビュー結果を投稿します...\n")
 
-		// PostMessage の呼び出しを修正 (cfgからブランチ名とURLを渡す)
+		// PostMessage の呼び出し
 		err = slackService.PostMessage(cmd.Context(), reviewResult, cfg.FeatureBranch, cfg.GitCloneURL)
 		if err != nil {
 			log.Printf("ERROR: Slack へのコメント投稿に失敗しました: %v\n", err)
@@ -134,11 +128,7 @@ func init() {
 		"Local path to clone the repository.",
 	)
 
-	// 指摘 #4: git-clone-url と feature-branch は RootCmd で MarkPersistentFlagRequired 済みのため、
-	// ここでの再度の MarkFlagRequired は削除またはコメントアウトするのが適切です。
-	// 仮に RootCmd で必須フラグとして設定済みと判断し、以下を削除またはコメントアウトします。
-	/*
-		slackCmd.MarkFlagRequired("git-clone-url")
-		slackCmd.MarkFlagRequired("feature-branch")
-	*/
+	// 共通の必須フラグは root.go でマークされていると仮定し、ここでは再度の MarkFlagRequired は省略
+	// slackCmd.MarkFlagRequired("git-clone-url")
+	// slackCmd.MarkFlagRequired("feature-branch")
 }

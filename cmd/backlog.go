@@ -1,21 +1,15 @@
 package cmd
 
 import (
-	_ "embed"
 	"fmt"
 	"log"
 	"os"
 
-	"git-gemini-reviewer-go/internal/services" // GitClient と Backlogサービスのため
+	"git-gemini-reviewer-go/internal/services"
+	"git-gemini-reviewer-go/prompts"
 
 	"github.com/spf13/cobra"
 )
-
-//go:embed prompts/release_review_prompt.md
-var backlogReleasePrompt string
-
-//go:embed prompts/detail_review_prompt.md
-var backlogDetailPrompt string
 
 // backlogCmd 固有のフラグ変数のみを定義
 var (
@@ -43,10 +37,12 @@ var backlogCmd = &cobra.Command{
 		// reviewMode は cmd/root.go の Persistent Flag の変数を使用
 		switch reviewMode {
 		case "release":
-			selectedPrompt = backlogReleasePrompt
+			// 変更点: services.ReleasePromptTemplate を使用
+			selectedPrompt = prompts.ReleasePromptTemplate
 			fmt.Println("✅ リリースレビューモードが選択されました。")
 		case "detail":
-			selectedPrompt = backlogDetailPrompt
+			// 変更点: services.DetailPromptTemplate を使用
+			selectedPrompt = prompts.DetailPromptTemplate
 			fmt.Println("✅ 詳細レビューモードが選択されました。（デフォルト）")
 		default:
 			return fmt.Errorf("無効なレビューモードが指定されました: '%s'。'release' または 'detail' を選択してください。", reviewMode)
@@ -109,7 +105,6 @@ var backlogCmd = &cobra.Command{
 	},
 }
 
-// init 関数が二重に定義されていた問題を解消し、一つに統合
 func init() {
 	RootCmd.AddCommand(backlogCmd)
 
