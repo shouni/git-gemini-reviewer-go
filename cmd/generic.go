@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"git-gemini-reviewer-go/internal/services"
-	"git-gemini-reviewer-go/prompts"
+
 	"github.com/spf13/cobra"
 )
 
@@ -16,30 +16,9 @@ var genericCmd = &cobra.Command{
 	Long:  `このコマンドは、指定されたGitリポジトリのブランチ間の差分をAIでレビューし、その結果を標準出力に直接表示します。Backlogなどの外部サービスとの連携は行いません。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		// 1. レビューモードの選択
-		var selectedPrompt string
-		switch reviewMode {
-		case "release":
-			selectedPrompt = prompts.ReleasePromptTemplate
-			fmt.Println("✅ リリースレビューモードが選択されました。")
-		case "detail":
-			selectedPrompt = prompts.DetailPromptTemplate
-			fmt.Println("✅ 詳細レビューモードが選択されました。（デフォルト）")
-		default:
-			return fmt.Errorf("無効なレビューモードが指定されました: '%s'。'release' または 'detail' を選択してください。", reviewMode)
-		}
-
-		// 2. 共通ロジックのための設定構造体を作成
-		// root.go で定義されたグローバル変数 (gitCloneURL, baseBranchなど) を使用
-		cfg := services.ReviewConfig{
-			GeminiModel:      geminiModel,
-			PromptContent:    selectedPrompt,
-			GitCloneURL:      gitCloneURL,
-			BaseBranch:       baseBranch,
-			FeatureBranch:    featureBranch,
-			SSHKeyPath:       sshKeyPath,
-			LocalPath:        localPath,
-			SkipHostKeyCheck: skipHostKeyCheck,
+		cfg, err := CreateReviewConfig()
+		if err != nil {
+			return err // 無効なレビューモードのエラーを処理
 		}
 
 		// 3. 共通ロジックを実行し、結果を取得

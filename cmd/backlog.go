@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"git-gemini-reviewer-go/internal/services"
-	"git-gemini-reviewer-go/prompts"
 
 	"github.com/spf13/cobra"
 )
@@ -32,31 +31,10 @@ var backlogCmd = &cobra.Command{
 			return fmt.Errorf("Backlog連携には環境変数 BACKLOG_API_KEY および BACKLOG_SPACE_URL が必須です")
 		}
 
-		// 2. レビューモードに基づいたプロンプトの選択
-		var selectedPrompt string
-		// reviewMode は cmd/root.go の Persistent Flag の変数を使用
-		switch reviewMode {
-		case "release":
-			selectedPrompt = prompts.ReleasePromptTemplate
-			fmt.Println("✅ リリースレビューモードが選択されました。")
-		case "detail":
-			selectedPrompt = prompts.DetailPromptTemplate
-			fmt.Println("✅ 詳細レビューモードが選択されました。（デフォルト）")
-		default:
-			return fmt.Errorf("無効なレビューモードが指定されました: '%s'。'release' または 'detail' を選択してください。", reviewMode)
-		}
-
 		// 3. 共通ロジックのための設定構造体を作成
-		// すべて cmd/root.go で定義された共通変数を使用
-		cfg := services.ReviewConfig{
-			GeminiModel:      geminiModel,
-			PromptContent:    selectedPrompt,
-			GitCloneURL:      gitCloneURL,
-			BaseBranch:       baseBranch,
-			FeatureBranch:    featureBranch,
-			SSHKeyPath:       sshKeyPath,
-			LocalPath:        localPath,
-			SkipHostKeyCheck: skipHostKeyCheck,
+		cfg, err := CreateReviewConfig()
+		if err != nil {
+			return err // 無効なレビューモードのエラーを処理
 		}
 
 		// 4. 共通ロジックを実行し、結果を取得
