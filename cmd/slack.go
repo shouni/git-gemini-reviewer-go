@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"git-gemini-reviewer-go/internal/services"
-	"git-gemini-reviewer-go/prompts"
 
 	"github.com/spf13/cobra"
 )
@@ -24,39 +23,14 @@ var slackCmd = &cobra.Command{
 	Short: "コードレビューを実行し、その結果をSlackの指定されたチャンネルに投稿します。",
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		// 1. レビューモードの取得と確認
-		currentReviewMode, err := cmd.Flags().GetString("mode")
-		if err != nil {
-			return fmt.Errorf("review-mode フラグの取得に失敗しました: %w", err)
-		}
-
 		// 2. 環境変数の確認
 		if slackWebhookURL == "" {
 			return fmt.Errorf("--slack-webhook-url フラグまたは SLACK_WEBHOOK_URL 環境変数の設定が必須です")
 		}
 
-		var selectedPrompt string
-		switch currentReviewMode {
-		case "release":
-			selectedPrompt = prompts.ReleasePromptTemplate
-			fmt.Println("✅ リリースレビューモードが選択されました。")
-		case "detail":
-			selectedPrompt = prompts.DetailPromptTemplate
-			fmt.Println("✅ 詳細レビューモードが選択されました。（デフォルト）")
-		default:
-			return fmt.Errorf("無効なレビューモードが指定されました: '%s'。'release' または 'detail' を選択してください。", currentReviewMode)
-		}
-
-		// 3. 共通ロジックのための設定構造体を作成
-		cfg := services.ReviewConfig{
-			GeminiModel:      geminiModel,
-			PromptContent:    selectedPrompt,
-			GitCloneURL:      gitCloneURL,
-			BaseBranch:       baseBranch,
-			FeatureBranch:    featureBranch,
-			SSHKeyPath:       sshKeyPath,
-			LocalPath:        localPath,
-			SkipHostKeyCheck: skipHostKeyCheck,
+		cfg, err := CreateReviewConfig()
+		if err != nil {
+			return err // 無効なレビューモードのエラーを処理
 		}
 
 		// 4. 一時ディレクトリのクリーンアップ (defer でクリーンアップ処理を追加)
