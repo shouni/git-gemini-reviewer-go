@@ -1,18 +1,13 @@
 package cmd
 
 import (
-	_ "embed"
 	"fmt"
 	"os"
 
 	"git-gemini-reviewer-go/internal/services"
+	"git-gemini-reviewer-go/prompts"
 	"github.com/spf13/cobra"
 )
-
-//go:embed prompts/release_review_prompt.md
-var releasePrompt string
-//go:embed prompts/detail_review_prompt.md
-var detailPrompt string
 
 // genericCmd は、リモートリポジトリのブランチ比較を Gemini AI に依頼し、結果を標準出力に出力するコマンドです。
 var genericCmd = &cobra.Command{
@@ -25,10 +20,10 @@ var genericCmd = &cobra.Command{
 		var selectedPrompt string
 		switch reviewMode {
 		case "release":
-			selectedPrompt = releasePrompt
+			selectedPrompt = prompts.ReleasePromptTemplate
 			fmt.Println("✅ リリースレビューモードが選択されました。")
 		case "detail":
-			selectedPrompt = detailPrompt
+			selectedPrompt = prompts.DetailPromptTemplate
 			fmt.Println("✅ 詳細レビューモードが選択されました。（デフォルト）")
 		default:
 			return fmt.Errorf("無効なレビューモードが指定されました: '%s'。'release' または 'detail' を選択してください。", reviewMode)
