@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/shouni/go-ai-client/pkg/ai/gemini"
+	"git-gemini-reviewer-go/internal/pkg/gemini"
 )
 
 // GeminiClient は go-ai-client の gemini.Client をラップし、
