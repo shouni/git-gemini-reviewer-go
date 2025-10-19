@@ -103,7 +103,7 @@ var slackCmd = &cobra.Command{
 		fmt.Printf("📤 Slack Webhook URL にレビュー結果を投稿します...\n")
 
 		// PostMessage の呼び出しを修正 (cfgからブランチ名とURLを渡す)
-		err = slackService.PostMessage(reviewResult, cfg.FeatureBranch, cfg.GitCloneURL)
+		err = slackService.PostMessage(cmd.Context(), reviewResult, cfg.FeatureBranch, cfg.GitCloneURL)
 		if err != nil {
 			log.Printf("ERROR: Slack へのコメント投稿に失敗しました: %v\n", err)
 			return fmt.Errorf("Slack へのメッセージ投稿に失敗しました。詳細はログを確認してください。")
