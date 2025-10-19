@@ -3,6 +3,7 @@ package prompts
 import (
 	_ "embed"
 	"fmt"
+	"strings"
 )
 
 //go:embed release_review_prompt.md
@@ -29,11 +30,11 @@ func (b *ReviewPromptBuilder) Build(diffContent string) (string, error) {
 	if b.promptTemplate == "" {
 		return "", fmt.Errorf("prompt template is not configured")
 	}
-	if diffContent == "" {
-		// 差分がない場合もエラーとせず、テンプレートだけを返すことで、AIに「差分なし」と伝える
+
+	if !strings.Contains(b.promptTemplate, "%s") {
+		return "", fmt.Errorf("prompt template is missing the required %%s placeholder for code diff insertion")
 	}
 
-	// テンプレートに diffContent を埋め込む
 	prompt := fmt.Sprintf(b.promptTemplate, diffContent)
 	return prompt, nil
 }

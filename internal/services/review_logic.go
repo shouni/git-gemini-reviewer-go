@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"strings"
+
+	"git-gemini-reviewer-go/prompts"
 )
 
 // ReviewConfig はレビュー実行に必要な全てのパラメータを保持します。
@@ -64,7 +66,7 @@ func RunReviewAndGetResult(ctx context.Context, cfg ReviewConfig) (string, error
 
 	// 3. プロンプトの組み立て (テンプレートロジックの分離)
 	// NewReviewPromptBuilder は cfg.PromptContent (テンプレート) を使用
-	promptBuilder := NewReviewPromptBuilder(cfg.PromptContent)
+	promptBuilder := prompts.NewReviewPromptBuilder(cfg.PromptContent)
 
 	// diffContent をテンプレートに埋め込み、最終的なプロンプトを生成
 	finalPrompt, err := promptBuilder.Build(diffContent)
