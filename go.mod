@@ -3,11 +3,13 @@ module git-gemini-reviewer-go
 go 1.24.0
 
 require (
+	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/go-git/go-git/v5 v5.16.2
 	github.com/slack-go/slack v0.17.3
 	github.com/spf13/cobra v1.10.1
 	golang.org/x/crypto v0.42.0
-	google.golang.org/genai v1.30.0
+	google.golang.org/genai v1.31.0
+	google.golang.org/grpc v1.76.0
 )
 
 require (
@@ -48,7 +50,6 @@ require (
 	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250908214217-97024824d090 // indirect
-	google.golang.org/grpc v1.75.1 // indirect
 	google.golang.org/protobuf v1.36.9 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )

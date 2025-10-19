@@ -3,95 +3,46 @@ package services
 import (
 	"context"
 	"fmt"
-	"os"
 
-	"google.golang.org/genai"
+	"git-gemini-reviewer-go/internal/pkg/gemini"
 )
 
-// GeminiClient はGemini APIとの通信を管理します。
+// GeminiClient は go-ai-client の gemini.Client をラップし、
+// git-gemini-reviewer-go のサービス層向けインターフェースを提供します。
 type GeminiClient struct {
-	client    *genai.Client
+	// 汎用的な gemini.Client を組み込む
+	client    *gemini.Client
 	modelName string
 }
 
 // NewGeminiClient はGeminiClientを初期化します。
+// NewClientFromEnv を利用することで、APIキーの取得とリトライ設定の初期化は gemini パッケージに任せます。
 func NewGeminiClient(ctx context.Context, modelName string) (*GeminiClient, error) {
-	// 1. APIキーの取得
-	apiKey := os.Getenv("GEMINI_API_KEY")
-	if apiKey == "" {
-		return nil, fmt.Errorf("GEMINI_API_KEY environment variable is not set")
-	}
 
-	// 2. クライアントの作成
-	// SDKのバージョンアップに伴うAPI仕様の変更に対応するため、
-	// genai.NewClient の引数を *genai.ClientConfig 形式に変更しています。
-	clientConfig := &genai.ClientConfig{
-		APIKey: apiKey,
-	}
-
-	client, err := genai.NewClient(ctx, clientConfig)
+	// gemini.NewClientFromEnv を利用し、APIキーとデフォルトリトライ設定を持つクライアントを生成
+	gClient, err := gemini.NewClientFromEnv(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
+		return nil, fmt.Errorf("failed to initialize underlying gemini client: %w", err)
 	}
 
 	return &GeminiClient{
-		client:    client,
+		client:    gClient,
 		modelName: modelName,
 	}, nil
 }
 
-// ReviewCodeDiff はコード差分を基にGeminiにレビューを依頼します。
-// promptTemplateString には、コード差分(%s)を埋め込むための fmt.Sprintf 形式のプレースホルダが含まれている必要があります。
-func (c *GeminiClient) ReviewCodeDiff(ctx context.Context, diffContent string, promptTemplateString string) (string, error) {
+// ReviewCodeDiff は完成されたプロンプトを基にGeminiにレビューを依頼します。
+// リトライ処理は gemini.Client.GenerateContent に内蔵されているため、ここでは単に呼び出すだけです。
+func (c *GeminiClient) ReviewCodeDiff(ctx context.Context, finalPrompt string) (string, error) {
 
-	// プロンプトの構成
-	prompt := fmt.Sprintf(promptTemplateString, diffContent)
-	// 入力コンテンツを作成
-	contents := []*genai.Content{
-		{
-			Role: "user",
-			Parts: []*genai.Part{
-				{Text: prompt},
-			},
-		},
-	}
-
-	// API呼び出しを実行 (want (context.Context, string, []*genai.Content, *genai.GenerateContentConfig) に準拠)
-	resp, err := c.client.Models.GenerateContent(
-		ctx,
-		c.modelName, // 1st argument: モデル名 (string)
-		contents,    // 2nd argument: コンテンツスライス ([]*genai.Content)
-		// 3rd argument: コンフィグ (*genai.GenerateContentConfig)。今回はnilで省略可能だが、生成設定（温度、トークン制限など）が必要な場合に利用。
-		nil,
-	)
+	// 汎用クライアントの GenerateContent メソッドを呼び出す
+	resp, err := c.client.GenerateContent(ctx, finalPrompt, c.modelName)
 
 	if err != nil {
-		return "", fmt.Errorf("GenerateContent failed with model %s: %w", c.modelName, err)
+		// リトライ上限到達などのエラーを含む
+		return "", fmt.Errorf("Gemini code review failed: %w", err)
 	}
 
-	// レスポンスの処理
-	if resp == nil || len(resp.Candidates) == 0 {
-		return "", fmt.Errorf("received empty or invalid response from Gemini API")
-	}
-
-	candidate := resp.Candidates[0]
-
-	if candidate.FinishReason != genai.FinishReasonUnspecified && candidate.FinishReason != genai.FinishReasonStop {
-		// FinishReason.String() が無い問題を回避するため、%v を使用
-		return "", fmt.Errorf("API response was blocked or finished prematurely. Reason: %v", candidate.FinishReason)
-	}
-
-	// その後、コンテンツの有無をチェック
-	if candidate.Content == nil || len(candidate.Content.Parts) == 0 {
-		return "", fmt.Errorf("Gemini response candidate is empty or lacks content parts")
-	}
-
-	firstPart := candidate.Content.Parts[0]
-
-	// Textフィールドの値を直接返す
-	if firstPart.Text == "" {
-		return "", fmt.Errorf("API returned non-text part in response or text field is empty")
-	}
-
-	return firstPart.Text, nil
+	// 成功レスポンスからテキストを返す
+	return resp.Text, nil
 }
