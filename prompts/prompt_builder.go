@@ -9,8 +9,6 @@ import (
 //go:embed release_review_prompt.md
 var ReleasePromptTemplate string
 
-// DetailPromptTemplate は詳細レビュー用のプロンプトテンプレートを保持します。
-//
 //go:embed detail_review_prompt.md
 var DetailPromptTemplate string
 
