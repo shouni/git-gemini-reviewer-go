@@ -7,18 +7,20 @@ import (
 	"os"
 
 	"git-gemini-reviewer-go/internal/services" // GitClient と Backlogサービスのため
+
 	"github.com/spf13/cobra"
 )
 
 //go:embed prompts/release_review_prompt.md
 var backlogReleasePrompt string
+
 //go:embed prompts/detail_review_prompt.md
 var backlogDetailPrompt string
 
 // backlogCmd 固有のフラグ変数のみを定義
 var (
-	issueID    string
-	noPost     bool
+	issueID string
+	noPost  bool
 )
 
 // backlogCmd は、レビュー結果を Backlog にコメントとして投稿するコマンドです。
@@ -93,7 +95,7 @@ var backlogCmd = &cobra.Command{
 
 		fmt.Printf("📤 Backlog 課題 ID: %s にレビュー結果を投稿します...\n", issueID)
 
-		err = backlogService.PostComment(issueID, reviewResult)
+		err = backlogService.PostComment(cmd.Context(), issueID, reviewResult)
 		if err != nil {
 			log.Printf("ERROR: Backlog へのコメント投稿に失敗しました (課題ID: %s): %v\n", issueID, err)
 			fmt.Println("\n--- Gemini AI レビュー結果 (Backlog投稿失敗) ---")

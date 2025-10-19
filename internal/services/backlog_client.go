@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"context" // contextをインポート
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,28 +10,30 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+
+	// 移植した内部リトライパッケージをインポート
+	"git-gemini-reviewer-go/internal/pkg/retry"
+	// backoff.Permanent を使用するためにインポート
+	"github.com/cenkalti/backoff/v4"
 )
 
 // BacklogClient はBacklog APIとの通信を管理します。
 type BacklogClient struct {
-	client  *http.Client
-	baseURL string // 例: https://your-space.backlog.jp/api/v2
-	apiKey  string
+	client      *http.Client
+	baseURL     string // 例: https://your-space.backlog.jp/api/v2
+	apiKey      string
+	retryConfig retry.Config // リトライ設定を追加
 }
 
 // BacklogErrorResponse はBacklog APIが返す一般的なエラー構造体です。
 type BacklogErrorResponse struct {
 	Errors []struct {
 		Message string `json:"message"`
-		Code    int    `json:"code"`
+		Code    int    `json://code"`
 	} `json:"errors"`
 }
 
 // 絵文字をマッチさせるための正規表現パターン。
-// \x{0080}-\x{FFFF} は基本多言語面と一部のBMP外文字（絵文字が含まれる可能性のある一般的な範囲）をカバーします。
-// より厳密な絵文字の範囲は Unicode 標準で定義されていますが、Goのregexpパッケージの制限内で
-// 一般的な「表示の問題を起こす可能性のある非ASCII文字」を対象とするアプローチです。
-// あるいは、`\p{Emoji_Presentation}` (Go 1.18+) を試すこともできますが、環境によっては動かない場合があるため、
 var emojiRegex = regexp.MustCompile(`[^\x00-\x7F]`) // ASCII 以外の文字を全て除去
 
 // cleanStringFromEmojis は、文字列から絵文字を削除します。
@@ -51,49 +54,80 @@ func NewBacklogClient(spaceURL string, apiKey string) (*BacklogClient, error) {
 		client:  &http.Client{},
 		baseURL: apiURL,
 		apiKey:  apiKey,
+		// デフォルトのリトライ設定を初期化
+		retryConfig: retry.DefaultConfig(),
 	}, nil
 }
 
 // PostComment は指定された課題IDにコメントを投稿します。
-// 最初の試行が失敗した場合、絵文字を除去して再試行します。
-func (c *BacklogClient) PostComment(issueID string, content string) error {
-	// 1. 最初の投稿試行
-	err := c.postCommentAttempt(issueID, content)
-	if err == nil {
-		fmt.Printf("✅ Backlog issue %s successfully commented.\n", issueID)
-		return nil
+// 外部から呼ばれるメインの投稿関数で、リトライ機構を組み込みます。
+func (c *BacklogClient) PostComment(ctx context.Context, issueID string, content string) error {
+
+	// --- 投稿操作を定義する関数 ---
+	op := func() error {
+		return c.postCommentAttempt(issueID, content)
 	}
 
-	// 2. エラータイプを判定
-	var backlogErr *BacklogError
-	if errors.As(err, &backlogErr) {
-		// APIエラーであり、かつ「不適切な文字列」エラーであるか確認
-		// Backlogのエラーメッセージを正確に確認する必要がありますが、ここでは一般的なチェックを行います
-		if backlogErr.StatusCode == http.StatusBadRequest && strings.Contains(backlogErr.Message, "Incorrect String") {
-			fmt.Printf("⚠️ Backlog API returned 'Incorrect String' error. Sanitizing comment and retrying...\n")
+	// --- エラー判定と再試行ロジックの定義 ---
+	shouldRetryFn := func(err error) bool {
+		var backlogErr *BacklogError
 
-			// 3. コメントから絵文字を除去
-			sanitizedContent := cleanStringFromEmojis(content)
-
-			// 変更がない場合は再試行しない
-			if sanitizedContent == content {
-				return fmt.Errorf("failed to post comment: %w (no emojis found to remove)", backlogErr)
+		if errors.As(err, &backlogErr) {
+			// Backlog APIが4xxクライアントエラーを返した場合
+			if backlogErr.StatusCode >= 400 && backlogErr.StatusCode < 500 {
+				// 永続的なエラーとして扱う (例: 認証失敗、不正な課題ID)
+				return false
 			}
-
-			// 4. サニタイズ後の再投稿試行
-			retryErr := c.postCommentAttempt(issueID, sanitizedContent)
-			if retryErr == nil {
-				fmt.Printf("✅ Backlog issue %s successfully commented after sanitizing.\n", issueID)
-				return nil
+			// 5xxサーバーエラーは一時的なものとしてリトライ
+			if backlogErr.StatusCode >= 500 {
+				return true
 			}
-
-			// 再試行でも失敗した場合
-			return fmt.Errorf("failed to post comment after sanitizing for issue %s: %w", issueID, retryErr)
 		}
+
+		// ネットワークエラーなどはリトライ対象
+		return true
 	}
 
-	// その他のエラーの場合はそのまま返す
-	return fmt.Errorf("failed to post comment to Backlog API for issue %s: %w", issueID, err)
+	// --- リトライの実行 ---
+	err := retry.Do(
+		ctx,
+		c.retryConfig,
+		fmt.Sprintf("Backlog comment post for issue %s", issueID),
+		op,
+		shouldRetryFn,
+	)
+
+	if err != nil {
+		// リトライ上限に達した、または永続エラーとして終了した場合
+
+		// 永続エラーの確認
+		var pErr *backoff.PermanentError
+		if errors.As(err, &pErr) {
+			// 永続エラーの場合、絵文字が原因であるか確認し、サニタイズして再試行
+			if strings.Contains(pErr.Err.Error(), "Incorrect String") {
+				fmt.Printf("⚠️ Backlog API returned 'Incorrect String' error. Sanitizing comment and trying once more...\n")
+
+				sanitizedContent := cleanStringFromEmojis(content)
+				if sanitizedContent == content {
+					return fmt.Errorf("failed to post comment: %w (no fixable content issues)", pErr.Err)
+				}
+
+				// サニタイズ後の最終試行 (リトライなし)
+				retryErr := c.postCommentAttempt(issueID, sanitizedContent)
+				if retryErr == nil {
+					fmt.Printf("✅ Backlog issue %s successfully commented after sanitizing.\n", issueID)
+					return nil
+				}
+				return fmt.Errorf("failed to post comment after sanitizing for issue %s: %w", issueID, retryErr)
+			}
+		}
+
+		// その他のエラー
+		return fmt.Errorf("failed to post comment to Backlog API for issue %s after retries: %w", issueID, err)
+	}
+
+	fmt.Printf("✅ Backlog issue %s successfully commented.\n", issueID)
+	return nil
 }
 
 // postCommentAttempt はAPIリクエストを実際に実行する内部ヘルパーメソッドです。
@@ -106,19 +140,18 @@ func (c *BacklogClient) postCommentAttempt(issueID string, content string) error
 	}
 	jsonBody, err := json.Marshal(commentData)
 	if err != nil {
-		return fmt.Errorf("failed to marshal comment data: %w", err)
+		return backoff.Permanent(fmt.Errorf("failed to marshal comment data: %w", err)) // 永続エラー
 	}
 
-	// 注: Backlog APIは通常、apiKeyをクエリパラメータで渡すため、
-	// Authorizationヘッダーは不要か、使用されていません。
 	req, err := http.NewRequest(http.MethodPost, fullURL, bytes.NewBuffer(jsonBody))
 	if err != nil {
-		return fmt.Errorf("failed to create POST request for Backlog: %w", err)
+		return backoff.Permanent(fmt.Errorf("failed to create POST request for Backlog: %w", err)) // 永続エラー
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.client.Do(req)
 	if err != nil {
+		// ネットワークエラーは通常のエラーとして返し、リトライ対象とする
 		return fmt.Errorf("failed to send POST request to Backlog: %w", err)
 	}
 	defer resp.Body.Close()
@@ -127,15 +160,19 @@ func (c *BacklogClient) postCommentAttempt(issueID string, content string) error
 		return nil
 	}
 
+	// エラーレスポンスの処理
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return &BacklogError{StatusCode: resp.StatusCode, Message: fmt.Sprintf("failed to read error body: %s", err.Error())}
 	}
 
 	var errorResp BacklogErrorResponse
-	// json.Unmarshalが失敗しても、bodyにはエラーメッセージが含まれている可能性があるため続行
 	if json.Unmarshal(body, &errorResp) == nil && len(errorResp.Errors) > 0 {
 		firstError := errorResp.Errors[0]
+		// 'Incorrect String' (絵文字など) のエラーは Permanent として返す
+		if strings.Contains(firstError.Message, "Incorrect String") {
+			return backoff.Permanent(&BacklogError{StatusCode: resp.StatusCode, Code: firstError.Code, Message: firstError.Message})
+		}
 		return &BacklogError{
 			StatusCode: resp.StatusCode,
 			Code:       firstError.Code,
