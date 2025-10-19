@@ -6,10 +6,10 @@ import (
 	"strings"
 )
 
-//go:embed release_review_prompt.md
+//go:embed prompt_release.md
 var ReleasePromptTemplate string
 
-//go:embed detail_review_prompt.md
+//go:embed prompt_detail.md
 var DetailPromptTemplate string
 
 // ReviewPromptBuilder はレビュープロンプトの構成を管理します。
