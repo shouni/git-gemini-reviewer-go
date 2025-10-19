@@ -2,7 +2,7 @@ package services
 
 import (
 	"bytes"
-	"context" // contextをインポート
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,7 +29,7 @@ type BacklogClient struct {
 type BacklogErrorResponse struct {
 	Errors []struct {
 		Message string `json:"message"`
-		Code    int    `json://code"`
+		Code    int    `json:"code"`
 	} `json:"errors"`
 }
 
@@ -113,7 +113,15 @@ func (c *BacklogClient) PostComment(ctx context.Context, issueID string, content
 				}
 
 				// サニタイズ後の最終試行 (リトライなし)
+				// NOTE: postCommentAttempt は PermanentError を返す可能性があるため、
+				// ここではそれを通常のエラーとしてラップし直す
 				retryErr := c.postCommentAttempt(issueID, sanitizedContent)
+
+				// PermanentError を解除
+				if errors.As(retryErr, &pErr) {
+					retryErr = pErr.Err
+				}
+
 				if retryErr == nil {
 					fmt.Printf("✅ Backlog issue %s successfully commented after sanitizing.\n", issueID)
 					return nil
@@ -169,6 +177,7 @@ func (c *BacklogClient) postCommentAttempt(issueID string, content string) error
 	var errorResp BacklogErrorResponse
 	if json.Unmarshal(body, &errorResp) == nil && len(errorResp.Errors) > 0 {
 		firstError := errorResp.Errors[0]
+
 		// 'Incorrect String' (絵文字など) のエラーは Permanent として返す
 		if strings.Contains(firstError.Message, "Incorrect String") {
 			return backoff.Permanent(&BacklogError{StatusCode: resp.StatusCode, Code: firstError.Code, Message: firstError.Message})
