@@ -37,11 +37,9 @@ var backlogCmd = &cobra.Command{
 		// reviewMode は cmd/root.go の Persistent Flag の変数を使用
 		switch reviewMode {
 		case "release":
-			// 変更点: services.ReleasePromptTemplate を使用
 			selectedPrompt = prompts.ReleasePromptTemplate
 			fmt.Println("✅ リリースレビューモードが選択されました。")
 		case "detail":
-			// 変更点: services.DetailPromptTemplate を使用
 			selectedPrompt = prompts.DetailPromptTemplate
 			fmt.Println("✅ 詳細レビューモードが選択されました。（デフォルト）")
 		default:

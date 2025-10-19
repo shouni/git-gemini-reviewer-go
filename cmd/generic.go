@@ -2,10 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	"git-gemini-reviewer-go/prompts"
 	"os"
 
 	"git-gemini-reviewer-go/internal/services"
+	"git-gemini-reviewer-go/prompts"
 	"github.com/spf13/cobra"
 )
 
@@ -20,11 +20,9 @@ var genericCmd = &cobra.Command{
 		var selectedPrompt string
 		switch reviewMode {
 		case "release":
-			// services パッケージから公開された変数を使用
 			selectedPrompt = prompts.ReleasePromptTemplate
 			fmt.Println("✅ リリースレビューモードが選択されました。")
 		case "detail":
-			// services パッケージから公開された変数を使用
 			selectedPrompt = prompts.DetailPromptTemplate
 			fmt.Println("✅ 詳細レビューモードが選択されました。（デフォルト）")
 		default:

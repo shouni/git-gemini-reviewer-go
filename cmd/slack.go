@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"git-gemini-reviewer-go/prompts"
 	"log"
 	"os"
 	"strings"
 
-	"git-gemini-reviewer-go/internal/services" // services パッケージからテンプレートを取得
+	"git-gemini-reviewer-go/internal/services"
+	"git-gemini-reviewer-go/prompts"
 
 	"github.com/spf13/cobra"
 )
@@ -38,11 +38,9 @@ var slackCmd = &cobra.Command{
 		var selectedPrompt string
 		switch currentReviewMode {
 		case "release":
-			// 変更点: services.ReleasePromptTemplate を使用
 			selectedPrompt = prompts.ReleasePromptTemplate
 			fmt.Println("✅ リリースレビューモードが選択されました。")
 		case "detail":
-			// 変更点: services.DetailPromptTemplate を使用
 			selectedPrompt = prompts.DetailPromptTemplate
 			fmt.Println("✅ 詳細レビューモードが選択されました。（デフォルト）")
 		default:
