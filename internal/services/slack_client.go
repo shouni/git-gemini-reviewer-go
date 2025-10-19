@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -12,6 +13,11 @@ import (
 	"time"
 
 	"github.com/slack-go/slack"
+
+	// 移植した内部リトライパッケージをインポート (プロジェクトのパス構造に依存)
+	"git-gemini-reviewer-go/internal/pkg/retry"
+	// backoff.Permanent を使用するためにインポート
+	"github.com/cenkalti/backoff/v4"
 )
 
 // SlackClient は Slack API と連携するためのクライアントです。
@@ -71,13 +77,14 @@ func getRepoIdentifier(gitCloneURL string) string {
 }
 
 // PostMessage は、汎用的なMarkdownテキストを解析し、SlackのBlock Kit形式で投稿します。
-func (c *SlackClient) PostMessage(markdownText string, featureBranch string, gitCloneURL string) error {
+// リトライ機構を導入するため、context.Context を最初の引数として受け取ります。
+func (c *SlackClient) PostMessage(ctx context.Context, markdownText string, featureBranch string, gitCloneURL string) error {
 	repoIdentifier := getRepoIdentifier(gitCloneURL)
 	if repoIdentifier == "" {
 		repoIdentifier = "不明なリポジトリ"
 	}
 
-	// --- 1. Block Kitの静的コンポーネントを構築 ---
+	// --- 1. Block Kitの構築ロジック ---
 	blocks := []slack.Block{
 		slack.NewHeaderBlock(
 			slack.NewTextBlockObject("plain_text", "🤖 Gemini AI Code Review Result", true, false),
@@ -90,15 +97,13 @@ func (c *SlackClient) PostMessage(markdownText string, featureBranch string, git
 		slack.NewDividerBlock(),
 	}
 
-	// --- 2. Markdownテキストを動的にブロックへ変換 ---
 	const maxSectionLength = 2900
 	const maxBlocks = 50
 	const truncationSuffix = "\n\n... (レビューが長すぎるため省略されました)"
 
-	// Markdownの変換ルールを定義
 	boldRegex := regexp.MustCompile(`\*\*(.*?)\*\*`)     // **text** -> *text*
 	headerRegex := regexp.MustCompile(`(?m)^##\s*(.*)$`) // ## Title -> *Title*
-	listItemRegex := regexp.MustCompile(`(?m)^\s*-\s+`) // - item -> • item
+	listItemRegex := regexp.MustCompile(`(?m)^\s*-\s+`)  // - item -> • item
 
 	reviewSections := regexp.MustCompile(`\n---\n?`).Split(markdownText, -1)
 
@@ -116,7 +121,7 @@ func (c *SlackClient) PostMessage(markdownText string, featureBranch string, git
 		processedText := sectionText
 		processedText = boldRegex.ReplaceAllString(processedText, "*$1*")
 		processedText = headerRegex.ReplaceAllString(processedText, "*$1*")
-		processedText = listItemRegex.ReplaceAllString(processedText, "• ") // "•" はビュレット(U+2022)
+		processedText = listItemRegex.ReplaceAllString(processedText, "• ")
 
 		if len(processedText) > maxSectionLength {
 			log.Printf("WARNING: A review section is too long (%d chars), truncating.", len(processedText))
@@ -133,7 +138,6 @@ func (c *SlackClient) PostMessage(markdownText string, featureBranch string, git
 		blocks = blocks[:len(blocks)-1] // 最後の余分なDividerを削除
 	}
 
-	// フッターを追加
 	footerBlock := slack.NewContextBlock(
 		"review-context",
 		slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("リポジトリ: `%s`  |  レビュー時刻: %s",
@@ -141,7 +145,7 @@ func (c *SlackClient) PostMessage(markdownText string, featureBranch string, git
 	)
 	blocks = append(blocks, footerBlock)
 
-	// --- 3. Webhookメッセージの作成と送信 ---
+	// --- 2. Webhookメッセージの作成とペイロード準備 ---
 	msg := slack.WebhookMessage{
 		Text: fmt.Sprintf("Gemini AI レビュー: %s (%s)", featureBranch, repoIdentifier),
 		Blocks: &slack.Blocks{
@@ -153,14 +157,60 @@ func (c *SlackClient) PostMessage(markdownText string, featureBranch string, git
 	if err != nil {
 		return fmt.Errorf("failed to marshal Slack payload: %w", err)
 	}
-	resp, err := c.httpClient.Post(c.WebhookURL, "application/json", bytes.NewBuffer(jsonPayload))
+
+	// --- 3. Webhookメッセージの送信（リトライ機構） ---
+
+	// リトライ設定の定義
+	retryCfg := retry.DefaultConfig()
+
+	// 実行する操作 (Operation) を定義
+	op := func() error {
+		// NOTE: bytes.NewBuffer(jsonPayload) は op が呼ばれるたびに新しいバッファを作成する
+		resp, err := c.httpClient.Post(c.WebhookURL, "application/json", bytes.NewBuffer(jsonPayload))
+		if err != nil {
+			// ネットワークエラーなどはリトライ対象
+			return fmt.Errorf("failed to post to Slack: %w", err)
+		}
+		defer resp.Body.Close()
+
+		// ステータスコードのチェック
+		if resp.StatusCode != http.StatusOK {
+			// 5xxエラー (サーバーエラー) は一時的と見なし、リトライ対象として通常のエラーを返す
+			if resp.StatusCode >= 500 {
+				return fmt.Errorf("Slack API server error (5xx): %d %s", resp.StatusCode, resp.Status)
+			}
+
+			// 4xxエラー (クライアントエラー: 不正なWebhook URL, ペイロードなど) は永続的と見なし、即時終了させる
+			if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+				// backoff.Permanent でマークして即時終了
+				return backoff.Permanent(fmt.Errorf("Slack API client error (4xx): %d %s. Check Webhook URL and payload.", resp.StatusCode, resp.Status))
+			}
+
+			// その他のエラーもリトライ対象とする
+			return fmt.Errorf("Slack API returned non-OK status code: %d %s", resp.StatusCode, resp.Status)
+		}
+
+		return nil // 成功
+	}
+
+	// shouldRetryFn: backoff.Permanent でないエラーは全てリトライ対象とする
+	shouldRetryFn := func(err error) bool {
+		// PermanentError は retry.Do が自動で処理
+		return true
+	}
+
+	// リトライの実行
+	err = retry.Do(
+		ctx,
+		retryCfg,
+		fmt.Sprintf("Slack message post to %s", repoIdentifier),
+		op,
+		shouldRetryFn,
+	)
+
 	if err != nil {
-		return fmt.Errorf("failed to post to Slack: %w", err)
+		return fmt.Errorf("failed to post to Slack after retries: %w", err)
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Slack API returned non-OK status code: %d %s", resp.StatusCode, resp.Status)
-	}
+
 	return nil
 }
-
