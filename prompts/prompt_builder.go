@@ -31,10 +31,18 @@ func (b *ReviewPromptBuilder) Build(diffContent string) (string, error) {
 		return "", fmt.Errorf("prompt template is not configured")
 	}
 
+	// 1. 【クリティカルな指摘への対応】: テンプレートに %s が必須であることを確認
+	// これにより、AIに差分が渡されないバグを防ぎます。
 	if !strings.Contains(b.promptTemplate, "%s") {
 		return "", fmt.Errorf("prompt template is missing the required %%s placeholder for code diff insertion")
 	}
 
+	// 2. 【diffContent が空の場合の意図の維持】
+	// diffContent が空の場合でも、意図通り空文字列を %s に埋め込み、AIに「差分なし」の状況を伝えます。
+	// このチェックは、呼び出し元 (review_logic.go) ですでに空文字列("")を返してスキップする処理があるため、
+	// ここでは特にロジック変更は不要です。fmt.Sprintf がそのまま空文字列を埋め込みます。
+
+	// テンプレートに diffContent を埋め込む
 	prompt := fmt.Sprintf(b.promptTemplate, diffContent)
 	return prompt, nil
 }
