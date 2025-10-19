@@ -2,6 +2,7 @@
 
 [![Language](https://img.shields.io/badge/Language-Go-blue)](https://golang.org/)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/shouni/git-gemini-reviewer-go)](https://golang.org/)
+[![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/shouni/git-gemini-reviewer-go)](https://github.com/shouni/git-gemini-reviewer-go/tags)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## 🚀 概要 (About) - 開発チームの生産性を高めるAIパートナー
@@ -30,6 +31,7 @@
 | **CLI フレームワーク** | **Cobra** | コマンドライン引数（フラグ）の解析とサブコマンド構造 (`generic`, `backlog`, `slack`) の構築に使用します。 |
 | **Git 操作** | **go-git / os/exec (外部Git)** | **リモートリポジトリのブランチ間差分**の取得、クローン、フェッチに使用します。SSH認証に対応しています。 |
 | **AI モデル** | **Google Gemini API** | 取得したコード差分を分析し、レビューコメントを生成するために使用します。 |
+| **堅牢性** | **cenkalti/backoff** (内部移植) | **API通信にリトライ機構と指数バックオフ**を実装。一時的なネットワーク障害やレート制限からの自動回復を実現します。 |
 | 連携サービス | Slack Go ライブラリ (slack-go/slack) / 標準 net/http | Slack Block Kit を使用したリッチなメッセージングと、Backlog API への投稿に使用します。 |
 
 -----
@@ -91,13 +93,14 @@ $env:SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 
 -----
 
-### 4\. プロンプトファイルの準備
+### 4\. プロンプト設定について
 
-現在、プロンプトはGoコード内に埋め込まれているため、外部ファイルの準備は**不要**です。プロンプトの内容を変更したい場合は、Goコード内のファイルを直接修正してください。
+本ツールでは、プロンプトのテンプレートロジックが**内部サービスから分離**されています。
+現在、プロンプトの内容はGoコード内のファイル (`prompts/`) に直接埋め込まれているため、外部ファイルの準備は**不要**です。プロンプトの内容を変更したい場合は、Goコード内のファイルを直接修正してください。
 
 -----
 
-## 🤖 AIコードレビューの種類 (`--mode` オプション) 
+## 🤖 AIコードレビューの種類 (`--mode` オプション)
 
 本ツールは、レビューの目的に応じて AI に与える指示（**プロンプト**）を切り替えることができます。これは共通フラグの **`-m`, `--mode`** で指定します。
 
