@@ -47,6 +47,21 @@ var backlogCmd = &cobra.Command{
 			return nil // Diffなしでスキップされた場合
 		}
 
+		// 課題番号、リポジトリ名、ブランチ情報を整形
+		header := fmt.Sprintf(
+			"### 🤖 Gemini AI コードレビュー結果\n\n"+
+				"**対象課題ID:** %s\n"+
+				"**基準ブランチ:** `%s`\n"+
+				"**レビュー対象ブランチ:** `%s`\n\n"+
+				"---\n",
+			issueID,
+			cfg.BaseBranch,
+			cfg.FeatureBranch,
+		)
+
+		// ヘッダーとレビュー結果を結合
+		finalContent := header + reviewResult
+
 		// 5. レビュー結果の出力または Backlog への投稿 (Backlog固有の処理)
 		if noPost {
 			fmt.Println("\n--- Gemini AI レビュー結果 (投稿スキップ) ---")
@@ -67,7 +82,7 @@ var backlogCmd = &cobra.Command{
 
 		fmt.Printf("📤 Backlog 課題 ID: %s にレビュー結果を投稿します...\n", issueID)
 
-		err = backlogService.PostComment(cmd.Context(), issueID, reviewResult)
+		err = backlogService.PostComment(cmd.Context(), issueID, finalContent)
 		if err != nil {
 			log.Printf("ERROR: Backlog へのコメント投稿に失敗しました (課題ID: %s): %v\n", issueID, err)
 			fmt.Println("\n--- Gemini AI レビュー結果 (Backlog投稿失敗) ---")
