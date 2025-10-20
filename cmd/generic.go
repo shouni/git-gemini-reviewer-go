@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"git-gemini-reviewer-go/internal/services"
+	"git-gemini-reviewer-go/internal/services" // services.RunReviewAndGetResult の呼び出し
 
 	"github.com/spf13/cobra"
 )
@@ -16,12 +16,27 @@ var genericCmd = &cobra.Command{
 	Long:  `このコマンドは、指定されたGitリポジトリのブランチ間の差分をAIでレビューし、その結果を標準出力に直接表示します。Backlogなどの外部サービスとの連携は行いません。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		cfg, err := CreateReviewConfig()
+		// 1. パラメータ構造体を作成 (グローバル変数への依存をここで解決)
+		params := CreateReviewConfigParams{
+			ReviewMode:       reviewMode,
+			GeminiModel:      geminiModel,
+			GitCloneURL:      gitCloneURL,
+			BaseBranch:       baseBranch,
+			FeatureBranch:    featureBranch,
+			SSHKeyPath:       sshKeyPath,
+			LocalPath:        localPath,
+			SkipHostKeyCheck: skipHostKeyCheck,
+		}
+
+		// 2. 修正された CreateReviewConfig を呼び出し、引数を渡す
+		cfg, err := CreateReviewConfig(params)
 		if err != nil {
 			return err // 無効なレビューモードのエラーを処理
 		}
 
 		// 3. 共通ロジックを実行し、結果を取得
+		// NOTE: services.RunReviewAndGetResult のシグネチャが config.ReviewConfig を受け取るように
+		// services パッケージ側で修正されている必要があります。
 		reviewResult, err := services.RunReviewAndGetResult(cmd.Context(), cfg)
 		if err != nil {
 			return err
@@ -43,8 +58,6 @@ var genericCmd = &cobra.Command{
 func init() {
 	RootCmd.AddCommand(genericCmd)
 
-	// NOTE: Git関連のフラグ (gitCloneURL, baseBranch, featureBranchなど) および
-	// model は root.go の PersistentFlags で定義済みのため、ここでは定義しない。
 	// local-path のデフォルト値上書きのみを定義する。
 	genericCmd.Flags().StringVar(
 		&localPath, // cmd/root.go で定義された変数にバインドし、デフォルト値を上書き
@@ -53,7 +66,6 @@ func init() {
 		"Local path to clone the repository.",
 	)
 
-	// genericCmd 固有の必須フラグはないため、ここでは MarkFlagRequired は不要
 	// 共通の必須フラグは root.go でマークされている
 	genericCmd.MarkFlagRequired("git-clone-url")
 	genericCmd.MarkFlagRequired("feature-branch")

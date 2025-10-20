@@ -1,15 +1,14 @@
-// internal/config/config.go
-
 package config
 
-// ReviewConfig はGit操作とGeminiレビューの実行に必要な共通の設定を保持します。
+// ReviewConfig はAIコードレビューに必要なすべての設定を含みます。
+// この構造体は、コマンドライン引数からサービスロジックへ設定を渡すための共通のデータモデルです。
 type ReviewConfig struct {
-	GitCloneURL     string
-	BaseBranch      string
-	FeatureBranch   string
-	LocalPath       string
-	GeminiModelName string
-	SSHKeyPath      string
-	PromptFilePath  string
-	InsecureSkipHostKeyCheck bool
+	GeminiModel      string
+	PromptContent    string
+	GitCloneURL      string
+	BaseBranch       string
+	FeatureBranch    string
+	SSHKeyPath       string
+	LocalPath        string
+	SkipHostKeyCheck bool
 }
