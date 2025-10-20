@@ -6,36 +6,22 @@ import (
 	"log"
 	"strings"
 
+	"git-gemini-reviewer-go/internal/config"
 	"git-gemini-reviewer-go/prompts"
 )
 
-// ReviewConfig はレビュー実行に必要な全てのパラメータを保持します。
-type ReviewConfig struct {
-	GeminiModel      string
-	PromptContent    string // プロンプトのテンプレート文字列
-	GitCloneURL      string
-	BaseBranch       string
-	FeatureBranch    string
-	SSHKeyPath       string
-	LocalPath        string
-	SkipHostKeyCheck bool
-}
+// NOTE: services.ReviewConfig の定義は internal/config/config.go に移動したため削除
 
 // RunReviewAndGetResult はGit Diffを取得し、Gemini AIでレビューを実行します。
 // 投稿は行わず、レビュー結果の文字列のみを返します。
-func RunReviewAndGetResult(ctx context.Context, cfg ReviewConfig) (string, error) {
+// cfg の型は config.ReviewConfig に依存
+func RunReviewAndGetResult(ctx context.Context, cfg config.ReviewConfig) (string, error) {
 
 	log.Println("--- 1. Gitリポジトリのセットアップと差分取得を開始 ---")
 	fmt.Println("🔍 Gitリポジトリを準備し、差分を取得中...")
 
-	// 2. Gitクライアントの初期化とセットアップ（ここでは仮のNewGitClientを使用）
-	gitClient := NewGitClient(cfg.LocalPath, cfg.SSHKeyPath)
-	if cfg.SkipHostKeyCheck {
-		log.Println("!!! SECURITY ALERT !!! SSH host key checking has been explicitly disabled. This makes connections vulnerable to Man-in-the-Middle attacks. Ensure this is intentional and NOT used in production.")
-		gitClient.InsecureSkipHostKeyCheck = true
-	}
-	gitClient.BaseBranch = cfg.BaseBranch
-	gitClient.InsecureSkipHostKeyCheck = cfg.SkipHostKeyCheck
+	// 2. Gitクライアントの初期化とセットアップを分離したヘルパー関数で実行
+	gitClient := setupGitClient(cfg)
 
 	// 2.1. クローン/アップデート
 	repo, err := gitClient.CloneOrUpdateWithExec(cfg.GitCloneURL, cfg.LocalPath)
@@ -64,7 +50,7 @@ func RunReviewAndGetResult(ctx context.Context, cfg ReviewConfig) (string, error
 
 	log.Printf("Git差分の取得に成功しました。サイズ: %dバイト\n", len(diffContent))
 
-	// 3. プロンプトの組み立て (テンプレートロジックの分離)
+	// 3. プロンプトの組み立て
 	// NewReviewPromptBuilder は cfg.PromptContent (テンプレート) を使用
 	promptBuilder := prompts.NewReviewPromptBuilder(cfg.PromptContent)
 
@@ -78,7 +64,7 @@ func RunReviewAndGetResult(ctx context.Context, cfg ReviewConfig) (string, error
 	// --- 4. AIレビュー（Gemini: リトライ内蔵） ---
 	fmt.Println("🚀 Gemini AIによるコードレビューを開始します...")
 
-	// 4.1. Geminiクライアントの初期化 (NewGeminiClientはリファクタリング済みのものを使用)
+	// 4.1. Geminiクライアントの初期化
 	geminiClient, err := NewGeminiClient(ctx, cfg.GeminiModel)
 	if err != nil {
 		log.Printf("ERROR: Geminiクライアントの初期化エラー: %v", err)
@@ -86,10 +72,8 @@ func RunReviewAndGetResult(ctx context.Context, cfg ReviewConfig) (string, error
 	}
 
 	// 4.2. レビューの依頼
-	// finalPrompt のみ渡し、リトライロジックは geminiClient 内部に委譲
 	reviewComment, err := geminiClient.ReviewCodeDiff(ctx, finalPrompt)
 	if err != nil {
-		// リトライは内部で処理済み。ここでは最終的なエラーを受け取る。
 		log.Printf("ERROR: Geminiによるコードレビュー中にエラーが発生しました: %v", err)
 		return "", fmt.Errorf("Geminiによるコードレビュー中にエラーが発生しました: %w", err)
 	}
@@ -97,4 +81,22 @@ func RunReviewAndGetResult(ctx context.Context, cfg ReviewConfig) (string, error
 	log.Println("AIレビューの取得に成功しました。")
 
 	return reviewComment, nil
+}
+
+// setupGitClient はGitクライアントを初期化し、設定を適用します。
+// Gitクライアントのインスタンス化と設定ロジックを分離します。
+func setupGitClient(cfg config.ReviewConfig) *GitClient { // *GitClientは仮の型
+	gitClient := NewGitClient(cfg.LocalPath, cfg.SSHKeyPath) // NewGitClientは仮のコンストラクタ
+
+	if cfg.SkipHostKeyCheck {
+		// セキュリティに関するログ出力はここに集約
+		log.Println("!!! SECURITY ALERT !!! SSH host key checking has been explicitly disabled. This makes connections vulnerable to Man-in-the-Middle attacks. Ensure this is intentional and NOT used in production.")
+	}
+
+	// 設定をまとめて適用
+	gitClient.BaseBranch = cfg.BaseBranch
+	// 重複を避け、ここで最終的な設定を適用
+	gitClient.InsecureSkipHostKeyCheck = cfg.SkipHostKeyCheck
+
+	return gitClient
 }
