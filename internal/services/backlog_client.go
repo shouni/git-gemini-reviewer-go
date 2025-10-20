@@ -8,13 +8,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
 	"strings"
 
 	// 移植した内部リトライパッケージをインポート
 	"git-gemini-reviewer-go/internal/pkg/retry"
-	// backoff.Permanent を使用するためにインポート
+
 	"github.com/cenkalti/backoff/v4"
+	"github.com/forPelevin/gomoji"
 )
 
 // BacklogClient はBacklog APIとの通信を管理します。
@@ -33,12 +33,9 @@ type BacklogErrorResponse struct {
 	} `json:"errors"`
 }
 
-// 絵文字をマッチさせるための正規表現パターン。
-var emojiRegex = regexp.MustCompile(`[^\x00-\x7F]`) // ASCII 以外の文字を全て除去
-
 // cleanStringFromEmojis は、文字列から絵文字を削除します。
 func cleanStringFromEmojis(s string) string {
-	return emojiRegex.ReplaceAllString(s, "")
+	return gomoji.RemoveEmojis(s)
 }
 
 // NewBacklogClient はBacklogClientを初期化します。
@@ -108,7 +105,9 @@ func (c *BacklogClient) PostComment(ctx context.Context, issueID string, content
 				fmt.Printf("⚠️ Backlog API returned 'Incorrect String' error. Sanitizing comment and trying once more...\n")
 
 				sanitizedContent := cleanStringFromEmojis(content)
+				// 削除された文字があるか確認
 				if sanitizedContent == content {
+					// サニタイズ前と内容が変わっていない場合、絵文字が原因ではなかったと判断して終了
 					return fmt.Errorf("failed to post comment: %w (no fixable content issues)", pErr.Err)
 				}
 
