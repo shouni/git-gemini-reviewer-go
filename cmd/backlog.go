@@ -51,8 +51,8 @@ var backlogCmd = &cobra.Command{
 		header := fmt.Sprintf(
 			"### AI コードレビュー結果\n\n"+
 				"**対象課題ID:** %s\n"+
-				"**基準ブランチ:** `%s`\n"+
-				"**レビュー対象ブランチ:** `%s`\n\n"+
+				"**基準ブランチ:** %s\n"+
+				"**レビュー対象ブランチ:** %s\n\n"+
 				"---\n",
 			issueID,
 			cfg.BaseBranch,
