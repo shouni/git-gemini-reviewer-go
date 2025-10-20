@@ -48,16 +48,16 @@ var backlogCmd = &cobra.Command{
 		}
 
 		// 課題番号、リポジトリ名、ブランチ情報を整形
-        header := fmt.Sprintf(
-            "### AI コードレビュー結果\n\n"+
-            "**対象課題ID:** `%s`\n"+
-            "**基準ブランチ:** `%s`\n"+
-            "**レビュー対象ブランチ:** `%s`\n\n"+
-            "---\n",
-            issueID,
-            cfg.BaseBranch,
-            cfg.FeatureBranch,
-        )
+		header := fmt.Sprintf(
+			"### AI コードレビュー結果\n\n"+
+				"**対象課題ID:** %s\n"+
+				"**基準ブランチ:** %s\n"+
+				"**レビュー対象ブランチ:** %s\n\n"+
+				"---\n",
+			issueID,
+			cfg.BaseBranch,
+			cfg.FeatureBranch,
+		)
 		// ヘッダーとレビュー結果を結合
 		finalContent := header + reviewResult
 
