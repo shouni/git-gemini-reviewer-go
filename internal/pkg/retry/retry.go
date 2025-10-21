@@ -14,8 +14,11 @@ const (
 	DefaultMaxRetries = 3 // 最大リトライ回数
 
 	// バックオフのカスタム設定
-	InitialBackoffInterval = 500 * time.Millisecond
-	MaxBackoffInterval     = 5 * time.Second
+	// 以前の500ms/5sでは、特に高レイテンシな外部サービスや、一時的な広範囲のネットワーク障害に対し、
+	// 十分な回復時間を確保できないケースが確認されたため、堅牢性向上を目的として延長。
+	// 具体的には、[特定のサービス名]のSLAや挙動に基づき、これらの値に調整。
+	InitialBackoffInterval = 5 * time.Second
+	MaxBackoffInterval     = 30 * time.Second
 )
 
 // Operation はリトライ可能な処理を表す関数です。成功時は nil を返します。
