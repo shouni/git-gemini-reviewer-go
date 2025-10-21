@@ -14,8 +14,8 @@ const (
 	DefaultMaxRetries = 3 // 最大リトライ回数
 
 	// バックオフのカスタム設定
-	InitialBackoffInterval = 500 * time.Millisecond
-	MaxBackoffInterval     = 5 * time.Second
+	InitialBackoffInterval = 5 * time.Second
+	MaxBackoffInterval     = 30 * time.Second
 )
 
 // Operation はリトライ可能な処理を表す関数です。成功時は nil を返します。
