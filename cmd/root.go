@@ -62,6 +62,7 @@ func init() {
 		"",
 		"The SSH URL of the Git repository to review.",
 	)
+	RootCmd.MarkPersistentFlagRequired("git-clone-url")
 	RootCmd.PersistentFlags().StringVarP(
 		&baseBranch,
 		"base-branch",
@@ -76,6 +77,7 @@ func init() {
 		"",
 		"The feature branch to review (e.g., 'feature/my-branch').",
 	)
+	RootCmd.MarkPersistentFlagRequired("feature-branch")
 	RootCmd.PersistentFlags().StringVarP(
 		&localPath,
 		"local-path",
@@ -103,10 +105,6 @@ func init() {
 		"gemini-2.5-flash",
 		"Gemini model name to use for review (e.g., 'gemini-2.5-flash').",
 	)
-
-	// 共通で必須となるフラグをルートコマンドでマーク
-	RootCmd.MarkPersistentFlagRequired("git-clone-url")
-	RootCmd.MarkPersistentFlagRequired("feature-branch")
 }
 
 // Execute はルートコマンドを実行し、アプリケーションを起動します。
