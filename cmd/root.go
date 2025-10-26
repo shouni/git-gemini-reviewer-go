@@ -99,9 +99,10 @@ func init() {
 		false,
 		"CRITICAL WARNING: Disables SSH host key verification. This dramatically increases the risk of Man-in-the-Middle attacks. NEVER USE IN PRODUCTION. Only for controlled development/testing environments.",
 	)
-	RootCmd.PersistentFlags().StringVar(
+	RootCmd.PersistentFlags().StringVarP(
 		&geminiModel,
 		"model",
+		"g",
 		"gemini-2.5-flash",
 		"Gemini model name to use for review (e.g., 'gemini-2.5-flash').",
 	)
