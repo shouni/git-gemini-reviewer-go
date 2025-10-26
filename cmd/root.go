@@ -48,56 +48,64 @@ var RootCmd = &cobra.Command{
 }
 
 func init() {
-	// PersistentFlags() でフラグを定義。
-	RootCmd.PersistentFlags().StringVarP(&reviewMode, "mode", "m", "detail", "レビューモードを指定: 'release' (リリース判定) または 'detail' (詳細レビュー)")
 
-	// Git 関連のフラグを PersistentFlags として定義
-	RootCmd.PersistentFlags().StringVar(
+	RootCmd.PersistentFlags().StringVarP(&reviewMode,
+		"mode",
+		"m",
+		"detail",
+		"レビューモードを指定: 'release' (リリース判定) または 'detail' (詳細レビュー)",
+	)
+	RootCmd.PersistentFlags().StringVarP(
 		&gitCloneURL,
 		"git-clone-url",
+		"u",
 		"",
 		"The SSH URL of the Git repository to review.",
 	)
-	RootCmd.PersistentFlags().StringVar(
+	RootCmd.MarkPersistentFlagRequired("git-clone-url")
+	RootCmd.PersistentFlags().StringVarP(
 		&baseBranch,
 		"base-branch",
+		"b",
 		"main",
 		"The base branch for diff comparison (e.g., 'main').",
 	)
-	RootCmd.PersistentFlags().StringVar(
+	RootCmd.PersistentFlags().StringVarP(
 		&featureBranch,
 		"feature-branch",
+		"f",
 		"",
 		"The feature branch to review (e.g., 'feature/my-branch').",
 	)
-	RootCmd.PersistentFlags().StringVar(
+	RootCmd.MarkPersistentFlagRequired("feature-branch")
+	RootCmd.PersistentFlags().StringVarP(
+		&localPath,
+		"local-path",
+		"l",
+		os.TempDir()+"/git-reviewer-repos/tmp",
+		"Local path to clone the repository.",
+	)
+	RootCmd.PersistentFlags().StringVarP(
 		&sshKeyPath,
 		"ssh-key-path",
+		"k",
 		"~/.ssh/id_rsa",
 		"Path to the SSH private key for Git authentication.",
 	)
-	RootCmd.PersistentFlags().StringVar(
-		&localPath,
-		"local-path",
-		os.TempDir()+"/git-reviewer-repos/tmp", // デフォルトの一時パス
-		"Local path to clone the repository.",
-	)
-	RootCmd.PersistentFlags().BoolVar(
+	RootCmd.PersistentFlags().BoolVarP(
 		&skipHostKeyCheck,
 		"skip-host-key-check",
+		"s",
 		false,
 		"CRITICAL WARNING: Disables SSH host key verification. This dramatically increases the risk of Man-in-the-Middle attacks. NEVER USE IN PRODUCTION. Only for controlled development/testing environments.",
 	)
-	RootCmd.PersistentFlags().StringVar(
+	RootCmd.PersistentFlags().StringVarP(
 		&geminiModel,
 		"model",
+		"g",
 		"gemini-2.5-flash",
 		"Gemini model name to use for review (e.g., 'gemini-2.5-flash').",
 	)
-
-	// 共通で必須となるフラグをルートコマンドでマーク
-	RootCmd.MarkPersistentFlagRequired("git-clone-url")
-	RootCmd.MarkPersistentFlagRequired("feature-branch")
 }
 
 // Execute はルートコマンドを実行し、アプリケーションを起動します。
