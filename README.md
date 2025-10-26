@@ -128,7 +128,7 @@ $env:SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 | `--local-path` | **`-l`** | リポジトリをクローンするローカルパス | 一時ディレクトリ | ❌ |
 | `--ssh-key-path` | **`-k`** | Git 認証用の SSH 秘密鍵のパス | `~/.ssh/id_rsa` | ❌ |
 | `--skip-host-key-check` | **`-s`** | SSHホストキーチェックをスキップする (**非推奨**) | `false` | ❌ |
-| `--model` | **なし** | 使用する Gemini モデル名 (例: `gemini-2.5-flash`) | `gemini-2.5-flash` | ❌ |
+| `--model` | **`-g`** | 使用する Gemini モデル名 (例: `gemini-2.5-flash`) | `gemini-2.5-flash` | ❌ |
 
 -----
 
