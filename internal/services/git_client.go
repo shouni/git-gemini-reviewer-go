@@ -109,7 +109,7 @@ func (c *GitClient) getGitSSHCommand() (string, error) {
 	}
 
 	// ssh -i <鍵の絶対パス> ...
-	sshCommand := fmt.Sprintf("ssh -i %s", absSSHKeyPath)
+	sshCommand := fmt.Sprintf("ssh -i %s", filepath.ToSlash(absSSHKeyPath))
 	// (上記のInsecureSkipHostKeyCheckのロジックをここに追加)
 	if c.InsecureSkipHostKeyCheck {
 		sshCommand += " -o StrictHostKeyChecking=no"
