@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"git-gemini-reviewer-go/internal/services" // services.RunReviewAndGetResult の呼び出し
 
