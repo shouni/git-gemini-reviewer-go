@@ -38,14 +38,6 @@ func init() {
 		"レビュー結果を投稿する Slack Webhook URL。",
 	)
 	slackCmd.Flags().BoolVar(&noPostSlack, "no-post", false, "投稿をスキップし、結果を標準出力する")
-
-	// local-path のデフォルト値上書き (サブコマンド固有のパス)
-	slackCmd.Flags().StringVar(
-		&localPath,
-		"local-path",
-		os.TempDir()+"/git-reviewer-repos/tmp-slack",
-		"Local path to clone the repository.",
-	)
 }
 
 // --------------------------------------------------------------------------

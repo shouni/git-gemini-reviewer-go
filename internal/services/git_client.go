@@ -108,8 +108,11 @@ func (c *GitClient) getGitSSHCommand() (string, error) {
 		return "", fmt.Errorf("SSHキーファイルが見つかりません: %s", absSSHKeyPath)
 	}
 
+	// これにより、GIT_SSH_COMMAND経由で実行されるsshが、パスを正しく解釈できるようにする
+	cleanPath := strings.ReplaceAll(absSSHKeyPath, "\\", "/")
+
 	// ssh -i <鍵の絶対パス> ...
-	sshCommand := fmt.Sprintf("ssh -i %s", absSSHKeyPath)
+	sshCommand := fmt.Sprintf("ssh -i %s", cleanPath)
 	// (上記のInsecureSkipHostKeyCheckのロジックをここに追加)
 	if c.InsecureSkipHostKeyCheck {
 		sshCommand += " -o StrictHostKeyChecking=no"

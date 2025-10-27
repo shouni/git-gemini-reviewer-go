@@ -33,18 +33,6 @@ func init() {
 	// Backlog 固有のフラグのみをここで定義する
 	backlogCmd.Flags().StringVar(&issueID, "issue-id", "", "コメントを投稿するBacklog課題ID（例: PROJECT-123）")
 	backlogCmd.Flags().BoolVar(&noPost, "no-post", false, "投稿をスキップし、結果を標準出力する")
-
-	// local-path のデフォルト値上書き (localPathはroot.goで定義されていると仮定)
-	backlogCmd.Flags().StringVar(
-		&localPath,
-		"local-path",
-		os.TempDir()+"/git-reviewer-repos/tmp-backlog",
-		"Local path to clone the repository.",
-	)
-
-	// 必須フラグの設定
-	backlogCmd.MarkFlagRequired("git-clone-url")
-	backlogCmd.MarkFlagRequired("feature-branch")
 }
 
 // --------------------------------------------------------------------------

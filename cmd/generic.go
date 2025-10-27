@@ -57,16 +57,4 @@ var genericCmd = &cobra.Command{
 
 func init() {
 	RootCmd.AddCommand(genericCmd)
-
-	// local-path のデフォルト値上書きのみを定義する。
-	genericCmd.Flags().StringVar(
-		&localPath, // cmd/root.go で定義された変数にバインドし、デフォルト値を上書き
-		"local-path",
-		os.TempDir()+"/git-reviewer-repos/tmp-generic", // generic 用の専用パス
-		"Local path to clone the repository.",
-	)
-
-	// 共通の必須フラグは root.go でマークされている
-	genericCmd.MarkFlagRequired("git-clone-url")
-	genericCmd.MarkFlagRequired("feature-branch")
 }
