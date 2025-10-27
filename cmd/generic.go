@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"git-gemini-reviewer-go/internal/services" // services.RunReviewAndGetResult の呼び出し
+	"git-gemini-reviewer-go/internal/services"
 
 	"github.com/spf13/cobra"
 )
