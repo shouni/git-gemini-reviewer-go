@@ -14,10 +14,8 @@ import (
 
 	"github.com/slack-go/slack"
 
-	// 移植した内部リトライパッケージをインポート (プロジェクトのパス構造に依存)
-	"git-gemini-reviewer-go/internal/pkg/retry"
-	// backoff.Permanent を使用するためにインポート
 	"github.com/cenkalti/backoff/v4"
+	"github.com/shouni/go-web-exact/pkg/retry"
 )
 
 // SlackClient は Slack API と連携するためのクライアントです。

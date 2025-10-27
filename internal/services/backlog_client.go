@@ -10,8 +10,7 @@ import (
 	"net/http"
 	"strings"
 
-	// 移植した内部リトライパッケージをインポート
-	"git-gemini-reviewer-go/internal/pkg/retry"
+	"github.com/shouni/go-web-exact/pkg/retry"
 
 	"github.com/cenkalti/backoff/v4"
 	"github.com/forPelevin/gomoji"
