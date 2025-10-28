@@ -8,6 +8,13 @@ import (
 	"github.com/shouni/go-ai-client/pkg/ai/gemini"
 )
 
+const (
+	// コードレビューの一貫性を優先するため、低い温度に設定
+	defaultGeminiTemperature = float32(0.2)
+	// 一時的なネットワークエラーやAPIのレート制限に対応するためのリトライ回数
+	defaultGeminiMaxRetries = uint64(3)
+)
+
 // GeminiClient は go-ai-client の gemini.Client をラップし、
 // git-gemini-reviewer-go のサービス層向けインターフェースを提供します。
 type GeminiClient struct {
@@ -31,18 +38,14 @@ func NewGeminiClient(ctx context.Context, modelName string) (*GeminiClient, erro
 	}
 
 	// 2. モデルパラメータとリトライ設定を定義
-
-	// 温度 0.2 を設定 (より決定的で一貫したレビューを期待)
-	temperature := float32(0.2)
-
-	// リトライ回数を明示的に設定し、以前の堅牢性を維持 (デフォルトと同じ 3 回)
-	maxRetries := uint64(3)
+	temperature := defaultGeminiTemperature
+	maxRetries := defaultGeminiMaxRetries
 
 	// 3. gemini.Config 構造体を構築
 	cfg := gemini.Config{
 		APIKey:      apiKey,
 		Temperature: &temperature,
-		MaxRetries:  maxRetries, // 修正: MaxRetries は uint64 で、ポインタではないため直接渡す
+		MaxRetries:  maxRetries,
 	}
 
 	// 4. gemini.NewClient を利用してクライアントを生成
