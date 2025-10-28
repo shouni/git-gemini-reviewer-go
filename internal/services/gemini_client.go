@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/shouni/go-ai-client/pkg/ai/gemini"
 )
@@ -16,11 +17,32 @@ type GeminiClient struct {
 }
 
 // NewGeminiClient はGeminiClientを初期化します。
-// NewClientFromEnv を利用することで、APIキーの取得とリトライ設定の初期化は gemini パッケージに任せます。
+// 温度 0.2 を明示的に指定し、APIキーは環境変数から取得します。
 func NewGeminiClient(ctx context.Context, modelName string) (*GeminiClient, error) {
 
-	// gemini.NewClientFromEnv を利用し、APIキーとデフォルトリトライ設定を持つクライアントを生成
-	gClient, err := gemini.NewClientFromEnv(ctx)
+	// 1. APIキーを環境変数から取得 (gemini.NewClientFromEnv のロジックを部分的に移植)
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		apiKey = os.Getenv("GOOGLE_API_KEY")
+	}
+	if apiKey == "" {
+		return nil, fmt.Errorf("GEMINI_API_KEY or GOOGLE_API_KEY environment variable is not set")
+	}
+
+	// 2. 温度 0.2 を設定
+	// *float32 型が必要なため、float32 の変数を作成し、そのポインタを渡す
+	temperature := float32(0.2)
+
+	// 3. gemini.Config 構造体を構築
+	cfg := gemini.Config{
+		APIKey: apiKey,
+		// Temperatureフィールドに、作成したポインタを渡す
+		Temperature: &temperature,
+		// MaxRetriesは設定しないため、デフォルト値が使用される
+	}
+
+	// 4. gemini.NewClient を利用してクライアントを生成
+	gClient, err := gemini.NewClient(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize underlying gemini client: %w", err)
 	}

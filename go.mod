@@ -6,8 +6,8 @@ require (
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/forPelevin/gomoji v1.4.1
 	github.com/go-git/go-git/v5 v5.16.2
-	github.com/shouni/go-ai-client v1.0.4
-	github.com/shouni/go-web-exact v1.0.5
+	github.com/shouni/go-ai-client v1.0.6
+	github.com/shouni/go-web-exact v1.0.6
 	github.com/slack-go/slack v0.17.3
 	github.com/spf13/cobra v1.10.1
 	golang.org/x/crypto v0.42.0
