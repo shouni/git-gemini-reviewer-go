@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time" // httpclient.New() のために time パッケージをインポート
 
 	"git-gemini-reviewer-go/internal/config"
 	"git-gemini-reviewer-go/internal/services"
+	"github.com/shouni/go-notifier/pkg/notifier"
+	"github.com/shouni/go-web-exact/pkg/httpclient" // httpclientをインポート
 
 	"github.com/spf13/cobra"
 )
@@ -98,7 +101,7 @@ func runBacklogCommand(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		// 投稿に失敗した場合、エラーログを出力し、レビュー結果をコンソールに出力
 		log.Printf("ERROR: Backlog へのコメント投稿に失敗しました (課題ID: %s): %v\n", issueID, err)
-		printReviewResult(reviewResult)
+		printReviewResult(reviewResult) // ここで呼び出されています
 		return fmt.Errorf("Backlog課題 %s へのコメント投稿に失敗しました。詳細は上記レビュー結果を確認してください。", issueID)
 	}
 
@@ -112,7 +115,10 @@ func runBacklogCommand(cmd *cobra.Command, args []string) error {
 
 // postToBacklog は、Backlogへの投稿処理の責務を持ちます。
 func postToBacklog(ctx context.Context, url, apiKey, issueID, content string) error {
-	backlogService, err := services.NewBacklogClient(url, apiKey)
+	// httpclient.New() と time.Second を使用
+	httpClient := httpclient.New(30 * time.Second)
+
+	backlogService, err := notifier.NewBacklogNotifier(httpClient, url, apiKey)
 	if err != nil {
 		return fmt.Errorf("Backlogクライアントの初期化に失敗しました: %w", err)
 	}

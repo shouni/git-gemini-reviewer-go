@@ -3,13 +3,15 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"git-gemini-reviewer-go/internal/services"
 	"log"
 	"os"
 	"strings"
-
-	"git-gemini-reviewer-go/internal/services"
+	"time"
 
 	"git-gemini-reviewer-go/internal/config"
+	"github.com/shouni/go-notifier/pkg/notifier"
+	"github.com/shouni/go-web-exact/pkg/httpclient"
 	"github.com/spf13/cobra"
 )
 
@@ -118,12 +120,36 @@ func setupCleanup(path string) {
 
 // postToSlack は、Slackへの投稿処理の責務を持ちます。
 func postToSlack(ctx context.Context, webhookURL, content string, cfg config.ReviewConfig) error {
-	slackService := services.NewSlackClient(webhookURL)
+	// 1. httpclient.New() を使用してクライアントを初期化
+	httpClient := httpclient.New(30 * time.Second)
+
+	// SlackNotifierに必要な追加の環境変数を取得
+	slackUsername := os.Getenv("SLACK_USERNAME")
+	slackIconEmoji := os.Getenv("SLACK_ICON_EMOJI")
+	slackChannel := os.Getenv("SLACK_CHANNEL")
+
+	// 2. notifier.NewSlackNotifier の呼び出しを修正:
+	// slack.go の定義 (client, webhookURL, username, iconEmoji, channel) に合わせる。
+	slackNotifier := notifier.NewSlackNotifier(
+		httpClient,
+		webhookURL,
+		slackUsername,
+		slackIconEmoji,
+		slackChannel,
+	)
+	// NOTE: NewSlackNotifierはエラーを返さないシグネチャのため、エラーチェックは不要
+
 	fmt.Printf("📤 Slack Webhook URL にレビュー結果を投稿します...\n")
 
-	// PostMessage の呼び出し
-	// PostMessage のシグネチャを調整し、ブランチ情報を渡せるようにしていると仮定
-	return slackService.PostMessage(ctx, content, cfg.FeatureBranch, cfg.GitCloneURL)
+	// ヘッダー文字列の作成 (ブランチ情報を結合)
+	headerText := fmt.Sprintf(
+		"📝 AIコードレビュー結果 (ブランチ: `%s` ← `%s`)",
+		cfg.BaseBranch,
+		cfg.FeatureBranch,
+	)
+
+	// SendTextWithHeader は content を整形し、ヘッダー情報を含めて投稿する
+	return slackNotifier.SendTextWithHeader(ctx, headerText, content)
 }
 
 // printSlackResult は noPost 時に結果を標準出力します。
