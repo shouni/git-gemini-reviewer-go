@@ -5,7 +5,7 @@ go 1.25
 require (
 	github.com/go-git/go-git/v5 v5.16.2
 	github.com/shouni/go-ai-client v1.0.6
-	github.com/shouni/go-notifier v1.0.2
+	github.com/shouni/go-notifier v1.0.3
 	github.com/shouni/go-web-exact v1.0.8
 	github.com/spf13/cobra v1.10.1
 	golang.org/x/crypto v0.42.0
