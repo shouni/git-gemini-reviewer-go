@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time" // httpclient.New() のために time パッケージをインポート
+	"time"
 
 	"git-gemini-reviewer-go/internal/config"
 	"git-gemini-reviewer-go/internal/services"
 	"github.com/shouni/go-notifier/pkg/notifier"
-	"github.com/shouni/go-web-exact/pkg/httpclient" // httpclientをインポート
+	"github.com/shouni/go-web-exact/pkg/httpclient"
 
 	"github.com/spf13/cobra"
 )
