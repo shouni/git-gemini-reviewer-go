@@ -17,7 +17,7 @@ func RunReviewAndGetResult(ctx context.Context, cfg config.ReviewConfig) (string
 	log.Println("--- 1. Gitリポジトリのセットアップと差分取得を開始 ---")
 	fmt.Println("🔍 Gitリポジトリを準備し、差分を取得中...")
 
-	// 2. Gitクライアントの初期化とセットアップを分離したヘルパー関数で実行
+	// 2. Gitクライアントの初期化とセットアップ
 	gitClient := setupGitClient(cfg)
 
 	// 2.1. クローン/アップデート
@@ -26,6 +26,13 @@ func RunReviewAndGetResult(ctx context.Context, cfg config.ReviewConfig) (string
 		log.Printf("ERROR: Gitリポジトリのセットアップに失敗しました: %v", err)
 		return "", fmt.Errorf("Gitリポジトリのクローン/更新に失敗しました: %w", err)
 	}
+
+	// メインの処理が成功/失敗に関わらず、この関数の終了時に必ず実行されます。
+	defer func() {
+		if cleanupErr := gitClient.Cleanup(repo); cleanupErr != nil {
+			log.Printf("Warning: Failed to cleanup local repository: %v", cleanupErr)
+		}
+	}()
 
 	// 2.2. フェッチ
 	if err := gitClient.Fetch(repo); err != nil {
@@ -88,9 +95,8 @@ func setupGitClient(cfg config.ReviewConfig) GitService {
 		WithInsecureSkipHostKeyCheck(cfg.SkipHostKeyCheck),
 	}
 
-	if cfg.BaseBranch != "" {
-		opts = append(opts, WithBaseBranch(cfg.BaseBranch))
-	}
+	// NewGitClientの内部でBaseBranchのデフォルト値が設定されるため、空文字チェックは不要
+	opts = append(opts, WithBaseBranch(cfg.BaseBranch))
 
 	gitClient := NewGitClient(
 		cfg.LocalPath,
