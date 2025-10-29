@@ -27,7 +27,7 @@ type GitService interface {
 	Fetch(repo *git.Repository) error
 	// CheckRemoteBranchExists は指定されたブランチがリモートに存在するか確認します。
 	CheckRemoteBranchExists(repo *git.Repository, branch string) (bool, error)
-	// GetCodeDiff は指定された2つのブランチ間の純粋な差分を、外部のgitコマンドで高速に取得します。
+	// GetCodeDiff は指定された2つのブランチ間の純粋な差分を文字列として取得します。
 	GetCodeDiff(repo *git.Repository, baseBranch, featureBranch string) (string, error)
 }
 
@@ -135,7 +135,6 @@ func (c *GitClient) getGitSSHCommand() (string, error) {
 	// -F /dev/null はシステム設定を無視し、環境変数のオプションを優先させる。
 	cmd := fmt.Sprintf("ssh -i %s -F /dev/null", sshKeyPath)
 
-	// 修正: InsecureSkipHostKeyCheck が true の場合のみ StrictHostKeyChecking=no を付与
 	if c.InsecureSkipHostKeyCheck {
 		cmd += " -o StrictHostKeyChecking=no"
 	}
@@ -152,7 +151,6 @@ func (c *GitClient) cloneRepository(repositoryURL, localPath, branch string) err
 		}
 	}
 
-	// 修正: ログメッセージを go-git に合わせる
 	log.Printf("Cloning %s into %s using go-git...\n", repositoryURL, localPath)
 
 	auth, err := c.getAuthMethod(repositoryURL)
@@ -254,14 +252,12 @@ func (c *GitClient) CloneOrUpdate(repositoryURL string) (*git.Repository, error)
 		return nil, fmt.Errorf("go-git用の認証情報取得に失敗しました: %w", err)
 	}
 	c.auth = auth
-	// 修正: ログレベルを INFO 相当に変更
 	log.Println("go-git authentication method has been set successfully.")
 
 	return repo, nil
 }
 
 // Fetch はリモートから最新の変更を取得します。
-// go-gitを使用。
 func (c *GitClient) Fetch(repo *git.Repository) error {
 	log.Printf("Fetching latest changes from remote for repository at %s...\n", c.LocalPath)
 
@@ -282,7 +278,7 @@ func (c *GitClient) Fetch(repo *git.Repository) error {
 
 // GetCodeDiff は指定された2つのブランチ間の純粋な差分を、外部コマンドで高速に取得します。
 func (c *GitClient) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch string) (string, error) {
-	// 修正: ログメッセージに c.LocalPath を含める
+	// NOTE: 大規模リポジトリでのパフォーマンス問題を回避するため、go-gitのPatchメソッドではなく、外部の 'git diff' コマンドを使用している。
 	log.Printf("Calculating code diff for repository at %s between remote/%s and remote/%s using external 'git diff' command...\n", c.LocalPath, baseBranch, featureBranch)
 
 	// コマンド引数: git diff origin/<base>...origin/<feature> (3点比較)
@@ -292,8 +288,16 @@ func (c *GitClient) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch 
 	}
 
 	cmd := exec.Command("git", cmdArgs...)
-	cmd.Dir = c.LocalPath  // リポジトリのローカルパスで実行
-	cmd.Env = os.Environ() // 環境変数を継承
+	cmd.Dir = c.LocalPath // リポジトリのローカルパスで実行
+
+	// 修正: 最小限の環境変数（PATH, HOMEなど）をコピーし、GIT_SSH_COMMANDを追加する
+	env := make([]string, 0, len(os.Environ())+2)
+	for _, e := range os.Environ() {
+		if strings.HasPrefix(e, "PATH=") || strings.HasPrefix(e, "HOME=") || strings.HasPrefix(e, "USER=") {
+			env = append(env, e)
+		}
+	}
+	cmd.Env = env
 
 	// SSH認証が必要な場合、GIT_SSH_COMMANDを設定する
 	gitSSHCommand, err := c.getGitSSHCommand()
@@ -309,7 +313,6 @@ func (c *GitClient) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch 
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		// 修正: エラーチェーンのセマンティクスを維持しつつ、Stderrを含める
 		return "", fmt.Errorf("git diff 実行に失敗しました: %w. Stderr: %s", err, stderr.String())
 	}
 
@@ -317,7 +320,6 @@ func (c *GitClient) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch 
 }
 
 // CheckRemoteBranchExists は指定されたブランチがリモート 'origin' に存在するか確認します。
-// go-gitを使用。
 func (c *GitClient) CheckRemoteBranchExists(repo *git.Repository, branch string) (bool, error) {
 	if branch == "" {
 		return false, fmt.Errorf("チェックするブランチ名が空です")
@@ -330,7 +332,8 @@ func (c *GitClient) CheckRemoteBranchExists(repo *git.Repository, branch string)
 		return false, nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("リモートブランチ '%s' の存在確認中にエラーが発生しました: %w", branch, err)
+		// 修正: エラーメッセージを簡潔にする
+		return false, fmt.Errorf("リモートブランチ '%s' の確認に失敗しました: %w", branch, err)
 	}
 
 	return true, nil
