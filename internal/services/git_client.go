@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"os/exec" // 差分取得に必要
+	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strings"
@@ -51,6 +51,7 @@ func WithInsecureSkipHostKeyCheck(skip bool) GitClientOption {
 }
 
 // NewGitClient はGitClientを初期化します。
+// GitServiceインターフェースを返します。
 func NewGitClient(localPath string, sshKeyPath string, baseBranch string, opts ...GitClientOption) GitService {
 	client := &GitClient{
 		LocalPath:  localPath,
@@ -130,7 +131,14 @@ func (c *GitClient) getGitSSHCommand() (string, error) {
 	}
 
 	// HostKeyCheckingを無効化するオプションと、秘密鍵のパスを指定。
-	cmd := fmt.Sprintf("ssh -i %s -o StrictHostKeyChecking=no -F /dev/null", sshKeyPath)
+	// InsecureSkipHostKeyCheck の設定を外部gitコマンドにも適用する
+	// -F /dev/null はシステム設定を無視し、環境変数のオプションを優先させる。
+	cmd := fmt.Sprintf("ssh -i %s -F /dev/null", sshKeyPath)
+
+	// 修正: InsecureSkipHostKeyCheck が true の場合のみ StrictHostKeyChecking=no を付与
+	if c.InsecureSkipHostKeyCheck {
+		cmd += " -o StrictHostKeyChecking=no"
+	}
 
 	return cmd, nil
 }
@@ -144,7 +152,8 @@ func (c *GitClient) cloneRepository(repositoryURL, localPath, branch string) err
 		}
 	}
 
-	log.Printf("Cloning %s into %s...\n", repositoryURL, localPath)
+	// 修正: ログメッセージを go-git に合わせる
+	log.Printf("Cloning %s into %s using go-git...\n", repositoryURL, localPath)
 
 	auth, err := c.getAuthMethod(repositoryURL)
 	if err != nil {
@@ -245,7 +254,8 @@ func (c *GitClient) CloneOrUpdate(repositoryURL string) (*git.Repository, error)
 		return nil, fmt.Errorf("go-git用の認証情報取得に失敗しました: %w", err)
 	}
 	c.auth = auth
-	log.Println("DEBUG: go-git authentication method has been set successfully.")
+	// 修正: ログレベルを INFO 相当に変更
+	log.Println("go-git authentication method has been set successfully.")
 
 	return repo, nil
 }
@@ -272,7 +282,8 @@ func (c *GitClient) Fetch(repo *git.Repository) error {
 
 // GetCodeDiff は指定された2つのブランチ間の純粋な差分を、外部コマンドで高速に取得します。
 func (c *GitClient) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch string) (string, error) {
-	log.Printf("Calculating code diff between remote/%s and remote/%s using external 'git diff' command...\n", baseBranch, featureBranch)
+	// 修正: ログメッセージに c.LocalPath を含める
+	log.Printf("Calculating code diff for repository at %s between remote/%s and remote/%s using external 'git diff' command...\n", c.LocalPath, baseBranch, featureBranch)
 
 	// コマンド引数: git diff origin/<base>...origin/<feature> (3点比較)
 	cmdArgs := []string{
@@ -298,7 +309,8 @@ func (c *GitClient) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch 
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("git diff 実行に失敗しました: %w\nStderr: %s", err, stderr.String())
+		// 修正: エラーチェーンのセマンティクスを維持しつつ、Stderrを含める
+		return "", fmt.Errorf("git diff 実行に失敗しました: %w. Stderr: %s", err, stderr.String())
 	}
 
 	return stdout.String(), nil
