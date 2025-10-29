@@ -3,12 +3,10 @@ module git-gemini-reviewer-go
 go 1.25
 
 require (
-	github.com/cenkalti/backoff/v4 v4.3.0
-	github.com/forPelevin/gomoji v1.4.1
 	github.com/go-git/go-git/v5 v5.16.2
 	github.com/shouni/go-ai-client v1.0.6
-	github.com/shouni/go-web-exact v1.0.6
-	github.com/slack-go/slack v0.17.3
+	github.com/shouni/go-notifier v1.0.1
+	github.com/shouni/go-web-exact v1.0.8
 	github.com/spf13/cobra v1.10.1
 	golang.org/x/crypto v0.42.0
 )
@@ -20,10 +18,14 @@ require (
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
+	github.com/PuerkitoBio/goquery v1.10.3 // indirect
+	github.com/andybalholm/cascadia v1.3.3 // indirect
+	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cloudflare/circl v1.6.1 // indirect
 	github.com/cyphar/filepath-securejoin v0.4.1 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
+	github.com/forPelevin/gomoji v1.4.1 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.6.2 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -41,6 +43,7 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
+	github.com/slack-go/slack v0.17.3 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
