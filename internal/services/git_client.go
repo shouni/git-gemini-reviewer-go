@@ -140,6 +140,7 @@ func (c *GitClient) cloneRepository(repositoryURL, localPath, branch string, env
 }
 
 // CloneOrUpdateWithExec は、リポジトリをクローンするか、既に存在する場合は pull で更新します。
+// pullでエラーが発生した場合（コンフリクト等）、リポジトリを削除して再クローンします。
 func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string) (*git.Repository, error) {
 
 	// 1. GIT_SSH_COMMAND を設定
@@ -214,9 +215,25 @@ func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string
 		cmd.Stderr = os.Stderr
 
 		if err := cmd.Run(); err != nil {
-			return nil, fmt.Errorf("git pull コマンドの実行に失敗しました: %w", err)
+			// ★★★★★ コンフリクト発生時の再クローン処理をここに追加 ★★★★★
+			fmt.Printf("Warning: 'git pull' failed for %s (possible conflict/network error): %v. Attempting re-cloning...\n", localPath, err)
+
+			// 1. 既存のディレクトリを削除
+			if err := os.RemoveAll(localPath); err != nil {
+				return nil, fmt.Errorf("git pull失敗後の既存リポジトリディレクトリ (%s) の削除に失敗しました: %w", localPath, err)
+			}
+			fmt.Printf("Existing repository at %s removed for re-cloning.\n", localPath)
+
+			// 2. クローン実行
+			if err := c.cloneRepository(repositoryURL, localPath, c.BaseBranch, env); err != nil {
+				return nil, fmt.Errorf("git pull失敗後の再クローンに失敗しました: %w", err)
+			}
+			fmt.Println("Repository re-cloned successfully.")
+
+			// 再クローンに成功したため、エラーを返さずに次のステップへ進む。
+		} else {
+			fmt.Println("Repository updated successfully using exec.Command.")
 		}
-		fmt.Println("Repository updated successfully using exec.Command.")
 	}
 
 	// 最終的に go-git でリポジトリを開いて返す
