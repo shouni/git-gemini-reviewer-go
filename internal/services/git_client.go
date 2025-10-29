@@ -163,7 +163,8 @@ func (c *GitClient) cloneRepository(repositoryURL, localPath, branch string) err
 		ReferenceName: plumbing.NewBranchReferenceName(branch),
 		SingleBranch:  true,
 		Auth:          auth,
-		Progress:      os.Stdout,
+		// Progressオプションは進捗をos.Stdoutに出力します。
+		Progress: os.Stdout,
 	})
 	if err != nil {
 		return fmt.Errorf("go-git クローンに失敗しました: %w", err)
@@ -227,6 +228,8 @@ func (c *GitClient) CloneOrUpdate(repositoryURL string) (*git.Repository, error)
 		} else {
 			log.Printf("Warning: go-git pull failed: %v. Attempting to recover by re-cloning...", pullErr)
 
+			// pull失敗時にローカルの状態をクリーンアップし、リモートに強制的に合わせる
+			// レビューツールとしては、常にクリーンな状態から開始することが重要であるため、この戦略を採用
 			w.Reset(&git.ResetOptions{Mode: git.HardReset})
 
 			if err := os.RemoveAll(localPath); err != nil {
@@ -290,9 +293,10 @@ func (c *GitClient) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch 
 	cmd := exec.Command("git", cmdArgs...)
 	cmd.Dir = c.LocalPath // リポジトリのローカルパスで実行
 
-	// 修正: 最小限の環境変数（PATH, HOMEなど）をコピーし、GIT_SSH_COMMANDを追加する
+	// 最小限の環境変数（PATH, HOMEなど）をコピーし、GIT_SSH_COMMANDを追加する
 	env := make([]string, 0, len(os.Environ())+2)
 	for _, e := range os.Environ() {
+		// gitコマンドの実行に最低限必要な環境変数をコピー
 		if strings.HasPrefix(e, "PATH=") || strings.HasPrefix(e, "HOME=") || strings.HasPrefix(e, "USER=") {
 			env = append(env, e)
 		}
@@ -332,7 +336,7 @@ func (c *GitClient) CheckRemoteBranchExists(repo *git.Repository, branch string)
 		return false, nil
 	}
 	if err != nil {
-		// 修正: エラーメッセージを簡潔にする
+		// エラーメッセージを簡潔にする
 		return false, fmt.Errorf("リモートブランチ '%s' の確認に失敗しました: %w", branch, err)
 	}
 
