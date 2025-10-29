@@ -1,11 +1,12 @@
 package services
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"net/url"
 	"os"
-	"os/exec"
+	"os/exec" // 差分取得に必要
 	"os/user"
 	"path/filepath"
 	"strings"
@@ -13,27 +14,53 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 	cryptossh "golang.org/x/crypto/ssh"
 )
 
-// GitClient はGitリポジトリ操作を管理します。
+// GitService はGitリポジトリ操作の抽象化を提供します。
+type GitService interface {
+	// CloneOrUpdate はリポジトリをクローンまたは更新し、go-gitリポジトリオブジェクトを返します。
+	CloneOrUpdate(repositoryURL string) (*git.Repository, error)
+	// Fetch はリモートから最新の変更を取得します。
+	Fetch(repo *git.Repository) error
+	// CheckRemoteBranchExists は指定されたブランチがリモートに存在するか確認します。
+	CheckRemoteBranchExists(repo *git.Repository, branch string) (bool, error)
+	// GetCodeDiff は指定された2つのブランチ間の純粋な差分を、外部のgitコマンドで高速に取得します。
+	GetCodeDiff(repo *git.Repository, baseBranch, featureBranch string) (string, error)
+}
+
+// GitClient は GitService インターフェースを実装する具体的な構造体です。
 type GitClient struct {
 	LocalPath                string
 	SSHKeyPath               string
 	BaseBranch               string
-	auth                     transport.AuthMethod
 	InsecureSkipHostKeyCheck bool
+	auth                     transport.AuthMethod
+}
+
+// GitClientOption はGitClientの初期化オプションを設定するための関数です。
+type GitClientOption func(*GitClient)
+
+// WithInsecureSkipHostKeyCheck はSSHホストキーチェックをスキップするオプションを設定します。
+func WithInsecureSkipHostKeyCheck(skip bool) GitClientOption {
+	return func(gc *GitClient) {
+		gc.InsecureSkipHostKeyCheck = skip
+	}
 }
 
 // NewGitClient はGitClientを初期化します。
-func NewGitClient(localPath string, sshKeyPath string) *GitClient {
-	return &GitClient{
+func NewGitClient(localPath string, sshKeyPath string, baseBranch string, opts ...GitClientOption) GitService {
+	client := &GitClient{
 		LocalPath:  localPath,
 		SSHKeyPath: sshKeyPath,
+		BaseBranch: baseBranch,
 	}
+	for _, opt := range opts {
+		opt(client)
+	}
+	return client
 }
 
 // expandTilde はクロスプラットフォームなチルダ展開をサポートする
@@ -43,31 +70,24 @@ func expandTilde(path string) string {
 	}
 	currentUser, err := user.Current()
 	if err != nil {
-		// エラーハンドリング: チルダ展開に失敗した場合は元のパスを返すか、エラーをログに記録
-		log.Printf("Warning: Failed to get current user home directory: %v. Using original path.\n", err) // ★変更点1
+		log.Printf("Warning: Failed to get current user home directory: %v. Using original path.\n", err)
 		return path
 	}
 	return filepath.Join(currentUser.HomeDir, path[2:])
 }
 
-// getAuthMethod はリポジトリURLに基づいて適切な認証方法を返します。
-// SSH URLの場合は、指定された鍵ファイルを直接読み込んで認証を設定します。
+// getAuthMethod は go-git が使用する認証方法を返します。
 func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) {
-	// ↓↓↓ このデバッグログを追加して、新しいコードが実行されているか確認する ↓↓↓
-	log.Println("DEBUG: getAuthMethod is called. Using direct key file reader method.") // ★変更点1
-
 	if strings.HasPrefix(repoURL, "git@") || strings.HasPrefix(repoURL, "ssh://") {
 
-		// 2. URLをパースしてユーザー名を取得する
 		u, err := url.Parse(repoURL)
 		if err != nil {
 			return nil, fmt.Errorf("リポジトリURLのパースに失敗しました: %w", err)
 		}
-		username := "git" // デフォルトは "git"
+		username := "git"
 		if u.User != nil {
 			username = u.User.Username()
 		}
-		log.Printf("DEBUG: Using username '%s' for SSH authentication.\n", username) // ★変更点1
 
 		sshKeyPath := expandTilde(c.SSHKeyPath)
 
@@ -75,51 +95,48 @@ func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) 
 			return nil, fmt.Errorf("SSHキーファイルが見つかりません: %s", sshKeyPath)
 		}
 
-		// 秘密鍵ファイルを直接読み込む
 		sshKey, err := os.ReadFile(sshKeyPath)
 		if err != nil {
 			return nil, fmt.Errorf("SSHキーファイルの読み込みに失敗しました: %w", err)
 		}
 
-		// 読み込んだ鍵データから認証情報を作成する
-		auth, err := ssh.NewPublicKeys(username, sshKey, "") // ハードコードされた "git" を username に変更
+		auth, err := ssh.NewPublicKeys(username, sshKey, "")
 		if err != nil {
 			return nil, fmt.Errorf("SSH認証キーのロードに失敗しました: %w", err)
 		}
 
-		auth.HostKeyCallback = cryptossh.InsecureIgnoreHostKey()
+		// InsecureSkipHostKeyCheck の設定を適用 (go-gitの内部SSHクライアントに適用)
+		if c.InsecureSkipHostKeyCheck {
+			auth.HostKeyCallback = cryptossh.InsecureIgnoreHostKey()
+		} else {
+			auth.HostKeyCallback = nil
+		}
 
 		return auth, nil
 	}
 	return nil, nil
 }
 
-// getGitSSHCommand は、外部gitコマンドで使用するための GIT_SSH_COMMAND の値を返します。
-// SSHキーの存在チェックと StrictHostKeyChecking=no オプションの設定を行います。
+// getGitSSHCommand は外部の 'git' コマンドで使用するための GIT_SSH_COMMAND 環境変数の値を構築します。
 func (c *GitClient) getGitSSHCommand() (string, error) {
+	if c.SSHKeyPath == "" {
+		return "", nil
+	}
+
 	sshKeyPath := expandTilde(c.SSHKeyPath)
 
-	// SSHキーパスを絶対パスに解決
-	absSSHKeyPath, err := filepath.Abs(sshKeyPath)
-	if err != nil {
-		return "", fmt.Errorf("SSHキーパスの解決に失敗しました: %w", err)
+	if _, err := os.Stat(sshKeyPath); os.IsNotExist(err) {
+		return "", fmt.Errorf("SSHキーファイルが見つかりません: %s", sshKeyPath)
 	}
 
-	if _, err := os.Stat(absSSHKeyPath); os.IsNotExist(err) {
-		return "", fmt.Errorf("SSHキーファイルが見つかりません: %s", absSSHKeyPath)
-	}
+	// HostKeyCheckingを無効化するオプションと、秘密鍵のパスを指定。
+	cmd := fmt.Sprintf("ssh -i %s -o StrictHostKeyChecking=no -F /dev/null", sshKeyPath)
 
-	// ssh -i <鍵の絶対パス> ...
-	sshCommand := fmt.Sprintf("ssh -i %s", filepath.ToSlash(absSSHKeyPath))
-	// (上記のInsecureSkipHostKeyCheckのロジックをここに追加)
-	if c.InsecureSkipHostKeyCheck {
-		sshCommand += " -o StrictHostKeyChecking=no"
-	}
-	return sshCommand, nil
+	return cmd, nil
 }
 
-// クローン処理をカプセル化したヘルパー関数
-func (c *GitClient) cloneRepository(repositoryURL, localPath, branch string, env []string) error {
+// cloneRepository は go-git.PlainClone を使用してクローン処理を実行するヘルパー関数です。
+func (c *GitClient) cloneRepository(repositoryURL, localPath, branch string) error {
 	parentDir := filepath.Dir(localPath)
 	if _, err := os.Stat(parentDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(parentDir, 0755); err != nil {
@@ -127,149 +144,125 @@ func (c *GitClient) cloneRepository(repositoryURL, localPath, branch string, env
 		}
 	}
 
-	log.Printf("Cloning %s into %s...\n", repositoryURL, localPath) // ★変更点1
-	cmd := exec.Command("git", "clone", "--branch", branch, repositoryURL, localPath)
-	cmd.Env = env
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	log.Printf("Cloning %s into %s...\n", repositoryURL, localPath)
 
-	if runErr := cmd.Run(); runErr != nil {
-		return fmt.Errorf("git clone コマンドの実行に失敗しました: %w", runErr)
+	auth, err := c.getAuthMethod(repositoryURL)
+	if err != nil {
+		return fmt.Errorf("go-git クローン用の認証情報取得に失敗しました: %w", err)
 	}
-	log.Println("Repository cloned successfully using exec.Command.") // ★変更点1
+
+	_, err = git.PlainClone(localPath, false, &git.CloneOptions{
+		URL:           repositoryURL,
+		ReferenceName: plumbing.NewBranchReferenceName(branch),
+		SingleBranch:  true,
+		Auth:          auth,
+		Progress:      os.Stdout,
+	})
+	if err != nil {
+		return fmt.Errorf("go-git クローンに失敗しました: %w", err)
+	}
+	log.Println("Repository cloned successfully using go-git.")
 	return nil
 }
 
-// CloneOrUpdateWithExec は、リポジトリをクローンするか、既に存在する場合は pull で更新します。
-// pullでエラーが発生した場合（コンフリクト等）、リポジトリを削除して再クローンします。
-func (c *GitClient) CloneOrUpdateWithExec(repositoryURL string, localPath string) (*git.Repository, error) {
+// CloneOrUpdate はリポジトリをクローンするか、既に存在する場合は go-git pull で更新します。
+func (c *GitClient) CloneOrUpdate(repositoryURL string) (*git.Repository, error) {
 
-	// 1. GIT_SSH_COMMAND を設定
-	gitSSHCommand, err := c.getGitSSHCommand()
-	if err != nil {
-		return nil, err
-	}
+	var err error
+	var repo *git.Repository
 
-	env := os.Environ()
-	env = append(env, fmt.Sprintf("GIT_SSH_COMMAND=%s", gitSSHCommand))
+	localPath := c.LocalPath
 
-	// リポジトリがクローン済みで、かつリモートURLが一致するかをチェックするヘルパー関数
-	// trueを返す場合、再クローンが必要。falseの場合、pullで更新可能。
-	repoNeedsReclone := func() bool {
-		gitDir := filepath.Join(localPath, ".git")
-		if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-			// .git ディレクトリが存在しないので、クローンが必要
-			log.Printf("Info: .git directory not found at %s. Cloning needed.\n", localPath) // ★変更点1
-			return true
-		}
-
-		repo, err := git.PlainOpen(localPath)
-		if err != nil {
-			// リポジトリを開けない、または壊れている可能性があるので再クローン
-			log.Printf("Warning: Existing repository at %s could not be opened: %v. Re-cloning...\n", localPath, err) // ★変更点1
-			return true
-		}
-
-		remote, err := repo.Remote("origin")
-		if err != nil {
-			// リモート'origin'がないので再クローン
-			log.Printf("Warning: Remote 'origin' not found in %s: %v. Re-cloning...\n", localPath, err) // ★変更点1
-			return true
-		}
-
-		remoteURLs := remote.Config().URLs
-		if len(remoteURLs) == 0 || remoteURLs[0] != repositoryURL {
-			// リモートURLが一致しないので再クローン
-			log.Printf("Warning: Existing repository remote URL (%v) does not match the requested URL (%s). Re-cloning...\n", remoteURLs, repositoryURL) // ★変更点1
-			return true
-		}
-
-		return false // 再クローンは不要、pullで更新可能
-	}
-
-	if repoNeedsReclone() {
-		log.Printf("Repository at %s needs to be cloned or re-cloned for %s.\n", localPath, repositoryURL) // ★変更点1
-
-		// 既存のディレクトリが存在する場合のみ削除を試みる
+	if c.repoNeedsReclone(repositoryURL, localPath) {
+		log.Printf("Repository at %s needs to be cloned or re-cloned for %s.\n", localPath, repositoryURL)
 		if _, err := os.Stat(localPath); err == nil {
 			if err := os.RemoveAll(localPath); err != nil {
 				return nil, fmt.Errorf("既存リポジトリディレクトリ (%s) の削除に失敗しました: %w", localPath, err)
 			}
-			log.Printf("Existing repository at %s removed.\n", localPath) // ★変更点1
+			log.Printf("Existing repository at %s removed.\n", localPath)
 		}
 
-		// クローン実行
-		if err := c.cloneRepository(repositoryURL, localPath, c.BaseBranch, env); err != nil {
+		if err := c.cloneRepository(repositoryURL, localPath, c.BaseBranch); err != nil {
 			return nil, fmt.Errorf("リポジトリのクローンに失敗しました: %w", err)
 		}
-		log.Println("Repository cloned successfully using exec.Command.") // ★変更点1
+
+		repo, err = git.PlainOpen(localPath)
+		if err != nil {
+			return nil, fmt.Errorf("クローン後のリポジトリのオープンに失敗しました: %w", err)
+		}
 
 	} else {
-		// リポジトリが存在し、リモートURLも一致するので pull で更新
-		log.Printf("Repository already exists at %s with matching URL. Running 'git pull' to update...\n", localPath) // ★変更点1
-		branchToPull := c.BaseBranch
-		cmd := exec.Command("git", "pull", "origin", branchToPull)
-		cmd.Dir = localPath
-		cmd.Env = env
-		// `os.Stdout`, `os.Stderr` への直接出力については別途ログポリシーに合わせて修正
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+		repo, err = git.PlainOpen(localPath)
+		if err != nil {
+			return nil, fmt.Errorf("既存リポジトリのオープンに失敗しました: %w", err)
+		}
 
-		if err := cmd.Run(); err != nil {
-			// pullが失敗した場合 (コンフリクト、ネットワークエラー、認証エラーなど)
-			// レビューツールはクリーンな状態を維持するため、再クローン戦略を採用する。
-			// 大規模リポジトリではI/Oコストが高いため、より詳細なエラーハンドリングが望ましいが、現在のユースケースを優先。
-			log.Printf("Warning: 'git pull' failed for %s (possible conflict/network error): %v. Attempting re-cloning...\n", localPath, err) // ★変更点1
+		authForPull, err := c.getAuthMethod(repositoryURL)
+		if err != nil {
+			return nil, fmt.Errorf("go-git pull用の認証情報取得に失敗しました: %w", err)
+		}
 
-			// 1. 既存のディレクトリを削除
-			if err := os.RemoveAll(localPath); err != nil {
-				return nil, fmt.Errorf("git pull失敗後の既存リポジトリディレクトリ (%s) の削除に失敗しました: %w", localPath, err)
-			}
-			log.Printf("Existing repository at %s removed for re-cloning.\n", localPath) // ★変更点1
+		log.Printf("Repository already exists at %s with matching URL. Running 'go-git pull' to update...\n", localPath)
+		w, err := repo.Worktree()
+		if err != nil {
+			return nil, fmt.Errorf("ワークツリーの取得に失敗しました: %w", err)
+		}
 
-			// 2. クローン実行
-			if err := c.cloneRepository(repositoryURL, localPath, c.BaseBranch, env); err != nil {
-				return nil, fmt.Errorf("git pull失敗後の再クローンに失敗しました: %w", err)
-			}
-			log.Println("Repository re-cloned successfully.") // ★変更点1
-			// 再クローンに成功したため、エラーを返さずに次のステップへ進む。// ★変更点2: コメントの復活
+		pullErr := w.Pull(&git.PullOptions{
+			RemoteName:    "origin",
+			ReferenceName: plumbing.NewBranchReferenceName(c.BaseBranch),
+			Auth:          authForPull,
+			SingleBranch:  true,
+		})
+
+		if pullErr == nil || pullErr == git.NoErrAlreadyUpToDate {
+			log.Println("Repository updated successfully using go-git pull.")
 		} else {
-			log.Println("Repository updated successfully using exec.Command.") // ★変更点1
+			log.Printf("Warning: go-git pull failed: %v. Attempting to recover by re-cloning...", pullErr)
+
+			w.Reset(&git.ResetOptions{Mode: git.HardReset})
+
+			if err := os.RemoveAll(localPath); err != nil {
+				return nil, fmt.Errorf("pull失敗後の既存リポジトリディレクトリ (%s) の削除に失敗しました: %w", localPath, err)
+			}
+			log.Printf("Existing repository at %s removed for re-cloning.\n", localPath)
+
+			if err := c.cloneRepository(repositoryURL, localPath, c.BaseBranch); err != nil {
+				return nil, fmt.Errorf("pull失敗後の再クローンに失敗しました: %w", err)
+			}
+			log.Println("Repository re-cloned successfully.")
+
+			repo, err = git.PlainOpen(localPath)
+			if err != nil {
+				return nil, fmt.Errorf("再クローン後のリポジトリのオープンに失敗しました: %w", err)
+			}
 		}
 	}
 
-	// 最終的に go-git でリポジトリを開いて返す
-	repo, err := git.PlainOpen(localPath)
-	if err != nil {
-		return nil, fmt.Errorf("最終的なリポジトリのオープンに失敗しました: %w", err)
-	}
-
-	// 後続の go-git を使う処理 (Fetchなど) のために、認証情報を取得して構造体にセットする。
-	// これが欠けていたことがエラーの根本原因。
+	// go-git および Fetchで認証情報を使えるよう、最後にc.authを設定する
 	auth, err := c.getAuthMethod(repositoryURL)
 	if err != nil {
 		return nil, fmt.Errorf("go-git用の認証情報取得に失敗しました: %w", err)
 	}
 	c.auth = auth
-	log.Println("DEBUG: go-git authentication method has been set successfully.") // ★変更点1
+	log.Println("DEBUG: go-git authentication method has been set successfully.")
 
 	return repo, nil
 }
 
 // Fetch はリモートから最新の変更を取得します。
+// go-gitを使用。
 func (c *GitClient) Fetch(repo *git.Repository) error {
-	log.Println("Fetching latest changes from remote...") // ★変更点1
+	log.Printf("Fetching latest changes from remote for repository at %s...\n", c.LocalPath)
 
-	// すべてのブランチのRefSpec
 	refSpec := config.RefSpec("+refs/heads/*:refs/remotes/origin/*")
 
 	err := repo.Fetch(&git.FetchOptions{
-		Auth:     c.auth, // 保持した認証情報を使用
+		Auth:     c.auth, // CloneOrUpdateで設定された認証情報を使用
 		RefSpecs: []config.RefSpec{refSpec},
 		Progress: os.Stdout,
 	})
 
-	// "already up-to-date" はエラーではないので無視
 	if err != nil && err != git.NoErrAlreadyUpToDate {
 		return fmt.Errorf("failed to fetch from remote: %w", err)
 	}
@@ -277,58 +270,81 @@ func (c *GitClient) Fetch(repo *git.Repository) error {
 	return nil
 }
 
-// GetCodeDiff は指定された2つのブランチ間の「純粋な差分」（3点比較）を、リモートの最新情報に基づいて取得します。
+// GetCodeDiff は指定された2つのブランチ間の純粋な差分を、外部コマンドで高速に取得します。
 func (c *GitClient) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch string) (string, error) {
-	const remoteName = "origin"
+	log.Printf("Calculating code diff between remote/%s and remote/%s using external 'git diff' command...\n", baseBranch, featureBranch)
 
-	// ヘルパー関数: リモートブランチのコミットオブジェクトを取得
-	getRemoteCommit := func(branch string) (*object.Commit, error) {
-		// 例: refs/remotes/origin/main
-		refName := plumbing.NewRemoteReferenceName(remoteName, branch)
-		ref, err := repo.Reference(refName, false)
-		if err != nil {
-			return nil, fmt.Errorf("リモートリファレンス '%s/%s' の取得に失敗しました: %w", remoteName, branch, err)
-		}
-		commit, err := repo.CommitObject(ref.Hash())
-		if err != nil {
-			return nil, fmt.Errorf("コミットオブジェクトの取得に失敗しました: %w", err)
-		}
-		return commit, nil
+	// コマンド引数: git diff origin/<base>...origin/<feature> (3点比較)
+	cmdArgs := []string{
+		"diff",
+		fmt.Sprintf("origin/%s...origin/%s", baseBranch, featureBranch),
 	}
 
-	// 1. ベースブランチとフィーチャーブランチのコミットを取得
-	baseCommit, err := getRemoteCommit(baseBranch)
+	cmd := exec.Command("git", cmdArgs...)
+	cmd.Dir = c.LocalPath  // リポジトリのローカルパスで実行
+	cmd.Env = os.Environ() // 環境変数を継承
+
+	// SSH認証が必要な場合、GIT_SSH_COMMANDを設定する
+	gitSSHCommand, err := c.getGitSSHCommand()
 	if err != nil {
-		return "", fmt.Errorf("ベースブランチのコミット取得に失敗: %w", err)
+		return "", err
+	}
+	if gitSSHCommand != "" {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_SSH_COMMAND=%s", gitSSHCommand))
 	}
 
-	featureCommit, err := getRemoteCommit(featureBranch)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("git diff 実行に失敗しました: %w\nStderr: %s", err, stderr.String())
+	}
+
+	return stdout.String(), nil
+}
+
+// CheckRemoteBranchExists は指定されたブランチがリモート 'origin' に存在するか確認します。
+// go-gitを使用。
+func (c *GitClient) CheckRemoteBranchExists(repo *git.Repository, branch string) (bool, error) {
+	if branch == "" {
+		return false, fmt.Errorf("チェックするブランチ名が空です")
+	}
+	refName := plumbing.NewRemoteReferenceName("origin", branch)
+
+	_, err := repo.Reference(refName, false)
+
+	if err == plumbing.ErrReferenceNotFound {
+		return false, nil
+	}
 	if err != nil {
-		return "", fmt.Errorf("フィーチャーブランチのコミット取得に失敗: %w", err)
+		return false, fmt.Errorf("リモートブランチ '%s' の存在確認中にエラーが発生しました: %w", branch, err)
 	}
 
-	// --- 2. 3点比較のためのマージベースの特定 ---
-	// 'git merge-base origin/base origin/feature' に相当する処理
-	mergeBaseCommits, err := baseCommit.MergeBase(featureCommit)
+	return true, nil
+}
+
+// repoNeedsReclone はリポジトリを再クローンする必要があるかをチェックするヘルパー関数
+func (c *GitClient) repoNeedsReclone(repositoryURL, localPath string) bool {
+	gitDir := filepath.Join(localPath, ".git")
+	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
+		log.Printf("Info: .git directory not found at %s. Cloning needed.\n", localPath)
+		return true
+	}
+	repo, err := git.PlainOpen(localPath)
 	if err != nil {
-		// go-gitのMergeBaseは、エラーを返さず空のスライスを返すケースが多いため、このエラーは通常、Git内部のエラー。
-		return "", fmt.Errorf("マージベース計算中に内部エラーが発生しました: %w", err)
+		log.Printf("Warning: Existing repository at %s could not be opened: %v. Re-cloning...\n", localPath, err)
+		return true
 	}
-
-	if len(mergeBaseCommits) == 0 {
-		return "", fmt.Errorf("ベースブランチとフィーチャーブランチ間に共通の祖先コミット（マージベース）が見つかりませんでした")
-	}
-
-	// マージベースが複数ある場合でも、最初の一つを使用する
-	mergeBaseCommit := mergeBaseCommits[0]
-
-	// 3. パッチの生成 (3点比較の実現)
-	// マージベースCommitからフィーチャーCommitへの差分を取得。
-	// これは 'git diff <MergeBase> <feature>' と同義で、「純粋な差分」を抽出します。
-	patch, err := mergeBaseCommit.Patch(featureCommit)
+	remote, err := repo.Remote("origin")
 	if err != nil {
-		return "", fmt.Errorf("差分パッチの生成に失敗しました: %w", err)
+		log.Printf("Warning: Remote 'origin' not found in %s: %v. Re-cloning...\n", localPath, err)
+		return true
 	}
-
-	return patch.String(), nil
+	remoteURLs := remote.Config().URLs
+	if len(remoteURLs) == 0 || remoteURLs[0] != repositoryURL {
+		log.Printf("Warning: Existing repository remote URL (%v) does not match the requested URL (%s). Re-cloning...\n", remoteURLs, repositoryURL)
+		return true
+	}
+	return false
 }
