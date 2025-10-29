@@ -29,6 +29,8 @@ type GitService interface {
 	CheckRemoteBranchExists(repo *git.Repository, branch string) (bool, error)
 	// GetCodeDiff は指定された2つのブランチ間の純粋な差分を文字列として取得します。
 	GetCodeDiff(repo *git.Repository, baseBranch, featureBranch string) (string, error)
+	// Cleanup は処理後にローカルリポジトリをクリーンな状態に戻します。
+	Cleanup(repo *git.Repository) error
 }
 
 // GitClient は GitService インターフェースを実装する具体的な構造体です。
@@ -71,6 +73,32 @@ func NewGitClient(localPath string, sshKeyPath string, opts ...GitClientOption) 
 		opt(client)
 	}
 	return client
+}
+
+// Cleanup は処理後にローカルリポジトリをクリーンな状態に戻します。
+// go-gitのWorktreeをBaseBranchにチェックアウトし、ローカルの状態をリセットします。
+func (c *GitClient) Cleanup(repo *git.Repository) error {
+	// ログを出力
+	log.Printf("Cleanup: Checking out base branch '%s'...\n", c.BaseBranch)
+
+	w, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("Cleanup: ワークツリーの取得に失敗しました: %w", err)
+	}
+
+	// ローカルの状態を破棄し、BaseBranchにチェックアウトする
+	// 強制的に切り替える (git checkout -f <branch>)
+	err = w.Checkout(&git.CheckoutOptions{
+		Branch: plumbing.NewBranchReferenceName(c.BaseBranch),
+		Force:  true,
+	})
+
+	if err != nil {
+		return fmt.Errorf("Cleanup: ベースブランチ '%s' へのチェックアウトに失敗しました: %w", c.BaseBranch, err)
+	}
+
+	log.Printf("Cleanup: Local repository successfully reset to base branch '%s'.\n", c.BaseBranch)
+	return nil
 }
 
 // expandTilde はクロスプラットフォームなチルダ展開をサポートする
