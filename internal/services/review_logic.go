@@ -10,11 +10,8 @@ import (
 	"git-gemini-reviewer-go/prompts"
 )
 
-// NOTE: services.ReviewConfig の定義は internal/config/config.go に移動したため削除
-
 // RunReviewAndGetResult はGit Diffを取得し、Gemini AIでレビューを実行します。
 // 投稿は行わず、レビュー結果の文字列のみを返します。
-// cfg の型は config.ReviewConfig に依存
 func RunReviewAndGetResult(ctx context.Context, cfg config.ReviewConfig) (string, error) {
 
 	log.Println("--- 1. Gitリポジトリのセットアップと差分取得を開始 ---")
@@ -24,7 +21,7 @@ func RunReviewAndGetResult(ctx context.Context, cfg config.ReviewConfig) (string
 	gitClient := setupGitClient(cfg)
 
 	// 2.1. クローン/アップデート
-	repo, err := gitClient.CloneOrUpdateWithExec(cfg.GitCloneURL, cfg.LocalPath)
+	repo, err := gitClient.CloneOrUpdate(cfg.GitCloneURL)
 	if err != nil {
 		log.Printf("ERROR: Gitリポジトリのセットアップに失敗しました: %v", err)
 		return "", fmt.Errorf("Gitリポジトリのクローン/更新に失敗しました: %w", err)
@@ -84,19 +81,27 @@ func RunReviewAndGetResult(ctx context.Context, cfg config.ReviewConfig) (string
 }
 
 // setupGitClient はGitクライアントを初期化し、設定を適用します。
-// Gitクライアントのインスタンス化と設定ロジックを分離します。
-func setupGitClient(cfg config.ReviewConfig) *GitClient { // *GitClientは仮の型
-	gitClient := NewGitClient(cfg.LocalPath, cfg.SSHKeyPath) // NewGitClientは仮のコンストラクタ
+// GitService インターフェースを返します。
+func setupGitClient(cfg config.ReviewConfig) GitService {
+	// NewGitClient の引数をオプションパターンに合わせる
+	opts := []GitClientOption{
+		WithInsecureSkipHostKeyCheck(cfg.SkipHostKeyCheck),
+	}
+
+	if cfg.BaseBranch != "" {
+		opts = append(opts, WithBaseBranch(cfg.BaseBranch))
+	}
+
+	gitClient := NewGitClient(
+		cfg.LocalPath,
+		cfg.SSHKeyPath,
+		opts...,
+	)
 
 	if cfg.SkipHostKeyCheck {
 		// セキュリティに関するログ出力はここに集約
 		log.Println("!!! SECURITY ALERT !!! SSH host key checking has been explicitly disabled. This makes connections vulnerable to Man-in-the-Middle attacks. Ensure this is intentional and NOT used in production.")
 	}
-
-	// 設定をまとめて適用
-	gitClient.BaseBranch = cfg.BaseBranch
-	// 重複を避け、ここで最終的な設定を適用
-	gitClient.InsecureSkipHostKeyCheck = cfg.SkipHostKeyCheck
 
 	return gitClient
 }
