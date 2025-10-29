@@ -62,7 +62,6 @@ func RunReviewAndGetResult(ctx context.Context, cfg config.ReviewConfig) (string
 	fmt.Println("🚀 Gemini AIによるコードレビューを開始します...")
 
 	// 4.1. Geminiクライアントの初期化
-	// NewGeminiClient は services.GeminiService インターフェースを返すことを期待
 	geminiClient, err := NewGeminiClient(ctx, cfg.GeminiModel)
 	if err != nil {
 		log.Printf("ERROR: Geminiクライアントの初期化エラー: %v", err)
@@ -84,12 +83,19 @@ func RunReviewAndGetResult(ctx context.Context, cfg config.ReviewConfig) (string
 // setupGitClient はGitクライアントを初期化し、設定を適用します。
 // GitService インターフェースを返します。
 func setupGitClient(cfg config.ReviewConfig) GitService {
-	// NewGitClient は GitServiceインターフェースを返すことを期待
+	// NewGitClient の引数をオプションパターンに合わせる
+	opts := []GitClientOption{
+		WithInsecureSkipHostKeyCheck(cfg.SkipHostKeyCheck),
+	}
+
+	if cfg.BaseBranch != "" {
+		opts = append(opts, WithBaseBranch(cfg.BaseBranch))
+	}
+
 	gitClient := NewGitClient(
 		cfg.LocalPath,
 		cfg.SSHKeyPath,
-		cfg.BaseBranch,
-		WithInsecureSkipHostKeyCheck(cfg.SkipHostKeyCheck),
+		opts...,
 	)
 
 	if cfg.SkipHostKeyCheck {

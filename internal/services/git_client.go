@@ -33,8 +33,10 @@ type GitService interface {
 
 // GitClient は GitService インターフェースを実装する具体的な構造体です。
 type GitClient struct {
-	LocalPath                string
-	SSHKeyPath               string
+	LocalPath  string
+	SSHKeyPath string
+	// 主にCloneOrUpdateやPullのデフォルトブランチとして使用されます。
+	// GetCodeDiffの引数は個別の比較対象として扱われます。
 	BaseBranch               string
 	InsecureSkipHostKeyCheck bool
 	auth                     transport.AuthMethod
@@ -50,13 +52,20 @@ func WithInsecureSkipHostKeyCheck(skip bool) GitClientOption {
 	}
 }
 
+// WithBaseBranch はベースブランチを設定するオプションです。
+func WithBaseBranch(branch string) GitClientOption {
+	return func(gc *GitClient) {
+		gc.BaseBranch = branch
+	}
+}
+
 // NewGitClient はGitClientを初期化します。
+// BaseBranchはオプションで設定されることを想定し、引数から削除されました。
 // GitServiceインターフェースを返します。
-func NewGitClient(localPath string, sshKeyPath string, baseBranch string, opts ...GitClientOption) GitService {
+func NewGitClient(localPath string, sshKeyPath string, opts ...GitClientOption) GitService {
 	client := &GitClient{
 		LocalPath:  localPath,
 		SSHKeyPath: sshKeyPath,
-		BaseBranch: baseBranch,
 	}
 	for _, opt := range opts {
 		opt(client)
@@ -110,6 +119,7 @@ func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) 
 		if c.InsecureSkipHostKeyCheck {
 			auth.HostKeyCallback = cryptossh.InsecureIgnoreHostKey()
 		} else {
+			// ホストキーチェックを有効にする (known_hosts を使用)
 			auth.HostKeyCallback = nil
 		}
 
@@ -131,9 +141,9 @@ func (c *GitClient) getGitSSHCommand() (string, error) {
 	}
 
 	// HostKeyCheckingを無効化するオプションと、秘密鍵のパスを指定。
-	// InsecureSkipHostKeyCheck の設定を外部gitコマンドにも適用する
+	// クロスプラットフォーム互換性のため、パスをToSlashで変換します。
 	// -F /dev/null はシステム設定を無視し、環境変数のオプションを優先させる。
-	cmd := fmt.Sprintf("ssh -i %s -F /dev/null", sshKeyPath)
+	cmd := fmt.Sprintf("ssh -i %s -F /dev/null", filepath.ToSlash(sshKeyPath))
 
 	if c.InsecureSkipHostKeyCheck {
 		cmd += " -o StrictHostKeyChecking=no"
@@ -164,6 +174,7 @@ func (c *GitClient) cloneRepository(repositoryURL, localPath, branch string) err
 		SingleBranch:  true,
 		Auth:          auth,
 		// Progressオプションは進捗をos.Stdoutに出力します。
+		// より制御されたログ出力のためには、カスタムのio.Writerを実装するか、log.Writer()を使用することを検討してください。
 		Progress: os.Stdout,
 	})
 	if err != nil {
@@ -284,21 +295,24 @@ func (c *GitClient) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch 
 	// NOTE: 大規模リポジトリでのパフォーマンス問題を回避するため、go-gitのPatchメソッドではなく、外部の 'git diff' コマンドを使用している。
 	log.Printf("Calculating code diff for repository at %s between remote/%s and remote/%s using external 'git diff' command...\n", c.LocalPath, baseBranch, featureBranch)
 
-	// コマンド引数: git diff origin/<base>...origin/<feature> (3点比較)
+	// コマンド引数: git diff --no-color origin/<base>...origin/<feature> (3点比較)
 	cmdArgs := []string{
 		"diff",
+		"--no-color", // 色付けを無効にする
 		fmt.Sprintf("origin/%s...origin/%s", baseBranch, featureBranch),
 	}
 
 	cmd := exec.Command("git", cmdArgs...)
 	cmd.Dir = c.LocalPath // リポジトリのローカルパスで実行
 
-	// 既存の環境変数をコピーし、GIT_SSH_COMMANDを設定/上書きする
+	// 最小限の環境変数（PATH, HOMEなど）をコピーし、GIT_SSH_COMMANDを設定/上書きする
 	env := os.Environ()
+
 	gitSSHCommand, err := c.getGitSSHCommand()
 	if err != nil {
 		return "", err
 	}
+
 	if gitSSHCommand != "" {
 		found := false
 		for i, e := range env {
@@ -328,7 +342,7 @@ func (c *GitClient) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch 
 // CheckRemoteBranchExists は指定されたブランチがリモート 'origin' に存在するか確認します。
 func (c *GitClient) CheckRemoteBranchExists(repo *git.Repository, branch string) (bool, error) {
 	if branch == "" {
-		return false, fmt.Errorf("チェックするブランチ名が空です")
+		return false, fmt.Errorf("リモートブランチの存在確認に失敗しました: ブランチ名が空です")
 	}
 	refName := plumbing.NewRemoteReferenceName("origin", branch)
 
@@ -338,7 +352,6 @@ func (c *GitClient) CheckRemoteBranchExists(repo *git.Repository, branch string)
 		return false, nil
 	}
 	if err != nil {
-		// エラーメッセージを簡潔にする
 		return false, fmt.Errorf("リモートブランチ '%s' の確認に失敗しました: %w", branch, err)
 	}
 
