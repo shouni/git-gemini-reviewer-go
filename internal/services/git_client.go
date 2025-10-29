@@ -293,24 +293,26 @@ func (c *GitClient) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch 
 	cmd := exec.Command("git", cmdArgs...)
 	cmd.Dir = c.LocalPath // リポジトリのローカルパスで実行
 
-	// 最小限の環境変数（PATH, HOMEなど）をコピーし、GIT_SSH_COMMANDを追加する
-	env := make([]string, 0, len(os.Environ())+2)
-	for _, e := range os.Environ() {
-		// gitコマンドの実行に最低限必要な環境変数をコピー
-		if strings.HasPrefix(e, "PATH=") || strings.HasPrefix(e, "HOME=") || strings.HasPrefix(e, "USER=") {
-			env = append(env, e)
-		}
-	}
-	cmd.Env = env
-
-	// SSH認証が必要な場合、GIT_SSH_COMMANDを設定する
+	// 既存の環境変数をコピーし、GIT_SSH_COMMANDを設定/上書きする
+	env := os.Environ()
 	gitSSHCommand, err := c.getGitSSHCommand()
 	if err != nil {
 		return "", err
 	}
 	if gitSSHCommand != "" {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_SSH_COMMAND=%s", gitSSHCommand))
+		found := false
+		for i, e := range env {
+			if strings.HasPrefix(e, "GIT_SSH_COMMAND=") {
+				env[i] = fmt.Sprintf("GIT_SSH_COMMAND=%s", gitSSHCommand)
+				found = true
+				break
+			}
+		}
+		if !found {
+			env = append(env, fmt.Sprintf("GIT_SSH_COMMAND=%s", gitSSHCommand))
+		}
 	}
+	cmd.Env = env
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
