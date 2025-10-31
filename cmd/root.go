@@ -130,31 +130,13 @@ func initAppPreRunE(cmd *cobra.Command, args []string) error {
 
 // Execute は、clibase.Execute を使用してルートコマンドの構築と実行を委譲します。
 func Execute() {
-	// clibase.Execute の第4引数以降にサブコマンドを追加します。
 	clibase.Execute(
-		"git-gemini-reviewer-go", // アプリケーション名
-		addAppPersistentFlags,    // カスタムフラグ追加関数
-		initAppPreRunE,           // PersistentPreRunE関数
-		// genericCmd, backlogCmd, slackCmd などのサブコマンドをここに追加する想定
+		"git-gemini-reviewer-go",
+		addAppPersistentFlags,
+		initAppPreRunE,
+		// ★★★ genericCmd がサブコマンドとして渡されているか確認 ★★★
+		genericCmd,
+		backlogCmd,
+		slackCmd,
 	)
 }
-
-// NewRootCmd は clibase.NewRootCmd に依存するため不要になりましたが、
-// アプリケーションのエントリとして RootCmd の Short/Long 定義は必要です。
-// RootCmd の定義は clibase.NewRootCmd が担当するため、ここではコメントアウトします。
-
-/*
-var RootCmd = &cobra.Command{
-    Use:   "git-gemini-reviewer-go",
-    Short: "Gemini AIを使ってGitの差分をレビューし、様々なプラットフォームに投稿するCLIツール",
-    Long: `このツールは、指定されたGitブランチ間の差分を取得し、Google Gemini APIに渡してコードレビューを行います。
-
-レビュー結果の出力先を選択できる3つのサブコマンドが利用可能です。
-
-利用可能なサブコマンド:
-  generic  : レビュー結果を標準出力 (STDOUT) に表示します。
-  backlog  : レビュー結果をBacklogの課題コメントとして投稿します。
-  slack    : レビュー結果をSlackの指定されたWebhook URLへ通知します。`,
-    RunE: nil,
-}
-*/
