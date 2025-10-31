@@ -47,7 +47,6 @@
 ```bash
 # リポジトリをクローン
 git clone git@github.com:shouni/git-gemini-reviewer-go.git
-cd git-gemini-reviewer-go
 
 # 実行ファイルを bin/ ディレクトリに生成
 go build -o bin/gemini_reviewer
@@ -61,8 +60,6 @@ go build -o bin/gemini_reviewer
 
 Gemini API を利用するために、API キーを環境変数に設定する必要があります。また、連携サービスを使用する場合は、対応する環境変数を設定します。
 
-#### macOS / Linux (bash/zsh)
-
 ```bash
 # Gemini API キー (必須)
 export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
@@ -74,22 +71,6 @@ export BACKLOG_SPACE_URL="https://your-space.backlog.jp"
 # Slack 連携を使用する場合 (`slack` コマンド利用時のみ)
 export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 ```
-
-#### Windows (PowerShell)
-
-```powershell
-# Gemini API キー (必須)
-$env:GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
-
-# Backlog 連携を使用する場合 (`backlog` コマンド利用時のみ)
-$env:BACKLOG_API_KEY="YOUR_BACKLOG_API_KEY"
-$env:BACKLOG_SPACE_URL="https://your-space.backlog.jp"
-
-# Slack 連携を使用する場合 (`slack` コマンド利用時のみ)
-$env:SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
-```
-
-> **Note:** 環境変数を恒久的に設定するには、シェルの設定ファイルやシステム設定で編集してください。
 
 -----
 
@@ -122,8 +103,8 @@ $env:SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 
 すべてのサブコマンド (`generic`, `backlog`, `slack`) で使用可能なフラグです。
 
-| フラグ | ショートカット | 説明 | デフォルト値 | 必須 |
-| :--- | :--- | :--- | :--- | :--- |
+| フラグ | ショートカット  | 説明 | デフォルト値 | 必須 |
+| :--- |:---| :--- | :--- | :--- |
 | `--mode` | **`-m`** | レビューモードを指定: `'release'` (リリース判定) または `'detail'` (詳細レビュー) | `detail` | ❌ |
 | `--git-clone-url` | **`-u`** | レビュー対象の Git リポジトリの **SSH URL** | **なし** | ✅ |
 | `--base-branch` | **`-b`** | 差分比較の基準ブランチ | `main` | ❌ |
@@ -131,7 +112,7 @@ $env:SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 | `--local-path` | **`-l`** | リポジトリをクローンするローカルパス | 一時ディレクトリ | ❌ |
 | `--ssh-key-path` | **`-k`** | Git 認証用の SSH 秘密鍵のパス | `~/.ssh/id_rsa` | ❌ |
 | `--skip-host-key-check` | **`-s`** | SSHホストキーチェックをスキップする (**非推奨**) | `false` | ❌ |
-| `--model` | **`-g`** | 使用する Gemini モデル名 (例: `gemini-2.5-flash`) | `gemini-2.5-flash` | ❌ |
+| `--model` | **`-G`** | 使用する Gemini モデル名 (例: `gemini-2.5-flash`) | `gemini-2.5-flash` | ❌ |
 
 -----
 
