@@ -6,10 +6,10 @@ import (
 	"git-gemini-reviewer-go/internal/services"
 	"log"
 	"os"
-	"strings"
 	"time"
 
 	"git-gemini-reviewer-go/internal/config"
+
 	"github.com/shouni/go-notifier/pkg/notifier"
 	"github.com/shouni/go-web-exact/v2/pkg/client"
 	"github.com/spf13/cobra"
@@ -71,9 +71,6 @@ func runSlackCommand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// 3. 一時ディレクトリのクリーンアップの予約
-	defer setupCleanup(cfg.LocalPath)
-
 	// 4. 共通ロジックを実行し、結果を取得
 	reviewResult, err := services.RunReviewAndGetResult(ctx, cfg)
 	if err != nil {
@@ -108,16 +105,6 @@ func runSlackCommand(cmd *cobra.Command, args []string) error {
 // ヘルパー関数
 // --------------------------------------------------------------------------
 
-// setupCleanup は、一時ディレクトリである場合にのみクリーンアップを予約します。
-func setupCleanup(path string) {
-	// デフォルトパスかつ一時ディレクトリである場合にのみクリーンアップを予約
-	if path != "" && strings.HasPrefix(path, os.TempDir()) {
-		if err := os.RemoveAll(path); err != nil {
-			log.Printf("WARN: failed to clean up local path '%s': %v", path, err)
-		}
-	}
-}
-
 // postToSlack は、Slackへの投稿処理の責務を持ちます。
 func postToSlack(ctx context.Context, webhookURL, content string, cfg config.ReviewConfig) error {
 	// 1. httpclient.New() を使用してクライアントを初期化
@@ -142,14 +129,14 @@ func postToSlack(ctx context.Context, webhookURL, content string, cfg config.Rev
 	fmt.Printf("📤 Slack Webhook URL にレビュー結果を投稿します...\n")
 
 	// ヘッダー文字列の作成 (ブランチ情報を結合)
-	headerText := fmt.Sprintf(
+	title := fmt.Sprintf(
 		"📝 AIコードレビュー結果 (ブランチ: `%s` ← `%s`)",
 		cfg.BaseBranch,
 		cfg.FeatureBranch,
 	)
 
 	// SendTextWithHeader は content を整形し、ヘッダー情報を含めて投稿する
-	return slackNotifier.SendTextWithHeader(ctx, headerText, content)
+	return slackNotifier.SendTextWithHeader(ctx, title, content)
 }
 
 // printSlackResult は noPost 時に結果を標準出力します。
