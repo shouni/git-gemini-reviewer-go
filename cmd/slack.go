@@ -27,15 +27,8 @@ var slackCmd = &cobra.Command{
 }
 
 func init() {
-	// RootCmd.AddCommand(slackCmd) // clibase.Execute の引数で処理されることを前提
-
-	// Slack 固有の no-post フラグのみを定義
+	// slackCmd は root.go の Execute() 関数で clibase.Execute にサブコマンドとして渡されます。
 	slackCmd.Flags().BoolVar(&noPostSlack, "no-post", false, "投稿をスキップし、結果を標準出力する")
-
-	// NOTE: slackWebhookURL の設定は、もしフラグとして提供したい場合、
-	// AppFlags に追加し、addAppPersistentFlags で定義するか、
-	// あるいは環境変数 SLACK_WEBHOOK_URL の利用に限定します。
-	// このコードでは環境変数 SLACK_WEBHOOK_URL の利用に限定されていると解釈します。
 }
 
 // --------------------------------------------------------------------------

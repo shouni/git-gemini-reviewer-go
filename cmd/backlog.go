@@ -8,6 +8,7 @@ import (
 
 	"git-gemini-reviewer-go/internal/config"
 	"git-gemini-reviewer-go/internal/services"
+
 	"github.com/shouni/go-notifier/pkg/notifier"
 	"github.com/spf13/cobra"
 )
@@ -28,13 +29,7 @@ var backlogCmd = &cobra.Command{
 }
 
 func init() {
-	// RootCmd は clibase.Execute の内部で生成されるため、サブコマンドの追加は Execute の引数で行うのが理想。
-	// ただし、単体ファイルとしてのinit()の実行順序により、ここでRootCmdにAddCommandするのが一般的です。
-	// RootCmd.AddCommand(backlogCmd) // 以前の root.go の実行で処理されることを想定しコメントアウト
-	// NOTE: 以前の RootCmd 定義は削除されたため、この行は実行されない可能性があります。
-	// Execute() にサブコマンドとして渡されることを前提とします。
-
-	// Backlog 固有のフラグのみをここで定義する
+	// backlogCmd は root.go の Execute() 関数で clibase.Execute にサブコマンドとして渡されます。
 	backlogCmd.Flags().StringVar(&backlogIssueID, "issue-id", "", "コメントを投稿するBacklog課題ID（例: PROJECT-123）")
 	backlogCmd.Flags().BoolVar(&noPost, "no-post", false, "投稿をスキップし、結果を標準出力する")
 }

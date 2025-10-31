@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 	"git-gemini-reviewer-go/internal/services"
-	"log" // log.Println を使用する可能性があるため追加
+	"log"
 
 	"github.com/spf13/cobra"
 )
@@ -57,19 +57,5 @@ var genericCmd = &cobra.Command{
 }
 
 func init() {
-	// RootCmd への AddCommand は、clibase.Execute の引数で処理されるのが理想ですが、
-	// サブコマンドの定義ファイルでの慣習に従い、init() で追加します。
-	// RootCmd の定義が clibase によって置き換えられたため、この行は実行されない可能性があります。
-	// RootCmd.AddCommand(genericCmd)
-
-	// NOTE: 以前の root.go の Execute() 関数でサブコマンドとして渡されることを前提とします。
-	/*
-		func Execute() {
-		    clibase.Execute(
-		        ...,
-		        genericCmd,   // ここに追加
-		        backlogCmd,   // 以前のファイルで定義
-		    )
-		}
-	*/
+	// genericCmd は root.go の Execute() 関数で clibase.Execute にサブコマンドとして渡されます。
 }

@@ -53,13 +53,10 @@ func addAppPersistentFlags(rootCmd *cobra.Command) {
 		"detail",
 		"レビューモードを指定: 'release' (リリース判定) または 'detail' (詳細レビュー)",
 	)
-	// NOTE: GeminiModel のフラグ名は、mode フラグのショートカット 'm' と競合するため、
-	// 以前のソースコードの 'g' ではなく、競合しない 'M' を使用するか、ショートカットを削除する必要があります。
-	// 以前のソースコードは競合していたため、ここではショートカット 'g' を削除し、'G' を使用します。（'g' は mode フラグに割り当て済み）
 	rootCmd.PersistentFlags().StringVarP(
 		&Flags.GeminiModel,
 		"gemini-model",
-		"G",
+		"G", // '--mode' の 'm' との競合を避けるため 'G' を使用
 		"gemini-2.5-flash",
 		"Gemini model name to use for review (e.g., 'gemini-2.5-flash').",
 	)
@@ -70,7 +67,6 @@ func addAppPersistentFlags(rootCmd *cobra.Command) {
 		"",
 		"The SSH URL of the Git repository to review.",
 	)
-	// **必須フラグのマーク付けはここで継続して行う**
 	rootCmd.MarkPersistentFlagRequired("git-clone-url")
 
 	rootCmd.PersistentFlags().StringVarP(
@@ -134,7 +130,6 @@ func Execute() {
 		"git-gemini-reviewer-go",
 		addAppPersistentFlags,
 		initAppPreRunE,
-		// ★★★ genericCmd がサブコマンドとして渡されているか確認 ★★★
 		genericCmd,
 		backlogCmd,
 		slackCmd,
