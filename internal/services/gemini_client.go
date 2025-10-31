@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/shouni/go-ai-client/pkg/ai/gemini"
+	"github.com/shouni/go-ai-client/v2/pkg/ai/gemini"
 )
 
 const (
