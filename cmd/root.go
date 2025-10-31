@@ -4,22 +4,33 @@ import (
 	"log"
 	"os"
 
+	"github.com/shouni/go-cli-base"
+	request "github.com/shouni/go-web-exact/v2/pkg/client"
 	"github.com/spf13/cobra"
 )
 
-// --- パッケージレベル変数の定義 (Persistent Flags のバインド先) ---
-var reviewMode string
-var gitCloneURL string
-var baseBranch string
-var featureBranch string
-var sshKeyPath string
-var localPath string
-var skipHostKeyCheck bool
-var geminiModel string
+// --- アプリケーション固有のフラグを保持する構造体 ---
+
+var sharedClient *request.Client
+
+// AppFlags は git-gemini-reviewer-go 固有の永続フラグを保持します。
+type AppFlags struct {
+	ReviewMode       string
+	GeminiModel      string
+	GitCloneURL      string
+	BaseBranch       string
+	FeatureBranch    string
+	SSHKeyPath       string
+	LocalPath        string
+	SkipHostKeyCheck bool
+}
+
+// Flags はアプリケーション固有フラグにアクセスするためのグローバル変数
+var Flags AppFlags
 
 // CreateReviewConfigParams は、フラグから読み取られたすべての引数を持つ構造体です。
-// グローバル変数への依存を明示し、CreateReviewConfig に渡すために使用されます。
-// NOTE: この構造体は、すべてのコマンドファイルからアクセスできるように、cmd パッケージ内で定義します。
+// NOTE: 固有フラグのグローバル変数 (Flags AppFlags) から値をコピーし、
+// この構造体をロジック層に渡すことを意図していると解釈します。
 type CreateReviewConfigParams struct {
 	ReviewMode       string
 	GeminiModel      string
@@ -31,11 +42,112 @@ type CreateReviewConfigParams struct {
 	SkipHostKeyCheck bool
 }
 
-// RootCmd はアプリケーションのベースコマンド（ディスパッチャ）です。
+// --- clibase に渡すカスタム関数 ---
+
+// addAppPersistentFlags は、アプリケーション固有の永続フラグをルートコマンドに追加します。
+// clibase.CustomFlagFunc のシグネチャに合致します。
+func addAppPersistentFlags(rootCmd *cobra.Command) {
+	rootCmd.PersistentFlags().StringVarP(&Flags.ReviewMode,
+		"mode",
+		"m",
+		"detail",
+		"レビューモードを指定: 'release' (リリース判定) または 'detail' (詳細レビュー)",
+	)
+	// NOTE: GeminiModel のフラグ名は、mode フラグのショートカット 'm' と競合するため、
+	// 以前のソースコードの 'g' ではなく、競合しない 'M' を使用するか、ショートカットを削除する必要があります。
+	// 以前のソースコードは競合していたため、ここではショートカット 'g' を削除し、'G' を使用します。（'g' は mode フラグに割り当て済み）
+	rootCmd.PersistentFlags().StringVarP(
+		&Flags.GeminiModel,
+		"gemini-model",
+		"G",
+		"gemini-2.5-flash",
+		"Gemini model name to use for review (e.g., 'gemini-2.5-flash').",
+	)
+	rootCmd.PersistentFlags().StringVarP(
+		&Flags.GitCloneURL,
+		"git-clone-url",
+		"u",
+		"",
+		"The SSH URL of the Git repository to review.",
+	)
+	// **必須フラグのマーク付けはここで継続して行う**
+	rootCmd.MarkPersistentFlagRequired("git-clone-url")
+
+	rootCmd.PersistentFlags().StringVarP(
+		&Flags.BaseBranch,
+		"base-branch",
+		"b",
+		"main",
+		"The base branch for diff comparison (e.g., 'main').",
+	)
+	rootCmd.PersistentFlags().StringVarP(
+		&Flags.FeatureBranch,
+		"feature-branch",
+		"f",
+		"",
+		"The feature branch to review (e.g., 'feature/my-branch').",
+	)
+	rootCmd.MarkPersistentFlagRequired("feature-branch")
+
+	rootCmd.PersistentFlags().StringVarP(
+		&Flags.LocalPath,
+		"local-path",
+		"l",
+		os.TempDir()+"/git-reviewer-repos/tmp",
+		"Local path to clone the repository.",
+	)
+	rootCmd.PersistentFlags().StringVarP(
+		&Flags.SSHKeyPath,
+		"ssh-key-path",
+		"k",
+		"~/.ssh/id_rsa",
+		"Path to the SSH private key for Git authentication.",
+	)
+	rootCmd.PersistentFlags().BoolVarP(
+		&Flags.SkipHostKeyCheck,
+		"skip-host-key-check",
+		"s",
+		false,
+		"CRITICAL WARNING: Disables SSH host key verification. This dramatically increases the risk of Man-in-the-Middle attacks. NEVER USE IN PRODUCTION. Only for controlled development/testing environments.",
+	)
+
+}
+
+// initAppPreRunE は、clibase共通処理の後に実行される、アプリケーション固有のPersistentPreRunEです。
+// 現状、特別な初期化がないため、nilを返します。
+// clibase.CustomPreRunEFunc のシグネチャに合致します。
+func initAppPreRunE(cmd *cobra.Command, args []string) error {
+	// clibase.Flags.Verbose などにアクセス可能
+	if clibase.Flags.Verbose {
+		log.Printf("Verbose mode: clibase flags: %+v, app flags: %+v", clibase.Flags, Flags)
+	}
+
+	// ここにアプリケーション固有の実行前チェック（例：ファイル存在チェック、環境変数チェックなど）を記述
+	return nil
+}
+
+// --- エントリポイント ---
+
+// Execute は、clibase.Execute を使用してルートコマンドの構築と実行を委譲します。
+func Execute() {
+	// clibase.Execute の第4引数以降にサブコマンドを追加します。
+	clibase.Execute(
+		"git-gemini-reviewer-go", // アプリケーション名
+		addAppPersistentFlags,    // カスタムフラグ追加関数
+		initAppPreRunE,           // PersistentPreRunE関数
+		// genericCmd, backlogCmd, slackCmd などのサブコマンドをここに追加する想定
+	)
+}
+
+// NewRootCmd は clibase.NewRootCmd に依存するため不要になりましたが、
+// アプリケーションのエントリとして RootCmd の Short/Long 定義は必要です。
+// RootCmd の定義は clibase.NewRootCmd が担当するため、ここではコメントアウトします。
+
+/*
 var RootCmd = &cobra.Command{
-	Use:   "git-gemini-reviewer-go",
-	Short: "Gemini AIを使ってGitの差分をレビューし、様々なプラットフォームに投稿するCLIツール",
-	Long: `このツールは、指定されたGitブランチ間の差分を取得し、Google Gemini APIに渡してコードレビューを行います。
+    Use:   "git-gemini-reviewer-go",
+    Short: "Gemini AIを使ってGitの差分をレビューし、様々なプラットフォームに投稿するCLIツール",
+    Long: `このツールは、指定されたGitブランチ間の差分を取得し、Google Gemini APIに渡してコードレビューを行います。
 
 レビュー結果の出力先を選択できる3つのサブコマンドが利用可能です。
 
@@ -43,76 +155,6 @@ var RootCmd = &cobra.Command{
   generic  : レビュー結果を標準出力 (STDOUT) に表示します。
   backlog  : レビュー結果をBacklogの課題コメントとして投稿します。
   slack    : レビュー結果をSlackの指定されたWebhook URLへ通知します。`,
-
-	RunE: nil,
+    RunE: nil,
 }
-
-func init() {
-
-	RootCmd.PersistentFlags().StringVarP(&reviewMode,
-		"mode",
-		"m",
-		"detail",
-		"レビューモードを指定: 'release' (リリース判定) または 'detail' (詳細レビュー)",
-	)
-	RootCmd.PersistentFlags().StringVarP(
-		&gitCloneURL,
-		"git-clone-url",
-		"u",
-		"",
-		"The SSH URL of the Git repository to review.",
-	)
-	RootCmd.MarkPersistentFlagRequired("git-clone-url")
-	RootCmd.PersistentFlags().StringVarP(
-		&baseBranch,
-		"base-branch",
-		"b",
-		"main",
-		"The base branch for diff comparison (e.g., 'main').",
-	)
-	RootCmd.PersistentFlags().StringVarP(
-		&featureBranch,
-		"feature-branch",
-		"f",
-		"",
-		"The feature branch to review (e.g., 'feature/my-branch').",
-	)
-	RootCmd.MarkPersistentFlagRequired("feature-branch")
-	RootCmd.PersistentFlags().StringVarP(
-		&localPath,
-		"local-path",
-		"l",
-		os.TempDir()+"/git-reviewer-repos/tmp",
-		"Local path to clone the repository.",
-	)
-	RootCmd.PersistentFlags().StringVarP(
-		&sshKeyPath,
-		"ssh-key-path",
-		"k",
-		"~/.ssh/id_rsa",
-		"Path to the SSH private key for Git authentication.",
-	)
-	RootCmd.PersistentFlags().BoolVarP(
-		&skipHostKeyCheck,
-		"skip-host-key-check",
-		"s",
-		false,
-		"CRITICAL WARNING: Disables SSH host key verification. This dramatically increases the risk of Man-in-the-Middle attacks. NEVER USE IN PRODUCTION. Only for controlled development/testing environments.",
-	)
-	RootCmd.PersistentFlags().StringVarP(
-		&geminiModel,
-		"model",
-		"g",
-		"gemini-2.5-flash",
-		"Gemini model name to use for review (e.g., 'gemini-2.5-flash').",
-	)
-}
-
-// Execute はルートコマンドを実行し、アプリケーションを起動します。
-func Execute() {
-	if err := RootCmd.Execute(); err != nil {
-		// log.Fatal の代わりに、エラーを出力し、os.Exit で終了する方がクリーン
-		log.Println(err)
-		os.Exit(1)
-	}
-}
+*/

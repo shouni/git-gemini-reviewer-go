@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-
 	"git-gemini-reviewer-go/internal/services"
+	"log" // log.Println を使用する可能性があるため追加
 
 	"github.com/spf13/cobra"
 )
@@ -15,33 +15,35 @@ var genericCmd = &cobra.Command{
 	Long:  `このコマンドは、指定されたGitリポジトリのブランチ間の差分をAIでレビューし、その結果を標準出力に直接表示します。Backlogなどの外部サービスとの連携は行いません。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		// 1. パラメータ構造体を作成 (グローバル変数への依存をここで解決)
+		// 1. パラメータ構造体を作成 (AppFlags (Flags) を利用)
+		// NOTE: 以前のソースコードで定義されていたグローバル変数（reviewMode, geminiModel など）
+		// の代わりに、AppFlags 構造体 (Flags) のフィールドを利用します。
 		params := CreateReviewConfigParams{
-			ReviewMode:       reviewMode,
-			GeminiModel:      geminiModel,
-			GitCloneURL:      gitCloneURL,
-			BaseBranch:       baseBranch,
-			FeatureBranch:    featureBranch,
-			SSHKeyPath:       sshKeyPath,
-			LocalPath:        localPath,
-			SkipHostKeyCheck: skipHostKeyCheck,
+			ReviewMode:       Flags.ReviewMode,
+			GeminiModel:      Flags.GeminiModel,
+			GitCloneURL:      Flags.GitCloneURL,
+			BaseBranch:       Flags.BaseBranch,
+			FeatureBranch:    Flags.FeatureBranch,
+			SSHKeyPath:       Flags.SSHKeyPath,
+			LocalPath:        Flags.LocalPath,
+			SkipHostKeyCheck: Flags.SkipHostKeyCheck,
 		}
 
-		// 2. 修正された CreateReviewConfig を呼び出し、引数を渡す
+		// 2. CreateReviewConfig を呼び出し、設定オブジェクトを取得
+		// NOTE: CreateReviewConfig は他の場所で定義されていると仮定
 		cfg, err := CreateReviewConfig(params)
 		if err != nil {
 			return err // 無効なレビューモードのエラーを処理
 		}
 
 		// 3. 共通ロジックを実行し、結果を取得
-		// NOTE: services.RunReviewAndGetResult のシグネチャが config.ReviewConfig を受け取るように
-		// services パッケージ側で修正されている必要があります。
 		reviewResult, err := services.RunReviewAndGetResult(cmd.Context(), cfg)
 		if err != nil {
 			return err
 		}
 
 		if reviewResult == "" {
+			log.Println("✅ Diff がないためレビューをスキップしました。")
 			return nil // Diffなしでスキップされた場合
 		}
 
@@ -55,5 +57,19 @@ var genericCmd = &cobra.Command{
 }
 
 func init() {
-	RootCmd.AddCommand(genericCmd)
+	// RootCmd への AddCommand は、clibase.Execute の引数で処理されるのが理想ですが、
+	// サブコマンドの定義ファイルでの慣習に従い、init() で追加します。
+	// RootCmd の定義が clibase によって置き換えられたため、この行は実行されない可能性があります。
+	// RootCmd.AddCommand(genericCmd)
+
+	// NOTE: 以前の root.go の Execute() 関数でサブコマンドとして渡されることを前提とします。
+	/*
+		func Execute() {
+		    clibase.Execute(
+		        ...,
+		        genericCmd,   // ここに追加
+		        backlogCmd,   // 以前のファイルで定義
+		    )
+		}
+	*/
 }

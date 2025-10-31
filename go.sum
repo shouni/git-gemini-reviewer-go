@@ -125,6 +125,8 @@ github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 h1:n661drycOFuPLCN
 github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3/go.mod h1:A0bzQcvG0E7Rwjx0REVgAGH58e96+X0MeOfepqsbeW4=
 github.com/shouni/go-ai-client/v2 v2.0.2 h1:9fej/MkJPAWv1M8Ljdbu2hmEkhFix9rpnQtMrCfpVpA=
 github.com/shouni/go-ai-client/v2 v2.0.2/go.mod h1:/qv/8cVRGaEBVJaRpe77wgHDwr80swJ6FumSHHoMJPI=
+github.com/shouni/go-cli-base v1.0.2 h1:U3AtTQAX637jP0LpGWUJaSBJQTSjqf6mc7nIl/2arRY=
+github.com/shouni/go-cli-base v1.0.2/go.mod h1:8E4ahg7/LC3cG5zSBR4u/s+ugqrXxEsqXVWGbFlE1P8=
 github.com/shouni/go-notifier v1.0.4 h1:if6T6+KEAlFB8zsCBRXkUbQg6WRGB9cjHoLoqebdt3g=
 github.com/shouni/go-notifier v1.0.4/go.mod h1:wZOTpGv564XyUCeabSRtx+dNU1Bjjks21GqVZ+OopN8=
 github.com/shouni/go-utils v1.0.3 h1:vH9gJvgdH9Og6lILPw++fzO3igC0zUTUI7fRL4dVxrM=
