@@ -10,7 +10,7 @@ import (
 	"git-gemini-reviewer-go/internal/config"
 	"git-gemini-reviewer-go/internal/services"
 	"github.com/shouni/go-notifier/pkg/notifier"
-	"github.com/shouni/go-web-exact/pkg/httpclient"
+	"github.com/shouni/go-web-exact/v2/pkg/client"
 
 	"github.com/spf13/cobra"
 )
@@ -116,9 +116,9 @@ func runBacklogCommand(cmd *cobra.Command, args []string) error {
 // postToBacklog は、Backlogへの投稿処理の責務を持ちます。
 func postToBacklog(ctx context.Context, url, apiKey, issueID, content string) error {
 	// httpclient.New() と time.Second を使用
-	httpClient := httpclient.New(30 * time.Second)
+	httpClient := client.New(30 * time.Second)
 
-	backlogService, err := notifier.NewBacklogNotifier(httpClient, url, apiKey)
+	backlogService, err := notifier.NewBacklogNotifier(*httpClient, url, apiKey)
 	if err != nil {
 		return fmt.Errorf("Backlogクライアントの初期化に失敗しました: %w", err)
 	}

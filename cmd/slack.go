@@ -11,7 +11,7 @@ import (
 
 	"git-gemini-reviewer-go/internal/config"
 	"github.com/shouni/go-notifier/pkg/notifier"
-	"github.com/shouni/go-web-exact/pkg/httpclient"
+	"github.com/shouni/go-web-exact/v2/pkg/client"
 	"github.com/spf13/cobra"
 )
 
@@ -121,7 +121,7 @@ func setupCleanup(path string) {
 // postToSlack は、Slackへの投稿処理の責務を持ちます。
 func postToSlack(ctx context.Context, webhookURL, content string, cfg config.ReviewConfig) error {
 	// 1. httpclient.New() を使用してクライアントを初期化
-	httpClient := httpclient.New(30 * time.Second)
+	httpClient := client.New(30 * time.Second)
 
 	// SlackNotifierに必要な追加の環境変数を取得
 	slackUsername := os.Getenv("SLACK_USERNAME")
@@ -131,7 +131,7 @@ func postToSlack(ctx context.Context, webhookURL, content string, cfg config.Rev
 	// 2. notifier.NewSlackNotifier の呼び出しを修正:
 	// slack.go の定義 (client, webhookURL, username, iconEmoji, channel) に合わせる。
 	slackNotifier := notifier.NewSlackNotifier(
-		httpClient,
+		*httpClient,
 		webhookURL,
 		slackUsername,
 		slackIconEmoji,
