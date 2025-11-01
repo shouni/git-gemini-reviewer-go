@@ -5,13 +5,13 @@ import (
 	"os"
 
 	"github.com/shouni/go-cli-base"
-	request "github.com/shouni/go-web-exact/v2/pkg/client"
+	"github.com/shouni/go-http-kit/pkg/httpkit"
 	"github.com/spf13/cobra"
 )
 
 // --- アプリケーション固有のフラグを保持する構造体 ---
 
-var sharedClient *request.Client
+var sharedClient *httpkit.Client
 
 // AppFlags は git-gemini-reviewer-go 固有の永続フラグを保持します。
 type AppFlags struct {
