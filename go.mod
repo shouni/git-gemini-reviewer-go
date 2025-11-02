@@ -6,7 +6,7 @@ require (
 	github.com/go-git/go-git/v5 v5.16.3
 	github.com/shouni/go-ai-client/v2 v2.0.2
 	github.com/shouni/go-cli-base v1.0.4
-	github.com/shouni/go-http-kit v1.0.2
+	github.com/shouni/go-http-kit v1.0.3
 	github.com/shouni/go-notifier v1.0.5
 	github.com/spf13/cobra v1.10.1
 	golang.org/x/crypto v0.43.0

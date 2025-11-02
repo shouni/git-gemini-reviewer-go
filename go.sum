@@ -122,8 +122,8 @@ github.com/shouni/go-ai-client/v2 v2.0.2 h1:9fej/MkJPAWv1M8Ljdbu2hmEkhFix9rpnQtM
 github.com/shouni/go-ai-client/v2 v2.0.2/go.mod h1:/qv/8cVRGaEBVJaRpe77wgHDwr80swJ6FumSHHoMJPI=
 github.com/shouni/go-cli-base v1.0.4 h1:h1jdvAxjUiS0AEn4ein0nc7E5bn3RtKiv8YkHeRc9Ak=
 github.com/shouni/go-cli-base v1.0.4/go.mod h1:8E4ahg7/LC3cG5zSBR4u/s+ugqrXxEsqXVWGbFlE1P8=
-github.com/shouni/go-http-kit v1.0.2 h1:9py4M3EPBE2FnYLhnoAmdcLKGsR687y7TYutQ6bAiME=
-github.com/shouni/go-http-kit v1.0.2/go.mod h1:ht5tew+VUo/vBnOoNuQIXHGs3+0NCXhx7fLfEw0FEwc=
+github.com/shouni/go-http-kit v1.0.3 h1:+ksTASxEXWsAGt5ZMtdHQre5KePmrNi01P3gUuBlPCw=
+github.com/shouni/go-http-kit v1.0.3/go.mod h1:ht5tew+VUo/vBnOoNuQIXHGs3+0NCXhx7fLfEw0FEwc=
 github.com/shouni/go-notifier v1.0.5 h1:Ng9fyfBlezKJHnDhjLdbg0HvoURdFCz1DcijM3J24zs=
 github.com/shouni/go-notifier v1.0.5/go.mod h1:ql388FHctry8NMkyf7RrrocAI6JUv/I9CeqL0dHHJaY=
 github.com/shouni/go-utils v1.0.3 h1:vH9gJvgdH9Og6lILPw++fzO3igC0zUTUI7fRL4dVxrM=
