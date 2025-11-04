@@ -104,7 +104,7 @@ export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 すべてのサブコマンド (`generic`, `backlog`, `slack`) で使用可能なフラグです。
 
 | フラグ | ショートカット  | 説明 | デフォルト値 | 必須 |
-| :--- |:---| :--- | :--- | :--- |
+| :--- |:---------| :--- | :--- | :--- |
 | `--mode` | **`-m`** | レビューモードを指定: `'release'` (リリース判定) または `'detail'` (詳細レビュー) | `detail` | ❌ |
 | `--git-clone-url` | **`-u`** | レビュー対象の Git リポジトリの **SSH URL** | **なし** | ✅ |
 | `--base-branch` | **`-b`** | 差分比較の基準ブランチ | `main` | ❌ |
@@ -112,7 +112,7 @@ export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 | `--local-path` | **`-l`** | リポジトリをクローンするローカルパス | 一時ディレクトリ | ❌ |
 | `--ssh-key-path` | **`-k`** | Git 認証用の SSH 秘密鍵のパス | `~/.ssh/id_rsa` | ❌ |
 | `--skip-host-key-check` | **`-s`** | SSHホストキーチェックをスキップする (**非推奨**) | `false` | ❌ |
-| `--model` | **`-G`** | 使用する Gemini モデル名 (例: `gemini-2.5-flash`) | `gemini-2.5-flash` | ❌ |
+| `--model` | **`-g`** | 使用する Gemini モデル名 (例: `gemini-2.5-flash`) | `gemini-2.5-flash` | ❌ |
 
 -----
 

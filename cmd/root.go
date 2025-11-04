@@ -3,6 +3,7 @@ package cmd
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/shouni/go-cli-base"
 	"github.com/shouni/go-http-kit/pkg/httpkit"
@@ -56,7 +57,7 @@ func addAppPersistentFlags(rootCmd *cobra.Command) {
 	rootCmd.PersistentFlags().StringVarP(
 		&Flags.GeminiModel,
 		"gemini-model",
-		"G", // '--mode' の 'm' との競合を避けるため 'G' を使用
+		"g", // '--mode' の 'm' との競合を避けるため 'g' を使用
 		"gemini-2.5-flash",
 		"Gemini model name to use for review (e.g., 'gemini-2.5-flash').",
 	)
@@ -113,6 +114,12 @@ func addAppPersistentFlags(rootCmd *cobra.Command) {
 // 現状、特別な初期化がないため、nilを返します。
 // clibase.CustomPreRunEFunc のシグネチャに合致します。
 func initAppPreRunE(cmd *cobra.Command, args []string) error {
+
+	// HTTPクライアントの初期化ロジック
+	timeout := time.Duration(30) * time.Second
+	// request.New() が *request.Client を返す前提
+	sharedClient = httpkit.New(timeout)
+
 	// clibase.Flags.Verbose などにアクセス可能
 	if clibase.Flags.Verbose {
 		log.Printf("Verbose mode: clibase flags: %+v, app flags: %+v", clibase.Flags, Flags)
