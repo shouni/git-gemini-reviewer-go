@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"os"
 
-	"git-gemini-reviewer-go/internal/config"
 	"git-gemini-reviewer-go/internal/services"
 
 	"github.com/shouni/go-notifier/pkg/notifier"

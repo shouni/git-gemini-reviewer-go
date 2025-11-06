@@ -6,6 +6,8 @@ import (
 	"os"
 	"time"
 
+	"git-gemini-reviewer-go/internal/config"
+
 	"github.com/shouni/go-cli-base"
 	"github.com/shouni/go-http-kit/pkg/httpkit"
 	"github.com/spf13/cobra"
