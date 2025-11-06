@@ -1,7 +1,8 @@
 package cmd
 
 import (
-	"log"
+	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -10,123 +11,131 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// --- アプリケーション固有のフラグを保持する構造体 ---
-
+// --- グローバル変数 ---
+var ReviewConfig config.ReviewConfig
 var sharedClient *httpkit.Client
 
-// AppFlags は git-gemini-reviewer-go 固有の永続フラグを保持します。
-type AppFlags struct {
-	ReviewMode       string
-	GeminiModel      string
-	GitCloneURL      string
-	BaseBranch       string
-	FeatureBranch    string
-	SSHKeyPath       string
-	LocalPath        string
-	SkipHostKeyCheck bool
+// --- 定数 ---
+const defaultHTTPTimeout = 30 * time.Second
+
+// --- 初期化ロジック ---
+
+// initHTTPClient は共有の HTTP クライアントを初期化します。
+func initHTTPClient() *httpkit.Client {
+	return httpkit.New(defaultHTTPTimeout)
 }
 
-// Flags はアプリケーション固有フラグにアクセスするためのグローバル変数
-var Flags AppFlags
+// initAppPreRunE は、アプリケーション固有のPersistentPreRunEです。
+func initAppPreRunE(cmd *cobra.Command, args []string) error {
 
-// CreateReviewConfigParams は、フラグから読み取られたすべての引数を持つ構造体です。
-// NOTE: 固有フラグのグローバル変数 (Flags AppFlags) から値をコピーし、
-// この構造体をロジック層に渡すことを意図していると解釈します。
-type CreateReviewConfigParams struct {
-	ReviewMode       string
-	GeminiModel      string
-	GitCloneURL      string
-	BaseBranch       string
-	FeatureBranch    string
-	SSHKeyPath       string
-	LocalPath        string
-	SkipHostKeyCheck bool
+	// 1. slog ハンドラの設定
+	logLevel := slog.LevelInfo
+	if clibase.Flags.Verbose {
+		logLevel = slog.LevelDebug
+	}
+
+	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{ // 標準エラー出力にログを出すのが一般的
+		Level: logLevel,
+	})
+	slog.SetDefault(slog.New(handler))
+
+	// 2. HTTPクライアントの初期化（グローバル変数に代入）
+	sharedClient = initHTTPClient()
+	slog.Debug("HTTPクライアントの初期化が完了しました。") // ログメッセージを移動
+
+	// 3. レビューモードに基づき、プロンプトを含む設定を構築
+	newConfig, err := CreateReviewConfig(ReviewConfig)
+	if err != nil {
+		// 設定構築エラーが発生した場合、処理を停止
+		slog.Error("アプリケーション設定の初期化に失敗しました。", "error", err)
+		return fmt.Errorf("application configuration initialization failed: %w", err)
+	}
+
+	// 更新された設定をグローバル変数に反映
+	ReviewConfig = newConfig
+
+	// Verbose ログ
+	slog.Debug("アプリケーション設定", "config", ReviewConfig) // 修正済み
+
+	// 設定完了ログ
+	// 【修正 4】行番号 50: mode フィールドを削除
+	slog.Info("アプリケーション設定初期化完了")
+
+	return nil
 }
 
-// --- clibase に渡すカスタム関数 ---
+// --- フラグ設定ロジック ---
 
 // addAppPersistentFlags は、アプリケーション固有の永続フラグをルートコマンドに追加します。
-// clibase.CustomFlagFunc のシグネチャに合致します。
 func addAppPersistentFlags(rootCmd *cobra.Command) {
-	rootCmd.PersistentFlags().StringVarP(&Flags.ReviewMode,
+	// ReviewConfig.ReviewMode にバインド
+	rootCmd.PersistentFlags().StringVarP(&ReviewConfig.ReviewMode,
 		"mode",
 		"m",
 		"detail",
 		"レビューモードを指定: 'release' (リリース判定) または 'detail' (詳細レビュー)",
 	)
 	rootCmd.PersistentFlags().StringVarP(
-		&Flags.GeminiModel,
-		"gemini-model",
-		"g", // '--mode' の 'm' との競合を避けるため 'g' を使用
+		&ReviewConfig.GeminiModel,
+		"model",
+		"g",
 		"gemini-2.5-flash",
 		"Gemini model name to use for review (e.g., 'gemini-2.5-flash').",
 	)
 	rootCmd.PersistentFlags().StringVarP(
-		&Flags.GitCloneURL,
+		&ReviewConfig.GitCloneURL,
 		"git-clone-url",
 		"u",
 		"",
 		"The SSH URL of the Git repository to review.",
 	)
-	rootCmd.MarkPersistentFlagRequired("git-clone-url")
+
+	// 必須フラグのエラーハンドリング
+	if err := rootCmd.MarkPersistentFlagRequired("git-clone-url"); err != nil {
+		return
+	}
 
 	rootCmd.PersistentFlags().StringVarP(
-		&Flags.BaseBranch,
+		&ReviewConfig.BaseBranch,
 		"base-branch",
 		"b",
 		"main",
 		"The base branch for diff comparison (e.g., 'main').",
 	)
 	rootCmd.PersistentFlags().StringVarP(
-		&Flags.FeatureBranch,
+		&ReviewConfig.FeatureBranch,
 		"feature-branch",
 		"f",
 		"",
 		"The feature branch to review (e.g., 'feature/my-branch').",
 	)
-	rootCmd.MarkPersistentFlagRequired("feature-branch")
 
+	if err := rootCmd.MarkPersistentFlagRequired("feature-branch"); err != nil {
+		return
+	}
+
+	// パスとホストキーチェックフラグ
 	rootCmd.PersistentFlags().StringVarP(
-		&Flags.LocalPath,
+		&ReviewConfig.LocalPath,
 		"local-path",
 		"l",
 		os.TempDir()+"/git-reviewer-repos/tmp",
 		"Local path to clone the repository.",
 	)
 	rootCmd.PersistentFlags().StringVarP(
-		&Flags.SSHKeyPath,
+		&ReviewConfig.SSHKeyPath,
 		"ssh-key-path",
 		"k",
 		"~/.ssh/id_rsa",
 		"Path to the SSH private key for Git authentication.",
 	)
 	rootCmd.PersistentFlags().BoolVarP(
-		&Flags.SkipHostKeyCheck,
+		&ReviewConfig.SkipHostKeyCheck,
 		"skip-host-key-check",
 		"s",
 		false,
 		"CRITICAL WARNING: Disables SSH host key verification. This dramatically increases the risk of Man-in-the-Middle attacks. NEVER USE IN PRODUCTION. Only for controlled development/testing environments.",
 	)
-
-}
-
-// initAppPreRunE は、clibase共通処理の後に実行される、アプリケーション固有のPersistentPreRunEです。
-// 現状、特別な初期化がないため、nilを返します。
-// clibase.CustomPreRunEFunc のシグネチャに合致します。
-func initAppPreRunE(cmd *cobra.Command, args []string) error {
-
-	// HTTPクライアントの初期化ロジック
-	timeout := time.Duration(30) * time.Second
-	// request.New() が *request.Client を返す前提
-	sharedClient = httpkit.New(timeout)
-
-	// clibase.Flags.Verbose などにアクセス可能
-	if clibase.Flags.Verbose {
-		log.Printf("Verbose mode: clibase flags: %+v, app flags: %+v", clibase.Flags, Flags)
-	}
-
-	// ここにアプリケーション固有の実行前チェック（例：ファイル存在チェック、環境変数チェックなど）を記述
-	return nil
 }
 
 // --- エントリポイント ---
