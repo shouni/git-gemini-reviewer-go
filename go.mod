@@ -6,8 +6,8 @@ require (
 	github.com/go-git/go-git/v5 v5.16.3
 	github.com/shouni/go-ai-client/v2 v2.0.2
 	github.com/shouni/go-cli-base v1.0.5
-	github.com/shouni/go-http-kit v1.0.4
-	github.com/shouni/go-notifier v1.0.6
+	github.com/shouni/go-http-kit v1.0.6
+	github.com/shouni/go-notifier v1.0.8
 	github.com/spf13/cobra v1.10.1
 	golang.org/x/crypto v0.43.0
 )
@@ -37,7 +37,7 @@ require (
 	github.com/pjbgf/sha1cd v0.3.2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
-	github.com/shouni/go-utils v1.0.6 // indirect
+	github.com/shouni/go-utils v1.0.7 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
 	github.com/slack-go/slack v0.17.3 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
