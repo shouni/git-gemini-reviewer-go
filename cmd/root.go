@@ -91,11 +91,8 @@ func addAppPersistentFlags(rootCmd *cobra.Command) {
 		"",
 		"The SSH URL of the Git repository to review.",
 	)
-
 	// 必須フラグのエラーハンドリング
-	if err := rootCmd.MarkPersistentFlagRequired("git-clone-url"); err != nil {
-		return
-	}
+	rootCmd.MarkPersistentFlagRequired("git-clone-url")
 
 	rootCmd.PersistentFlags().StringVarP(
 		&ReviewConfig.BaseBranch,
@@ -111,10 +108,7 @@ func addAppPersistentFlags(rootCmd *cobra.Command) {
 		"",
 		"The feature branch to review (e.g., 'feature/my-branch').",
 	)
-
-	if err := rootCmd.MarkPersistentFlagRequired("feature-branch"); err != nil {
-		return
-	}
+	rootCmd.MarkPersistentFlagRequired("feature-branch")
 
 	// パスとホストキーチェックフラグ
 	rootCmd.PersistentFlags().StringVarP(
