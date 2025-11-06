@@ -7,38 +7,26 @@ import (
 	"git-gemini-reviewer-go/prompts"
 )
 
-// CreateReviewConfig は、コマンドライン引数と選択されたレビューモードに基づき
-// config.ReviewConfig 構造体を構築します。
+// CreateReviewConfig は、フラグからバインドされた設定構造体を受け取り、
+// ReviewMode フィールドに基づいて適切なプロンプトテンプレートを設定します。
 //
-// CreateReviewConfigParams は cmd/root.go で定義されています。
-func CreateReviewConfig(params CreateReviewConfigParams) (config.ReviewConfig, error) {
-	// 1. レビューモードに基づいたプロンプトの選択
-	var selectedPrompt string
+// この関数は設定の構築に専念し、副作用（ログ出力など）を持ちません。
+func CreateReviewConfig(baseConfig config.ReviewConfig) (config.ReviewConfig, error) {
 
-	switch params.ReviewMode {
+	// 呼び出し元でフラグからバインドされた ReviewMode フィールドを参照
+	switch baseConfig.ReviewMode {
 	case "release":
-		// prompts パッケージからテンプレートを取得
-		selectedPrompt = prompts.ReleasePromptTemplate
-		fmt.Println("✅ リリースレビューモードが選択されました。")
+		baseConfig.PromptContent = prompts.ReleasePromptTemplate
+
 	case "detail":
-		selectedPrompt = prompts.DetailPromptTemplate
-		fmt.Println("✅ 詳細レビューモードが選択されました。（デフォルト）")
+		// DetailPromptTemplate を設定
+		baseConfig.PromptContent = prompts.DetailPromptTemplate
+
 	default:
-		return config.ReviewConfig{}, fmt.Errorf("無効なレビューモードが指定されました: '%s'。'release' または 'detail' を選択してください。", params.ReviewMode)
+		// 不明なモードが指定された場合は、エラーを返します
+		return config.ReviewConfig{}, fmt.Errorf("無効なレビューモードが指定されました: '%s'。'release' または 'detail' を選択してください。", baseConfig.ReviewMode)
 	}
 
-	// 2. 共通ロジックのための設定構造体を作成
-	// params 構造体から値を取得する
-	cfg := config.ReviewConfig{
-		GeminiModel:      params.GeminiModel,
-		PromptContent:    selectedPrompt,
-		GitCloneURL:      params.GitCloneURL,
-		BaseBranch:       params.BaseBranch,
-		FeatureBranch:    params.FeatureBranch,
-		SSHKeyPath:       params.SSHKeyPath,
-		LocalPath:        params.LocalPath,
-		SkipHostKeyCheck: params.SkipHostKeyCheck,
-	}
-
-	return cfg, nil
+	// 適切な PromptContent が設定された baseConfig を返す
+	return baseConfig, nil
 }
