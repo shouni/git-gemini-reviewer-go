@@ -47,9 +47,8 @@ func initAppPreRunE(cmd *cobra.Command, args []string) error {
 	})
 	slog.SetDefault(slog.New(handler))
 
-	// 2. HTTPクライアントの初期化（グローバル変数に代入）
-	// HTTPクライアントの初期化
-	httpClient := httpkit.New(defaultHTTPTimeout) // 正しい
+	// 2. HTTPクライアントの初期化
+	httpClient := httpkit.New(defaultHTTPTimeout)
 
 	// コマンドのコンテキストに HTTP Client を格納
 	ctx := context.WithValue(cmd.Context(), clientKey{}, httpClient)
