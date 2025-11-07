@@ -7,7 +7,7 @@ require (
 	github.com/shouni/go-ai-client/v2 v2.0.2
 	github.com/shouni/go-cli-base v1.0.5
 	github.com/shouni/go-http-kit v1.0.6
-	github.com/shouni/go-notifier v1.1.0
+	github.com/shouni/go-notifier v1.1.1
 	github.com/spf13/cobra v1.10.1
 	golang.org/x/crypto v0.43.0
 )
