@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 
@@ -113,11 +112,17 @@ func postToSlack(
 	// 1. Contextから httpkit.Client を取得 (cmd/root.go の関数を使用)
 	httpClient, err := GetHTTPClient(ctx)
 	if err != nil {
-		log.Fatalf("🚨 HTTP Clientの取得に失敗しました: %v", err)
+		slog.Error("🚨 HTTP Clientの取得に失敗しました", "error", err)
+		return fmt.Errorf("HTTP Clientの取得に失敗しました: %w", err) // エラーを返す
 	}
 
 	// httpClient を使用して依存性を注入
 	slackClient, err := factory.GetSlackClient(httpClient)
+	if err != nil {
+		slog.Error("🚨 Slackクライアントの初期化に失敗しました", "error", err)
+		return fmt.Errorf("Slackクライアントの初期化に失敗しました: %w", err) // エラーを返す
+	}
+
 	// slogへ移行
 	slog.Info("Slack Webhook URL にレビュー結果を投稿します...", "channel", authInfo.Channel)
 

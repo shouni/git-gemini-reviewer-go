@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"os"
 	"time"
@@ -51,14 +50,8 @@ func initAppPreRunE(cmd *cobra.Command, args []string) error {
 
 	// 2. HTTPクライアントの初期化（グローバル変数に代入）
 	// HTTPクライアントの初期化
-	timeout := time.Duration(defaultHTTPTimeout) * time.Second
-	httpClient := httpkit.New(timeout) // ローカル変数として初期化
-
-	// clibaseのVerboseフラグと連携したロギング
-	if clibase.Flags.Verbose {
-		log.Printf("HTTPクライアントを初期化しました (Timeout: %s)。", timeout)
-	}
-
+	httpClient := httpkit.New(defaultHTTPTimeout) // 正しい
+	
 	// コマンドのコンテキストに HTTP Client を格納
 	ctx := context.WithValue(cmd.Context(), clientKey{}, httpClient)
 	cmd.SetContext(ctx)

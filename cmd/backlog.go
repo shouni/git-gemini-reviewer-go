@@ -112,15 +112,20 @@ func getBacklogAuthInfo() backlogAuthInfo {
 }
 
 // postToBacklog は、Backlogへの投稿処理の責務を持ちます。
-func postToBacklog(ctx context.Context, authInfo backlogAuthInfo, issueID, content string) error {
+func postToBacklog(ctx context.Context, issueID, content string) error {
 	// 1. Contextから httpkit.Client を取得 (cmd/root.go の関数を使用)
 	httpClient, err := GetHTTPClient(ctx)
 	if err != nil {
-		slog.Error("🚨 HTTP Clientの取得に失敗しました: %v", err)
+		slog.Error("🚨 HTTP Clientの取得に失敗しました", "error", err)
+		return fmt.Errorf("HTTP Clientの取得に失敗しました: %w", err) // エラーを返す
 	}
 
 	// httpClient を使用して依存性を注入
 	backlogClient, err := factory.GetBacklogClient(httpClient)
+	if err != nil {
+		slog.Error("🚨 Backlogクライアントの初期化に失敗しました", "error", err)
+		return fmt.Errorf("Backlogクライアントの初期化に失敗しました: %w", err) // エラーを返す
+	}
 
 	// 【slogへ移行】logに出力
 	slog.Info("Backlog課題にレビュー結果を投稿します...", "issue_id", issueID)
