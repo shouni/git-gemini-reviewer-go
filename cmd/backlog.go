@@ -82,7 +82,7 @@ func runBacklogCommand(cmd *cobra.Command, args []string) error {
 	finalContent := formatBacklogComment(backlogIssueID, ReviewConfig, reviewResult)
 
 	// 6. Backlog投稿を実行
-	err = postToBacklog(ctx, authInfo, backlogIssueID, finalContent)
+	err = postToBacklog(ctx, backlogIssueID, finalContent)
 	if err != nil {
 		// 【slogへ移行】エラーログの直後に printReviewResult を呼び出す順序に修正
 		slog.Error("Backlogへのコメント投稿に失敗しました。",
