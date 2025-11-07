@@ -9,7 +9,7 @@ import (
 	"git-gemini-reviewer-go/internal/config"
 	"git-gemini-reviewer-go/internal/services"
 
-	"github.com/shouni/go-notifier/pkg/notifier"
+	"github.com/shouni/go-notifier/pkg/factory"
 	"github.com/spf13/cobra"
 )
 
@@ -82,7 +82,7 @@ func runBacklogCommand(cmd *cobra.Command, args []string) error {
 	finalContent := formatBacklogComment(backlogIssueID, ReviewConfig, reviewResult)
 
 	// 6. Backlog投稿を実行
-	err = postToBacklog(ctx, authInfo, backlogIssueID, finalContent)
+	err = postToBacklog(ctx, backlogIssueID, finalContent)
 	if err != nil {
 		// 【slogへ移行】エラーログの直後に printReviewResult を呼び出す順序に修正
 		slog.Error("Backlogへのコメント投稿に失敗しました。",
@@ -112,23 +112,26 @@ func getBacklogAuthInfo() backlogAuthInfo {
 }
 
 // postToBacklog は、Backlogへの投稿処理の責務を持ちます。
-func postToBacklog(ctx context.Context, authInfo backlogAuthInfo, issueID, content string) error {
-	// 1. sharedClient の状態チェック
-	if sharedClient == nil {
-		return fmt.Errorf("内部エラー: HTTP クライアントが初期化されていません")
+func postToBacklog(ctx context.Context, issueID, content string) error {
+	// 1. Contextから httpkit.Client を取得 (cmd/root.go の関数を使用)
+	httpClient, err := GetHTTPClient(ctx)
+	if err != nil {
+		slog.Error("🚨 HTTP Clientの取得に失敗しました", "error", err)
+		return fmt.Errorf("HTTP Clientの取得に失敗しました: %w", err) // エラーを返す
 	}
 
-	// 2. BacklogNotifier の初期化
-	backlogNotifier, err := notifier.NewBacklogNotifier(*sharedClient, authInfo.SpaceURL, authInfo.APIKey)
+	// httpClient を使用して依存性を注入
+	backlogClient, err := factory.GetBacklogClient(httpClient)
 	if err != nil {
-		return fmt.Errorf("Backlogクライアントの初期化に失敗しました: %w", err)
+		slog.Error("🚨 Backlogクライアントの初期化に失敗しました", "error", err)
+		return fmt.Errorf("Backlogクライアントの初期化に失敗しました: %w", err) // エラーを返す
 	}
 
 	// 【slogへ移行】logに出力
 	slog.Info("Backlog課題にレビュー結果を投稿します...", "issue_id", issueID)
 
 	// PostComment はリトライロジックを持つ
-	return backlogNotifier.PostComment(ctx, issueID, content)
+	return backlogClient.PostComment(ctx, issueID, content)
 }
 
 // formatBacklogComment はコメントのヘッダーと本文を整形します。

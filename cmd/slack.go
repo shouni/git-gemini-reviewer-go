@@ -8,7 +8,7 @@ import (
 
 	"git-gemini-reviewer-go/internal/services"
 
-	"github.com/shouni/go-notifier/pkg/notifier"
+	"github.com/shouni/go-notifier/pkg/factory"
 	"github.com/spf13/cobra"
 )
 
@@ -109,20 +109,19 @@ func postToSlack(
 	content string,
 	authInfo slackAuthInfo,
 ) error {
-	// 1. sharedClient の利用
-	if sharedClient == nil {
-		// 【修正 8】行番号 92-94: エラーメッセージを簡潔化
-		return fmt.Errorf("内部エラー: HTTP クライアントが初期化されていません")
+	// 1. Contextから httpkit.Client を取得 (cmd/root.go の関数を使用)
+	httpClient, err := GetHTTPClient(ctx)
+	if err != nil {
+		slog.Error("🚨 HTTP Clientの取得に失敗しました", "error", err)
+		return fmt.Errorf("HTTP Clientの取得に失敗しました: %w", err) // エラーを返す
 	}
 
-	// 2. slackService の初期化 (sharedClient を利用)
-	slackService := notifier.NewSlackNotifier(
-		*sharedClient,
-		authInfo.WebhookURL,
-		authInfo.Username,
-		authInfo.IconEmoji,
-		authInfo.Channel,
-	)
+	// httpClient を使用して依存性を注入
+	slackClient, err := factory.GetSlackClient(httpClient)
+	if err != nil {
+		slog.Error("🚨 Slackクライアントの初期化に失敗しました", "error", err)
+		return fmt.Errorf("Slackクライアントの初期化に失敗しました: %w", err) // エラーを返す
+	}
 
 	// slogへ移行
 	slog.Info("Slack Webhook URL にレビュー結果を投稿します...", "channel", authInfo.Channel)
@@ -135,7 +134,7 @@ func postToSlack(
 	)
 
 	// SendTextWithHeader は content を整形し、ヘッダー情報を含めて投稿する
-	return slackService.SendTextWithHeader(ctx, title, content)
+	return slackClient.SendTextWithHeader(ctx, title, content)
 }
 
 // printSlackResult は noPost 時に結果を標準出力します。

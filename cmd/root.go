@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -15,17 +16,22 @@ import (
 
 // --- グローバル変数 ---
 var ReviewConfig config.ReviewConfig
-var sharedClient *httpkit.Client
 
 // --- 定数 ---
 const defaultHTTPTimeout = 30 * time.Second
 
-// --- 初期化ロジック ---
+// clientKey は context.Context に httpkit.Client を格納・取得するための非公開キー
+type clientKey struct{}
 
-// initHTTPClient は共有の HTTP クライアントを初期化します。
-func initHTTPClient() *httpkit.Client {
-	return httpkit.New(defaultHTTPTimeout)
+// GetHTTPClient は、cmd.Context() から *httpkit.Client を取り出す公開関数です。
+func GetHTTPClient(ctx context.Context) (*httpkit.Client, error) {
+	if client, ok := ctx.Value(clientKey{}).(*httpkit.Client); ok {
+		return client, nil
+	}
+	return nil, fmt.Errorf("contextからhttpkit.Clientを取得できませんでした。rootコマンドの初期化を確認してください。")
 }
+
+// --- 初期化ロジック ---
 
 // initAppPreRunE は、アプリケーション固有のPersistentPreRunEです。
 func initAppPreRunE(cmd *cobra.Command, args []string) error {
@@ -41,9 +47,12 @@ func initAppPreRunE(cmd *cobra.Command, args []string) error {
 	})
 	slog.SetDefault(slog.New(handler))
 
-	// 2. HTTPクライアントの初期化（グローバル変数に代入）
-	sharedClient = initHTTPClient()
-	slog.Debug("HTTPクライアントの初期化が完了しました。") // ログメッセージを移動
+	// 2. HTTPクライアントの初期化
+	httpClient := httpkit.New(defaultHTTPTimeout)
+
+	// コマンドのコンテキストに HTTP Client を格納
+	ctx := context.WithValue(cmd.Context(), clientKey{}, httpClient)
+	cmd.SetContext(ctx)
 
 	// 3. レビューモードに基づき、プロンプトを含む設定を構築
 	newConfig, err := CreateReviewConfig(ReviewConfig)
