@@ -16,7 +16,6 @@ import (
 
 // --- グローバル変数 ---
 var ReviewConfig config.ReviewConfig
-var sharedClient *httpkit.Client
 
 // --- 定数 ---
 const defaultHTTPTimeout = 30 * time.Second
@@ -51,7 +50,7 @@ func initAppPreRunE(cmd *cobra.Command, args []string) error {
 	// 2. HTTPクライアントの初期化（グローバル変数に代入）
 	// HTTPクライアントの初期化
 	httpClient := httpkit.New(defaultHTTPTimeout) // 正しい
-	
+
 	// コマンドのコンテキストに HTTP Client を格納
 	ctx := context.WithValue(cmd.Context(), clientKey{}, httpClient)
 	cmd.SetContext(ctx)
