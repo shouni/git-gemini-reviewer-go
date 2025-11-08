@@ -33,8 +33,7 @@ var (
 var slackCmd = &cobra.Command{
 	Use:   "slack",
 	Short: "コードレビューを実行し、その結果をSlackの指定されたチャンネルに投稿します。",
-	// 【修正 3】行番号 28: RunE: runSlackCommand, のコメントアウトされた行を削除
-	RunE: runSlackCommand,
+	RunE:  runSlackCommand,
 }
 
 func init() {
