@@ -1,41 +1,29 @@
 # ----------------------------------------------------------------------
 # STEP 1: ビルドステージ (Goバイナリのコンパイル)
 # ----------------------------------------------------------------------
+# go-gitを使用しているため、外部のgitコマンドは不要ですが、CGO_ENABLED=0で静的リンクします。
 FROM golang:1.24 AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
-# アプリケーションのソースコード全体をコピー (main.go を含む)
+# アプリケーションのソースコード全体をコピー
 COPY . .
-# 実行ファイルが ルート直下の main.go を起点としているため、ビルド対象をルート (.) に指定
-# 実行ファイルは ./app/bin/reviewer に出力されます
+# 静的リンクを強制し、実行ファイルを /app/bin/reviewer に出力します
+# go-gitを使用するため、外部gitコマンドの依存は完全に解消されています。
 RUN CGO_ENABLED=0 go build -o bin/reviewer .
 
 # ----------------------------------------------------------------------
-# STEP 2: gitの依存関係収集ステージ
+# STEP 2: 実行ステージ (Distroless)
 # ----------------------------------------------------------------------
-FROM debian:stable-slim AS git_deps
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    ca-certificates \
-    libcurl4-openssl-dev \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# ----------------------------------------------------------------------
-# STEP 3: 実行ステージ (Distroless)
-# ----------------------------------------------------------------------
+# 静的にコンパイルされたバイナリとCA証明書のみを含む、最小限のイメージです。
 FROM gcr.io/distroless/static-debian12
 
-# 2. git依存関係ステージから git バイナリと依存ライブラリをコピー (修正箇所)
-# Gitバイナリをアプリケーションと同じディレクトリにコピー
-COPY --from=git_deps /usr/bin/git /usr/local/bin/git
-# 必須の共有ライブラリ（libc.so.6など）をコピー
-COPY --from=git_deps /lib /lib
-COPY --from=git_deps /usr/lib /usr/lib
+# 必要なCA証明書をコピー (HTTPS/SSH接続に必要)
+# builderステージはdebianベースのため、ここからコピーします。
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-# CA証明書をコピー
-COPY --from=git_deps /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+# コンパイルされた静的バイナリをコピー
+COPY --from=builder /app/bin/reviewer /usr/local/bin/reviewer
 
-# ENTRYPOINTは変更なし
+# エントリーポイント
 ENTRYPOINT ["/usr/local/bin/reviewer"]
