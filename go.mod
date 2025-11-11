@@ -10,6 +10,7 @@ require (
 	github.com/shouni/go-notifier v1.1.2
 	github.com/spf13/cobra v1.10.1
 	golang.org/x/crypto v0.43.0
+	golang.org/x/sync v0.17.0
 )
 
 require (
