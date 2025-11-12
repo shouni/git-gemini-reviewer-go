@@ -2,7 +2,7 @@ package gitclient
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/url"
 	"os"
 	"os/user"
@@ -74,7 +74,7 @@ func NewClient(localPath string, sshKeyPath string, opts ...Option) Service {
 
 // Cleanup は処理後にローカルリポジトリをクリーンな状態に戻します。
 func (c *Client) Cleanup(repo *git.Repository) error { // レシーバー名を (c *Client) に変更
-	log.Printf("Cleanup: Checking out base branch '%s'...\n", c.BaseBranch)
+	slog.Info("Cleanup: Checking out base branch '%s'...\n", c.BaseBranch)
 
 	w, err := repo.Worktree()
 	if err != nil {
@@ -91,7 +91,7 @@ func (c *Client) Cleanup(repo *git.Repository) error { // レシーバー名を 
 		return fmt.Errorf("ベースブランチ '%s' へのチェックアウトに失敗しました: %w", c.BaseBranch, err)
 	}
 
-	log.Printf("Cleanup: Local repository successfully reset to base branch '%s'.\n", c.BaseBranch)
+	slog.Info("Cleanup: Local repository successfully reset to base branch '%s'.\n", c.BaseBranch)
 	return nil
 }
 
@@ -160,7 +160,7 @@ func (c *Client) cloneRepository(repositoryURL, localPath, branch string) error 
 		}
 	}
 
-	log.Printf("Cloning %s into %s using go-git...\n", repositoryURL, localPath)
+	slog.Info("Cloning %s into %s using go-git...\n", repositoryURL, localPath)
 
 	auth, err := c.getAuthMethod(repositoryURL)
 	if err != nil {
@@ -177,7 +177,7 @@ func (c *Client) cloneRepository(repositoryURL, localPath, branch string) error 
 	if err != nil {
 		return fmt.Errorf("go-git クローンに失敗しました: %w", err)
 	}
-	log.Println("Repository cloned successfully using go-git.")
+	slog.Info("Repository cloned successfully using go-git.")
 	return nil
 }
 
@@ -187,7 +187,7 @@ func (c *Client) recloneRepository(repositoryURL, localPath, branch string) (*gi
 		if err := os.RemoveAll(localPath); err != nil {
 			return nil, fmt.Errorf("既存リポジトリディレクトリ (%s) の削除に失敗しました: %w", localPath, err)
 		}
-		log.Printf("Existing repository at %s removed for re-cloning.\n", localPath)
+		slog.Info("Existing repository at %s removed for re-cloning.\n", localPath)
 	}
 
 	if err := c.cloneRepository(repositoryURL, localPath, branch); err != nil {
@@ -208,7 +208,7 @@ func (c *Client) updateExistingRepository(repo *git.Repository, repositoryURL st
 		return fmt.Errorf("go-git pull用の認証情報取得に失敗しました: %w", err)
 	}
 
-	log.Printf("Repository already exists at %s. Running 'go-git pull' to update...\n", c.LocalPath)
+	slog.Info("Repository already exists at %s. Running 'go-git pull' to update...\n", c.LocalPath)
 	w, err := repo.Worktree()
 	if err != nil {
 		return fmt.Errorf("ワークツリーの取得に失敗しました: %w", err)
@@ -222,12 +222,12 @@ func (c *Client) updateExistingRepository(repo *git.Repository, repositoryURL st
 	})
 
 	if pullErr == nil || pullErr == git.NoErrAlreadyUpToDate {
-		log.Println("Repository updated successfully using go-git pull.")
+		slog.Info("Repository updated successfully using go-git pull.")
 		return nil
 	}
 
 	// pull失敗時のリカバリロジック
-	log.Printf("Warning: go-git pull failed: %v. Attempting to recover by re-cloning...", pullErr)
+	slog.Info("Warning: go-git pull failed: %v. Attempting to recover by re-cloning...", pullErr)
 	// 再クローンのためにディレクトリを削除
 	if err := os.RemoveAll(c.LocalPath); err != nil {
 		return fmt.Errorf("pull失敗後の既存リポジトリディレクトリ (%s) の削除に失敗しました: %w", c.LocalPath, err)
@@ -244,7 +244,7 @@ func (c *Client) CloneOrUpdate(repositoryURL string) (*git.Repository, error) { 
 	var err error
 
 	if c.repoNeedsReclone(repositoryURL, localPath) {
-		log.Printf("Repository at %s needs to be cloned or re-cloned for %s.\n", localPath, repositoryURL)
+		slog.Info("Repository at %s needs to be cloned or re-cloned for %s.\n", localPath, repositoryURL)
 		repo, err = c.recloneRepository(repositoryURL, localPath, c.BaseBranch)
 		if err != nil {
 			return nil, err
@@ -260,7 +260,7 @@ func (c *Client) CloneOrUpdate(repositoryURL string) (*git.Repository, error) { 
 		if pullErr := c.updateExistingRepository(repo, repositoryURL); pullErr != nil {
 			// updateExistingRepositoryがエラーを返した場合、再クローンが必要か判断
 			if strings.HasPrefix(pullErr.Error(), "pull failed, reclone required") {
-				log.Println("Starting re-cloning for recovery...")
+				slog.Info("Starting re-cloning for recovery...")
 				// 再クローン
 				repo, err = c.recloneRepository(repositoryURL, localPath, c.BaseBranch)
 				if err != nil {
@@ -278,14 +278,14 @@ func (c *Client) CloneOrUpdate(repositoryURL string) (*git.Repository, error) { 
 		return nil, fmt.Errorf("go-git用の認証情報取得に失敗しました: %w", err)
 	}
 	c.auth = auth // Clientインスタンスに認証情報を保持
-	log.Println("go-git authentication method has been set successfully for this client.")
+	slog.Info("go-git authentication method has been set successfully for this client.")
 
 	return repo, nil
 }
 
 // Fetch はリモートから最新の変更を取得します。
 func (c *Client) Fetch(repo *git.Repository) error { // レシーバー名を (c *Client) に変更
-	log.Printf("Fetching latest changes from remote for repository at %s...\n", c.LocalPath)
+	slog.Info("Fetching latest changes from remote for repository at %s...\n", c.LocalPath)
 	if c.auth == nil {
 		return fmt.Errorf("認証情報が設定されていません。ClientのAuthMethodを設定するには、先にCloneOrUpdateを実行してください。")
 	}
@@ -332,7 +332,7 @@ func (c *Client) getTwoDotDiff(baseCommit, featureCommit *object.Commit) (string
 
 // GetCodeDiff は指定された2つのブランチ間の純粋な差分を、go-gitのみで取得します。
 func (c *Client) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch string) (string, error) { // レシーバー名を (c *Client) に変更
-	log.Printf("Calculating code diff for repository at %s between remote/%s and remote/%s using go-git...\n", c.LocalPath, baseBranch, featureBranch)
+	slog.Info("Calculating code diff for repository at %s between remote/%s and remote/%s using go-git...\n", c.LocalPath, baseBranch, featureBranch)
 
 	// 1. ブランチ参照を解決
 	baseRefName := plumbing.NewRemoteReferenceName("origin", baseBranch)
@@ -420,22 +420,22 @@ func (c *Client) CheckRemoteBranchExists(repo *git.Repository, branch string) (b
 func (c *Client) repoNeedsReclone(repositoryURL, localPath string) bool { // レシーバー名を (c *Client) に変更
 	gitDir := filepath.Join(localPath, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
-		log.Printf("Info: .git directory not found at %s. Cloning needed.\n", localPath)
+		slog.Info("Info: .git directory not found at %s. Cloning needed.\n", localPath)
 		return true
 	}
 	repo, err := git.PlainOpen(localPath)
 	if err != nil {
-		log.Printf("Warning: Existing repository at %s could not be opened: %v. Re-cloning...\n", localPath, err)
+		slog.Info("Warning: Existing repository at %s could not be opened: %v. Re-cloning...\n", localPath, err)
 		return true
 	}
 	remote, err := repo.Remote("origin")
 	if err != nil {
-		log.Printf("Warning: Remote 'origin' not found in %s: %v. Re-cloning...\n", localPath, err)
+		slog.Info("Warning: Remote 'origin' not found in %s: %v. Re-cloning...\n", localPath, err)
 		return true
 	}
 	remoteURLs := remote.Config().URLs
 	if len(remoteURLs) == 0 || remoteURLs[0] != repositoryURL {
-		log.Printf("Warning: Existing repository remote URL (%v) does not match the requested URL (%s). Re-cloning...\n", remoteURLs, repositoryURL)
+		slog.Info("Warning: Existing repository remote URL (%v) does not match the requested URL (%s). Re-cloning...\n", remoteURLs, repositoryURL)
 		return true
 	}
 	return false
