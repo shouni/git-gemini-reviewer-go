@@ -3,7 +3,7 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 
 	"git-gemini-reviewer-go/internal/config"
@@ -21,63 +21,56 @@ func RunReviewAndGetResult(
 	geminiService geminiclient.Service,
 ) (string, error) { // config.ReviewConfig は設定値として維持
 
-	log.Println("--- 1. Gitリポジトリのセットアップと差分取得を開始 ---")
-	fmt.Println("🔍 Gitリポジトリを準備し、差分を取得中...")
-
+	slog.Info("Gitリポジトリのセットアップと差分取得を開始します。")
 	// 2.1. クローン/アップデート
 	repo, err := gitService.CloneOrUpdate(cfg.GitCloneURL)
 	if err != nil {
-		log.Printf("ERROR: Gitリポジトリのセットアップに失敗しました: %v", err)
+		slog.Error("Gitリポジトリのセットアップに失敗しました。", "error", err, "url", cfg.GitCloneURL)
 		return "", fmt.Errorf("Gitリポジトリのクローン/更新に失敗しました: %w", err)
 	}
 
 	// defer処理
 	defer func() {
 		if cleanupErr := gitService.Cleanup(repo); cleanupErr != nil {
-			log.Printf("Warning: Failed to cleanup local repository: %v", cleanupErr)
+			slog.Warn("ローカルリポジトリのクリーンアップに失敗しました。", "error", cleanupErr)
 		}
 	}()
 
 	// 2.2. フェッチ
 	if err := gitService.Fetch(repo); err != nil {
-		log.Printf("ERROR: 最新の変更のフェッチに失敗しました: %v", err)
+		slog.Error("最新の変更のフェッチに失敗しました。", "error", err)
 		return "", fmt.Errorf("最新の変更のフェッチに失敗しました: %w", err)
 	}
 
 	// 2.3. コード差分を取得
 	diffContent, err := gitService.GetCodeDiff(repo, cfg.BaseBranch, cfg.FeatureBranch)
 	if err != nil {
-		log.Printf("ERROR: Git差分の取得に失敗しました: %v", err)
+		slog.Error("Git差分の取得に失敗しました。", "error", err)
 		return "", fmt.Errorf("Git差分の取得に失敗しました: %w", err)
 	}
 
 	if strings.TrimSpace(diffContent) == "" {
-		fmt.Println("ℹ️ 差分が見つかりませんでした。レビューをスキップします。")
 		return "", nil
 	}
-
-	log.Printf("Git差分の取得に成功しました。サイズ: %dバイト\n", len(diffContent))
+	slog.Info("Git差分の取得に成功しました。", "size_bytes", len(diffContent))
 
 	// 3. プロンプトの組み立て
 	promptBuilder := prompts.NewReviewPromptBuilder(cfg.PromptContent)
-
 	finalPrompt, err := promptBuilder.Build(diffContent)
 	if err != nil {
-		log.Printf("ERROR: プロンプトの組み立てエラー: %v", err)
+		slog.Error("プロンプトの組み立てエラー。", "error", err)
 		return "", fmt.Errorf("プロンプトの組み立てに失敗しました: %w", err)
 	}
 
 	// --- 4. AIレビュー ---
-	fmt.Println("🚀 Gemini AIによるコードレビューを開始します...")
-
-	// 4.2. レビューの依頼
+	slog.Info("Gemini AIによるコードレビューを開始します。", "model", cfg.GeminiModel)
 	reviewComment, err := geminiService.ReviewCodeDiff(ctx, finalPrompt)
 	if err != nil {
-		log.Printf("ERROR: Geminiによるコードレビュー中にエラーが発生しました: %v", err)
+		// log.Printf("ERROR: ...") を slog.Error に置換
+		slog.Error("Geminiによるコードレビュー中にエラーが発生しました。", "error", err)
 		return "", fmt.Errorf("Geminiによるコードレビュー中にエラーが発生しました: %w", err)
 	}
-
-	log.Println("AIレビューの取得に成功しました。")
+	slog.Info("AIレビューの取得に成功しました。")
 
 	return reviewComment, nil
 }

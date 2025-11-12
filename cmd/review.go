@@ -19,14 +19,10 @@ func executeReviewPipeline(
 ) (string, error) {
 
 	// --- 1. 依存関係の構築（Builder パッケージを使用） ---
-
-	// 1.1. Git Service の構築
 	gitService := builder.BuildGitService(cfg, logger)
-
-	// 1.2. Gemini Service の構築
 	geminiService, err := builder.BuildGeminiService(ctx, cfg, logger)
 	if err != nil {
-		return "", fmt.Errorf("Gemini Service の構築に失敗しました: %w", err) // 戻り値に "" を追加
+		return "", fmt.Errorf("Gemini Service の構築に失敗しました: %w", err)
 	}
 
 	// --- 2. 共通ロジック (Pipeline) の実行 ---
@@ -44,7 +40,7 @@ func executeReviewPipeline(
 
 	// --- 3. 結果の返却 ---
 	if reviewResult == "" {
-		logger.Info("レiff がないためレビューをスキップしました。")
+		logger.Info("Diff がないためレビューをスキップしました。")
 		return "", nil
 	}
 
