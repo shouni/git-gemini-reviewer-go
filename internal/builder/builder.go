@@ -8,7 +8,7 @@ import (
 	"git-gemini-reviewer-go/internal/config"
 	"git-gemini-reviewer-go/internal/geminiclient"
 	"git-gemini-reviewer-go/internal/gitclient"
-	"git-gemini-reviewer-go/internal/prompts"
+	"git-gemini-reviewer-go/prompts"
 )
 
 // 既存の BuildGitService 関数を修正して依存パスを調整

@@ -9,7 +9,7 @@ import (
 	"git-gemini-reviewer-go/internal/config"
 	"git-gemini-reviewer-go/internal/geminiclient"
 	"git-gemini-reviewer-go/internal/gitclient"
-	"git-gemini-reviewer-go/internal/prompts"
+	"git-gemini-reviewer-go/prompts"
 )
 
 // RunReviewAndGetResult はGit Diffを取得し、Gemini AIでレビューを実行します。
