@@ -51,6 +51,16 @@ func initAppPreRunE(cmd *cobra.Command, args []string) error {
 	ctx := context.WithValue(cmd.Context(), clientKey{}, httpClient)
 	cmd.SetContext(ctx)
 
+	// --- 3. フラグ値の検証 ---
+	// フラグは既に ReviewConfig にバインドされているため、直接参照する
+	switch ReviewConfig.ReviewMode {
+	case "release", "detail":
+		// 有効な値 -> 次へ
+	default:
+		// 無効な値
+		return fmt.Errorf("無効なレビューモードが指定されました: '%s'。'release' または 'detail' を選択してください。", ReviewConfig.ReviewMode)
+	}
+
 	slog.Info("アプリケーション設定初期化完了", slog.String("mode", ReviewConfig.ReviewMode))
 
 	return nil
