@@ -20,10 +20,13 @@ var genericCmd = &cobra.Command{
 		}
 
 		// 2. レビュー結果の出力 (generic 固有の処理)
-		printReviewResult(reviewResult) // レビュー結果を標準出力 (fmt.Println)
-
-		// 成功ログを slog で出力
-		slog.Info("レビュー結果を標準出力に出力しました。")
+		// ユーザーの提案に基づき、レビュー結果の内容が空でない場合にのみ標準出力に出力する
+		if reviewResult != "" {
+			printReviewResult(reviewResult)
+			slog.Info("レビュー結果を標準出力に出力しました。")
+		} else {
+			slog.Info("レビュー結果の内容が空のため、標準出力への出力はスキップしました。")
+		}
 
 		return nil
 	},

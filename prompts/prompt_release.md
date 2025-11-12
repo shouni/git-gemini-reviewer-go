@@ -52,5 +52,5 @@
 * **クリティカルではない**軽微なバグやエッジケース。
 
 --- diff start ---
-%s
+{{.DiffContent}}
 --- diff end ---

@@ -7,22 +7,24 @@ import (
 	"strings"
 
 	"git-gemini-reviewer-go/internal/config"
-	"git-gemini-reviewer-go/prompts"
-
 	"git-gemini-reviewer-go/internal/geminiclient"
 	"git-gemini-reviewer-go/internal/gitclient"
+	"git-gemini-reviewer-go/prompts"
 )
 
 // RunReviewAndGetResult はGit Diffを取得し、Gemini AIでレビューを実行します。
+// 依存関係として *prompts.ReviewPromptBuilder を受け取るように変更します。
 func RunReviewAndGetResult(
 	ctx context.Context,
 	cfg config.ReviewConfig,
 	gitService gitclient.Service,
 	geminiService geminiclient.Service,
+	promptBuilder *prompts.ReviewPromptBuilder,
 ) (string, error) {
 
 	slog.Info("Gitリポジトリのセットアップと差分取得を開始します。")
 	// 2.1. クローン/アップデート
+	// ... (Git 処理は変更なし) ...
 	repo, err := gitService.CloneOrUpdate(cfg.GitCloneURL)
 	if err != nil {
 		slog.Error("Gitリポジトリのセットアップに失敗しました。", "error", err, "url", cfg.GitCloneURL)
@@ -56,8 +58,12 @@ func RunReviewAndGetResult(
 	slog.Info("Git差分の取得に成功しました。", "size_bytes", len(diffContent))
 
 	// 3. プロンプトの組み立て
-	promptBuilder := prompts.NewReviewPromptBuilder(cfg.PromptContent)
-	finalPrompt, err := promptBuilder.Build(diffContent)
+	// 注入されたビルダーと新しいデータ構造を使用
+	reviewData := prompts.ReviewTemplateData{
+		DiffContent: diffContent,
+	}
+
+	finalPrompt, err := promptBuilder.Build(reviewData)
 	if err != nil {
 		slog.Error("プロンプトの組み立てエラー。", "error", err)
 		return "", fmt.Errorf("プロンプトの組み立てに失敗しました: %w", err)

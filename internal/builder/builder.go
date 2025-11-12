@@ -2,11 +2,13 @@ package builder
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"git-gemini-reviewer-go/internal/config"
 	"git-gemini-reviewer-go/internal/geminiclient"
 	"git-gemini-reviewer-go/internal/gitclient"
+	"git-gemini-reviewer-go/prompts"
 )
 
 // 既存の BuildGitService 関数を修正して依存パスを調整
@@ -51,4 +53,32 @@ func BuildGeminiService(ctx context.Context, cfg config.ReviewConfig) (geminicli
 
 	// geminiclient.Serviceインターフェースとして返却
 	return geminiClient, nil
+}
+
+// BuildReviewPromptBuilder は、レビューの種類に応じて適切な ReviewPromptBuilder を構築します。
+// レビューの種類（リリースノート用か詳細レビュー用か）は ReviewConfig から決定されると仮定します。
+func BuildReviewPromptBuilder(cfg config.ReviewConfig) (*prompts.ReviewPromptBuilder, error) {
+	var name string
+	var templateContent string
+
+	switch cfg.ReviewMode {
+	case "release":
+		name = "release_review"
+		templateContent = prompts.ReleasePromptTemplate
+	case "detail":
+		name = "detail_review"
+		templateContent = prompts.DetailPromptTemplate
+	default:
+		// cmdパッケージで既に検出されるが、builderの堅牢性を高めるためにここでもエラーを返す
+		return nil, fmt.Errorf("無効なレビューモードが指定されました: '%s'。'release' または 'detail' を選択してください。", cfg.ReviewMode)
+	}
+
+	builder, err := prompts.NewReviewPromptBuilder(name, templateContent)
+	if err != nil {
+		return nil, fmt.Errorf("レビュープロンプトビルダーの初期化エラー: %w", err)
+	}
+
+	slog.Debug("ReviewPromptBuilderを構築しました。", slog.String("prompt_builder_id", name))
+
+	return builder, nil
 }
