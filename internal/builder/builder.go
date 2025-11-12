@@ -1,0 +1,54 @@
+package builder
+
+import (
+	"context"
+	"log/slog"
+
+	"git-gemini-reviewer-go/internal/config"
+	"git-gemini-reviewer-go/internal/geminiclient"
+	"git-gemini-reviewer-go/internal/gitclient"
+)
+
+// 既存の BuildGitService 関数を修正して依存パスを調整
+// BuildGitService は、アプリケーションの設定に基づいて gitclient.Service の実装を構築します。
+func BuildGitService(cfg config.ReviewConfig, logger *slog.Logger) gitclient.Service {
+	//
+
+	// 1. GitClientOptionの設定
+	skipHostKeyCheckOption := gitclient.WithInsecureSkipHostKeyCheck(cfg.SkipHostKeyCheck)
+	baseBranchOption := gitclient.WithBaseBranch(cfg.BaseBranch)
+
+	// 2. gitclient.NewClient を呼び出してインスタンスを構築
+	gitClient := gitclient.NewClient(
+		cfg.LocalPath,
+		cfg.SSHKeyPath,
+		skipHostKeyCheckOption,
+		baseBranchOption,
+	)
+
+	logger.Debug("GitServiceを構築しました。",
+		slog.String("local_path", cfg.LocalPath),
+		slog.String("base_branch", cfg.BaseBranch),
+	)
+
+	return gitClient
+}
+
+// BuildGeminiService は、アプリケーションの設定に基づいて geminiclient.Service の実装を構築します。
+// NewClient は context.Context を必要とするため、引数に追加します。
+func BuildGeminiService(ctx context.Context, cfg config.ReviewConfig, logger *slog.Logger) (geminiclient.Service, error) {
+
+	// geminiclient.NewClient を呼び出してインスタンスを構築
+	geminiClient, err := geminiclient.NewClient(ctx, cfg.GeminiModel)
+	if err != nil {
+		// クライアント構築時のエラーを呼び出し元に返す
+		return nil, err
+	}
+
+	logger.Debug("GeminiServiceを構築しました。",
+		slog.String("model", cfg.GeminiModel),
+	)
+
+	// geminiclient.Serviceインターフェースとして返却
+	return geminiClient, nil
+}

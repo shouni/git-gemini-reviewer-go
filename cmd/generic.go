@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"git-gemini-reviewer-go/internal/services"
-
 	"github.com/spf13/cobra"
 )
 
@@ -16,19 +14,13 @@ var genericCmd = &cobra.Command{
 	Long:  `このコマンドは、指定されたGitリポジトリのブランチ間の差分をAIでレビューし、その結果を標準出力に直接表示します。Backlogなどの外部サービスとの連携は行いません。`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		// 1. 共通ロジックを実行し、結果を取得
-		// ReviewConfig は initAppPreRunE で既に構築・反映済み
-		reviewResult, err := services.RunReviewAndGetResult(cmd.Context(), ReviewConfig)
+		// 1. パイプラインを実行し、結果を受け取る
+		reviewResult, err := executeReviewPipeline(cmd.Context(), ReviewConfig, slog.Default())
 		if err != nil {
 			return err
 		}
 
-		if reviewResult == "" {
-			slog.Info("Diff がないためレビューをスキップしました。")
-			return nil
-		}
-
-		// 3. レビュー結果の出力 (generic 固有の処理)
+		// 2. レビュー結果の出力 (generic 固有の処理)
 		// NOTE: このセクションは標準出力に結果を出すというコア機能のため、fmt.Println を維持
 		fmt.Println("\n--- Gemini AI レビュー結果 ---")
 		fmt.Println(reviewResult)

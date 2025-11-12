@@ -1,4 +1,4 @@
-package services
+package geminiclient
 
 import (
 	"context"
@@ -15,20 +15,26 @@ const (
 	defaultGeminiMaxRetries = uint64(3)
 )
 
-// GeminiClient は go-ai-client の gemini.Client をラップし、
-// git-gemini-reviewer-go のサービス層向けインターフェースを提供します。
-type GeminiClient struct {
+// Service は、Gemini AIとの通信機能の抽象化を提供し、DIで使用されます。
+type Service interface {
+	// ReviewCodeDiff は完成されたプロンプトを基にGeminiにレビューを依頼します。
+	ReviewCodeDiff(ctx context.Context, finalPrompt string) (string, error)
+}
+
+// Client は go-ai-client の gemini.Client をラップし、
+// Service インターフェースを実装する具体的な構造体です。
+type Client struct {
 	// 汎用的な gemini.Client を組み込む
 	client    *gemini.Client
 	modelName string
 }
 
-// NewGeminiClient はGeminiClientを初期化します。
+// NewClient はClientを初期化し、Serviceインターフェースとして返します。
 // 温度 0.2 を明示的に指定するため、gemini.NewClientFromEnv ではなく gemini.NewClient を直接利用します。
 // APIキーは環境変数から取得し、リトライ回数はデフォルトの3回を設定します。
-func NewGeminiClient(ctx context.Context, modelName string) (*GeminiClient, error) {
+func NewClient(ctx context.Context, modelName string) (Service, error) {
 
-	// 1. APIキーを環境変数から取得 (NewClientFromEnv のロジックを部分的に移植)
+	// 1. APIキーを環境変数から取得
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
 		apiKey = os.Getenv("GOOGLE_API_KEY")
@@ -54,16 +60,15 @@ func NewGeminiClient(ctx context.Context, modelName string) (*GeminiClient, erro
 		return nil, fmt.Errorf("failed to initialize underlying gemini client: %w", err)
 	}
 
-	return &GeminiClient{
+	// Client構造体のインスタンスを Serviceインターフェースとして返す
+	return &Client{
 		client:    gClient,
 		modelName: modelName,
 	}, nil
 }
 
-// ReviewCodeDiff は完成されたプロンプトを基にGeminiにレビューを依頼します。
-// リトライ処理は gemini.Client.GenerateContent に内蔵されているため、ここでは単に呼び出すだけです。
-func (c *GeminiClient) ReviewCodeDiff(ctx context.Context, finalPrompt string) (string, error) {
-
+// ReviewCodeDiff は Service インターフェースを満たします。
+func (c *Client) ReviewCodeDiff(ctx context.Context, finalPrompt string) (string, error) {
 	// 汎用クライアントの GenerateContent メソッドを呼び出す
 	resp, err := c.client.GenerateContent(ctx, finalPrompt, c.modelName)
 

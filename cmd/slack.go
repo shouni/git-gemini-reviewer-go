@@ -3,10 +3,9 @@ package cmd
 import (
 	"context"
 	"fmt"
+
 	"log/slog"
 	"os"
-
-	"git-gemini-reviewer-go/internal/services"
 
 	"github.com/shouni/go-notifier/pkg/factory"
 	"github.com/spf13/cobra"
@@ -55,16 +54,10 @@ func runSlackCommand(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("SLACK_WEBHOOK_URL 環境変数の設定が必須です。")
 	}
 
-	// 2. 共通ロジックを実行し、結果を取得 (ReviewConfig は PersistentPreRunE で構築済み)
-	reviewResult, err := services.RunReviewAndGetResult(ctx, ReviewConfig)
+	// 2. パイプラインを実行し、結果を受け取る
+	reviewResult, err := executeReviewPipeline(cmd.Context(), ReviewConfig, slog.Default())
 	if err != nil {
-		// services層で発生したエラーはそのまま返す
 		return err
-	}
-
-	if reviewResult == "" {
-		slog.Info("Diffが見つからなかったため、レビューをスキップしました。")
-		return nil
 	}
 
 	// 3. no-post フラグによる出力分岐
