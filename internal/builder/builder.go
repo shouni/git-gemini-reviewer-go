@@ -59,22 +59,21 @@ func BuildGeminiService(ctx context.Context, cfg config.ReviewConfig) (geminicli
 // レビューの種類（リリースノート用か詳細レビュー用か）は ReviewConfig から決定されると仮定します。
 func BuildReviewPromptBuilder(cfg config.ReviewConfig) (*prompts.ReviewPromptBuilder, error) {
 	var name string
-	var template string
+	var templateContent string
 
-	// 適切なテンプレートを選択するロジック
 	switch cfg.ReviewMode {
 	case "release":
 		name = "release_review"
-		template = prompts.ReleasePromptTemplate
+		templateContent = prompts.ReleasePromptTemplate
 	case "detail":
 		name = "detail_review"
-		template = prompts.DetailPromptTemplate
+		templateContent = prompts.DetailPromptTemplate
 	default:
-		// ここではエラーを返さない設計になっているようですが、
-		// cmdパッケージのPreRunEで無効なモードは既に検出されるため、現状維持とします。
+		// cmdパッケージで既に検出されるが、builderの堅牢性を高めるためにここでもエラーを返す
+		return nil, fmt.Errorf("無効なレビューモードが指定されました: '%s'。'release' または 'detail' を選択してください。", cfg.ReviewMode)
 	}
 
-	builder, err := prompts.NewReviewPromptBuilder(name, template)
+	builder, err := prompts.NewReviewPromptBuilder(name, templateContent)
 	if err != nil {
 		return nil, fmt.Errorf("レビュープロンプトビルダーの初期化エラー: %w", err)
 	}

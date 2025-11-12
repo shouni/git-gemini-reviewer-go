@@ -30,7 +30,6 @@ type ReviewTemplateData struct {
 type ReviewPromptBuilder struct {
 	// 差分を埋め込むための text/template を保持します
 	tmpl *template.Template
-	err  error
 }
 
 // NewReviewPromptBuilder は ReviewPromptBuilder を初期化します。
@@ -48,18 +47,12 @@ func NewReviewPromptBuilder(name string, templateContent string) (*ReviewPromptB
 	return &ReviewPromptBuilder{tmpl: tmpl}, nil
 }
 
-// Err は PromptBuilder の初期化（テンプレートパース）時に発生したエラーを返します。
-func (b *ReviewPromptBuilder) Err() error {
-	return b.err
-}
-
 // Build は ReviewTemplateData を埋め込み、Geminiへ送るための最終的なプロンプト文字列を完成させます。
 func (b *ReviewPromptBuilder) Build(data ReviewTemplateData) (string, error) {
-	if b.tmpl == nil || b.err != nil {
-		return "", fmt.Errorf("review prompt template is not properly initialized: %w", b.err)
+	if b.tmpl == nil {
+		return "", fmt.Errorf("review prompt template is not properly initialized") // エラーメッセージも簡略化
 	}
 
-	// テンプレートを実行し、結果を strings.Builder に書き込む
 	var sb strings.Builder
 	if err := b.tmpl.Execute(&sb, data); err != nil {
 		return "", fmt.Errorf("レビュープロンプトの実行に失敗しました: %w", err)
