@@ -74,8 +74,8 @@ func BuildReviewPromptBuilder(cfg config.ReviewConfig) (*prompts.ReviewPromptBui
 		// cmdパッケージのPreRunEで無効なモードは既に検出されるため、現状維持とします。
 	}
 
-	builder := prompts.NewReviewPromptBuilder(name, template)
-	if err := builder.Err(); err != nil {
+	builder, err := prompts.NewReviewPromptBuilder(name, template)
+	if err != nil {
 		return nil, fmt.Errorf("レビュープロンプトビルダーの初期化エラー: %w", err)
 	}
 

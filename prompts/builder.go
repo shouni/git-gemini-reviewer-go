@@ -36,14 +36,16 @@ type ReviewPromptBuilder struct {
 // NewReviewPromptBuilder は ReviewPromptBuilder を初期化します。
 // テンプレート文字列を受け取り、それをパースして *template.Template を保持します。
 // name はテンプレートの名前であり、主にデバッグやエラーメッセージの識別に利用されます。
-func NewReviewPromptBuilder(name string, templateContent string) *ReviewPromptBuilder {
+func NewReviewPromptBuilder(name string, templateContent string) (*ReviewPromptBuilder, error) {
 	if templateContent == "" {
-		return &ReviewPromptBuilder{err: fmt.Errorf("prompt template content is empty")}
+		return nil, fmt.Errorf("prompt template content is empty")
 	}
 
-	// テンプレートをパース
 	tmpl, err := template.New(name).Parse(templateContent)
-	return &ReviewPromptBuilder{tmpl: tmpl, err: err}
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse prompt template: %w", err)
+	}
+	return &ReviewPromptBuilder{tmpl: tmpl}, nil
 }
 
 // Err は PromptBuilder の初期化（テンプレートパース）時に発生したエラーを返します。
