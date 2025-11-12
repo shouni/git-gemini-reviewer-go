@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"git-gemini-reviewer-go/internal/pipeline"
 	"log/slog"
 	"os"
 
@@ -56,7 +57,7 @@ func runBacklogCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	// 2. 共通ロジックを実行し、結果を取得 (ReviewConfig は PersistentPreRunE で構築済み)
-	reviewResult, err := services.RunReviewAndGetResult(ctx, ReviewConfig)
+	reviewResult, err := pipeline.RunReviewAndGetResult(ctx, ReviewConfig)
 	if err != nil {
 		return err
 	}

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"git-gemini-reviewer-go/internal/pipeline"
 	"log/slog"
 
 	"git-gemini-reviewer-go/internal/services"
@@ -18,7 +19,7 @@ var genericCmd = &cobra.Command{
 
 		// 1. 共通ロジックを実行し、結果を取得
 		// ReviewConfig は initAppPreRunE で既に構築・反映済み
-		reviewResult, err := services.RunReviewAndGetResult(cmd.Context(), ReviewConfig)
+		reviewResult, err := pipeline.RunReviewAndGetResult(cmd.Context(), ReviewConfig)
 		if err != nil {
 			return err
 		}

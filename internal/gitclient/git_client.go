@@ -1,4 +1,4 @@
-package services
+package gitclient
 
 import (
 	"fmt"
@@ -18,8 +18,9 @@ import (
 	cryptossh "golang.org/x/crypto/ssh"
 )
 
-// GitService はGitリポジトリ操作の抽象化を提供します。
-type GitService interface {
+// Service はGitリポジトリ操作の抽象化を提供します。
+// (旧: GitService)
+type Service interface {
 	// CloneOrUpdate はリポジトリをクローンまたは更新し、go-gitリポジトリオブジェクトを返します。
 	CloneOrUpdate(repositoryURL string) (*git.Repository, error)
 	// Fetch はリモートから最新の変更を取得します。
@@ -32,8 +33,8 @@ type GitService interface {
 	Cleanup(repo *git.Repository) error
 }
 
-// GitClient は GitService インターフェースを実装する具体的な構造体です。
-type GitClient struct {
+// Client は Service インターフェースを実装する具体的な構造体です。
+type Client struct {
 	LocalPath                string
 	SSHKeyPath               string
 	BaseBranch               string
@@ -41,27 +42,27 @@ type GitClient struct {
 	auth                     transport.AuthMethod
 }
 
-// GitClientOption はGitClientの初期化オプションを設定するための関数です。
-type GitClientOption func(*GitClient)
+// Option はClientの初期化オプションを設定するための関数です。
+type Option func(*Client)
 
 // WithInsecureSkipHostKeyCheck はSSHホストキーチェックをスキップするオプションを設定します。
-func WithInsecureSkipHostKeyCheck(skip bool) GitClientOption {
-	return func(gc *GitClient) {
+func WithInsecureSkipHostKeyCheck(skip bool) Option {
+	return func(gc *Client) {
 		gc.InsecureSkipHostKeyCheck = skip
 	}
 }
 
 // WithBaseBranch はベースブランチを設定するオプションです。
-func WithBaseBranch(branch string) GitClientOption {
-	return func(gc *GitClient) {
+func WithBaseBranch(branch string) Option {
+	return func(gc *Client) {
 		gc.BaseBranch = branch
 	}
 }
 
-// NewGitClient はGitClientを初期化します。
-// GitServiceインターフェースを返します。
-func NewGitClient(localPath string, sshKeyPath string, opts ...GitClientOption) GitService {
-	client := &GitClient{
+// NewClient はClientを初期化します。
+// Serviceインターフェースを返します。
+func NewClient(localPath string, sshKeyPath string, opts ...Option) Service {
+	client := &Client{
 		LocalPath:  localPath,
 		SSHKeyPath: sshKeyPath,
 	}
@@ -72,7 +73,7 @@ func NewGitClient(localPath string, sshKeyPath string, opts ...GitClientOption) 
 }
 
 // Cleanup は処理後にローカルリポジトリをクリーンな状態に戻します。
-func (c *GitClient) Cleanup(repo *git.Repository) error {
+func (c *Client) Cleanup(repo *git.Repository) error { // レシーバー名を (c *Client) に変更
 	log.Printf("Cleanup: Checking out base branch '%s'...\n", c.BaseBranch)
 
 	w, err := repo.Worktree()
@@ -101,14 +102,13 @@ func expandTilde(path string) (string, error) {
 	}
 	currentUser, err := user.Current()
 	if err != nil {
-		// 警告ではなくエラーとして返す
 		return "", fmt.Errorf("現在のユーザーのホームディレクトリの取得に失敗しました: %w", err)
 	}
 	return filepath.Join(currentUser.HomeDir, path[2:]), nil
 }
 
 // getAuthMethod は go-git が使用する認証方法を返します。
-func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) {
+func (c *Client) getAuthMethod(repoURL string) (transport.AuthMethod, error) { // レシーバー名を (c *Client) に変更
 	if strings.HasPrefix(repoURL, "git@") || strings.HasPrefix(repoURL, "ssh://") {
 
 		u, err := url.Parse(repoURL)
@@ -152,7 +152,7 @@ func (c *GitClient) getAuthMethod(repoURL string) (transport.AuthMethod, error) 
 }
 
 // cloneRepository は go-git.PlainClone を使用してクローン処理を実行するヘルパー関数です。
-func (c *GitClient) cloneRepository(repositoryURL, localPath, branch string) error {
+func (c *Client) cloneRepository(repositoryURL, localPath, branch string) error { // レシーバー名を (c *Client) に変更
 	parentDir := filepath.Dir(localPath)
 	if _, err := os.Stat(parentDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(parentDir, 0755); err != nil {
@@ -182,7 +182,7 @@ func (c *GitClient) cloneRepository(repositoryURL, localPath, branch string) err
 }
 
 // recloneRepository は、既存リポジトリを削除し、再クローンします。（修正 1のヘルパー）
-func (c *GitClient) recloneRepository(repositoryURL, localPath, branch string) (*git.Repository, error) {
+func (c *Client) recloneRepository(repositoryURL, localPath, branch string) (*git.Repository, error) { // レシーバー名を (c *Client) に変更
 	if _, err := os.Stat(localPath); err == nil {
 		if err := os.RemoveAll(localPath); err != nil {
 			return nil, fmt.Errorf("既存リポジトリディレクトリ (%s) の削除に失敗しました: %w", localPath, err)
@@ -202,7 +202,7 @@ func (c *GitClient) recloneRepository(repositoryURL, localPath, branch string) (
 }
 
 // updateExistingRepository は、既存リポジトリをプルで更新し、失敗した場合は再クローンが必要なエラーを返します。（修正 1のヘルパー）
-func (c *GitClient) updateExistingRepository(repo *git.Repository, repositoryURL string) error {
+func (c *Client) updateExistingRepository(repo *git.Repository, repositoryURL string) error { // レシーバー名を (c *Client) に変更
 	authForPull, err := c.getAuthMethod(repositoryURL)
 	if err != nil {
 		return fmt.Errorf("go-git pull用の認証情報取得に失敗しました: %w", err)
@@ -238,8 +238,7 @@ func (c *GitClient) updateExistingRepository(repo *git.Repository, repositoryURL
 }
 
 // CloneOrUpdate はリポジトリをクローンするか、既に存在する場合は go-git pull で更新します。
-func (c *GitClient) CloneOrUpdate(repositoryURL string) (*git.Repository, error) {
-
+func (c *Client) CloneOrUpdate(repositoryURL string) (*git.Repository, error) { // レシーバー名を (c *Client) に変更
 	localPath := c.LocalPath
 	var repo *git.Repository
 	var err error
@@ -276,20 +275,19 @@ func (c *GitClient) CloneOrUpdate(repositoryURL string) (*git.Repository, error)
 	// go-git および Fetchで認証情報を使えるよう、最後にc.authを設定する
 	auth, err := c.getAuthMethod(repositoryURL)
 	if err != nil {
-		// 【修正 4】冗長なプレフィックスを削除
 		return nil, fmt.Errorf("go-git用の認証情報取得に失敗しました: %w", err)
 	}
-	c.auth = auth // GitClientインスタンスに認証情報を保持
+	c.auth = auth // Clientインスタンスに認証情報を保持
 	log.Println("go-git authentication method has been set successfully for this client.")
 
 	return repo, nil
 }
 
 // Fetch はリモートから最新の変更を取得します。
-func (c *GitClient) Fetch(repo *git.Repository) error {
+func (c *Client) Fetch(repo *git.Repository) error { // レシーバー名を (c *Client) に変更
 	log.Printf("Fetching latest changes from remote for repository at %s...\n", c.LocalPath)
 	if c.auth == nil {
-		return fmt.Errorf("認証情報が設定されていません。GitClientのAuthMethodを設定するには、先にCloneOrUpdateを実行してください。")
+		return fmt.Errorf("認証情報が設定されていません。ClientのAuthMethodを設定するには、先にCloneOrUpdateを実行してください。")
 	}
 
 	refSpec := config.RefSpec("+refs/heads/*:refs/remotes/origin/*")
@@ -308,7 +306,7 @@ func (c *GitClient) Fetch(repo *git.Repository) error {
 }
 
 // getTwoDotDiff は 2-dot diff (A..B) を計算するヘルパー
-func (c *GitClient) getTwoDotDiff(baseCommit, featureCommit *object.Commit) (string, error) {
+func (c *Client) getTwoDotDiff(baseCommit, featureCommit *object.Commit) (string, error) { // レシーバー名を (c *Client) に変更
 	baseTree, err := baseCommit.Tree()
 	if err != nil {
 		return "", fmt.Errorf("ベースツリー(2-dot)の取得に失敗しました: %w", err)
@@ -333,7 +331,7 @@ func (c *GitClient) getTwoDotDiff(baseCommit, featureCommit *object.Commit) (str
 }
 
 // GetCodeDiff は指定された2つのブランチ間の純粋な差分を、go-gitのみで取得します。
-func (c *GitClient) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch string) (string, error) {
+func (c *Client) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch string) (string, error) { // レシーバー名を (c *Client) に変更
 	log.Printf("Calculating code diff for repository at %s between remote/%s and remote/%s using go-git...\n", c.LocalPath, baseBranch, featureBranch)
 
 	// 1. ブランチ参照を解決
@@ -375,27 +373,23 @@ func (c *GitClient) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch 
 	// 4. ツリーの取得
 	baseTree, err := mergeBaseCommit.Tree() // マージベースのツリー
 	if err != nil {
-		// 【修正 4】冗長なプレフィックスを削除
 		return "", fmt.Errorf("マージベースのツリー取得に失敗しました: %w", err)
 	}
 
 	featureTree, err := featureCommit.Tree() // フィーチャーブランチのツリー
 	if err != nil {
-		// 【修正 4】冗長なプレフィックスを削除
 		return "", fmt.Errorf("フィーチャーブランチのツリー取得に失敗しました: %w", err)
 	}
 
 	// 5. 差分 (Changes) の生成
 	changes, err := baseTree.Diff(featureTree)
 	if err != nil {
-		// 【修正 4】冗長なプレフィックスを削除
 		return "", fmt.Errorf("ツリーの差分取得に失敗しました: %w", err)
 	}
 
 	// 6. Patch オブジェクトに変換
 	patch, err := changes.Patch()
 	if err != nil {
-		// 【修正 4】冗長なプレフィックスを削除
 		return "", fmt.Errorf("パッチの生成に失敗しました: %w", err)
 	}
 
@@ -404,7 +398,7 @@ func (c *GitClient) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch 
 }
 
 // CheckRemoteBranchExists は指定されたブランチがリモート 'origin' に存在するか確認します。
-func (c *GitClient) CheckRemoteBranchExists(repo *git.Repository, branch string) (bool, error) {
+func (c *Client) CheckRemoteBranchExists(repo *git.Repository, branch string) (bool, error) { // レシーバー名を (c *Client) に変更
 	if branch == "" {
 		return false, fmt.Errorf("リモートブランチの存在確認に失敗しました: ブランチ名が空です")
 	}
@@ -423,7 +417,7 @@ func (c *GitClient) CheckRemoteBranchExists(repo *git.Repository, branch string)
 }
 
 // repoNeedsReclone はリポジトリを再クローンする必要があるかをチェックするヘルパー関数
-func (c *GitClient) repoNeedsReclone(repositoryURL, localPath string) bool {
+func (c *Client) repoNeedsReclone(repositoryURL, localPath string) bool { // レシーバー名を (c *Client) に変更
 	gitDir := filepath.Join(localPath, ".git")
 	if _, err := os.Stat(gitDir); os.IsNotExist(err) {
 		log.Printf("Info: .git directory not found at %s. Cloning needed.\n", localPath)
