@@ -7,12 +7,6 @@ import (
 	"text/template"
 )
 
-//go:embed prompt_release.md
-var ReleasePromptTemplate string
-
-//go:embed prompt_detail.md
-var DetailPromptTemplate string
-
 // ----------------------------------------------------------------
 // テンプレート構造体
 // ----------------------------------------------------------------
