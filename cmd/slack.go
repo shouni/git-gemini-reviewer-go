@@ -62,7 +62,7 @@ func runSlackCommand(cmd *cobra.Command, args []string) error {
 
 	// 3. no-post フラグによる出力分岐
 	if noPostSlack {
-		printSlackResult(reviewResult)
+		printReviewResult(reviewResult)
 		return nil
 	}
 
@@ -70,7 +70,7 @@ func runSlackCommand(cmd *cobra.Command, args []string) error {
 	err = postToSlack(ctx, reviewResult, authInfo)
 	if err != nil {
 		// 投稿失敗時: エラーログとレビュー結果の出力順序は適切
-		printSlackResult(reviewResult) // レビュー結果を標準出力 (fmt.Println)
+		printReviewResult(reviewResult) // レビュー結果を標準出力 (fmt.Println)
 		slog.Error("Slackへのメッセージ投稿に失敗しました。", "error", err)
 
 		return fmt.Errorf("Slack へのメッセージ投稿に失敗しました。詳細はログを確認してください。")
@@ -127,12 +127,4 @@ func postToSlack(
 
 	// SendTextWithHeader は content を整形し、ヘッダー情報を含めて投稿する
 	return slackClient.SendTextWithHeader(ctx, title, content)
-}
-
-// printSlackResult は noPost 時に結果を標準出力します。
-func printSlackResult(result string) {
-	// 標準出力 (fmt.Println) は維持
-	fmt.Println("\n--- Gemini AI レビュー結果 (投稿スキップまたは投稿失敗) ---")
-	fmt.Println(result)
-	fmt.Println("-----------------------------------------------------")
 }

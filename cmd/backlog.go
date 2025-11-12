@@ -77,7 +77,6 @@ func runBacklogCommand(cmd *cobra.Command, args []string) error {
 	// 6. Backlog投稿を実行
 	err = postToBacklog(ctx, backlogIssueID, finalContent)
 	if err != nil {
-		// 【slogへ移行】エラーログの直後に printReviewResult を呼び出す順序に修正
 		slog.Error("Backlogへのコメント投稿に失敗しました。",
 			"issue_id", backlogIssueID,
 			"error", err,
@@ -87,7 +86,6 @@ func runBacklogCommand(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("Backlog課題 %s へのコメント投稿処理が失敗しました。詳細はログを確認してください。", backlogIssueID)
 	}
 
-	// 【slogへ移行】絵文字を削除し、logに出力
 	slog.Info("レビュー結果を Backlog 課題にコメント投稿しました。", "issue_id", backlogIssueID)
 	return nil
 }
@@ -119,8 +117,6 @@ func postToBacklog(ctx context.Context, issueID, content string) error {
 		slog.Error("🚨 Backlogクライアントの初期化に失敗しました", "error", err)
 		return fmt.Errorf("Backlogクライアントの初期化に失敗しました: %w", err) // エラーを返す
 	}
-
-	// 【slogへ移行】logに出力
 	slog.Info("Backlog課題にレビュー結果を投稿します...", "issue_id", issueID)
 
 	// PostComment はリトライロジックを持つ
@@ -143,12 +139,4 @@ func formatBacklogComment(issueID string, cfg config.ReviewConfig, reviewResult 
 
 	// ヘッダーとレビュー結果を結合
 	return header + reviewResult
-}
-
-// printReviewResult は noPost 時に結果を標準出力します。
-func printReviewResult(result string) {
-	// 標準出力 (fmt.Println) は維持
-	fmt.Println("\n--- Gemini AI レビュー結果 (投稿スキップまたは投稿失敗) ---")
-	fmt.Println(result)
-	fmt.Println("-----------------------------------------------------")
 }

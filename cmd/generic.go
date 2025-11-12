@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"log/slog"
 
 	"github.com/spf13/cobra"
@@ -21,10 +20,7 @@ var genericCmd = &cobra.Command{
 		}
 
 		// 2. レビュー結果の出力 (generic 固有の処理)
-		// NOTE: このセクションは標準出力に結果を出すというコア機能のため、fmt.Println を維持
-		fmt.Println("\n--- Gemini AI レビュー結果 ---")
-		fmt.Println(reviewResult)
-		fmt.Println("------------------------------")
+		printReviewResult(reviewResult) // レビュー結果を標準出力 (fmt.Println)
 
 		// 成功ログを slog で出力
 		slog.Info("レビュー結果を標準出力に出力しました。")
