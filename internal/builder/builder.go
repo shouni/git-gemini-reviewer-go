@@ -11,7 +11,7 @@ import (
 
 // 既存の BuildGitService 関数を修正して依存パスを調整
 // BuildGitService は、アプリケーションの設定に基づいて gitclient.Service の実装を構築します。
-func BuildGitService(cfg config.ReviewConfig, logger *slog.Logger) gitclient.Service {
+func BuildGitService(cfg config.ReviewConfig) gitclient.Service {
 	//
 
 	// 1. GitClientOptionの設定
@@ -26,7 +26,7 @@ func BuildGitService(cfg config.ReviewConfig, logger *slog.Logger) gitclient.Ser
 		baseBranchOption,
 	)
 
-	logger.Debug("GitServiceを構築しました。",
+	slog.Debug("GitServiceを構築しました。",
 		slog.String("local_path", cfg.LocalPath),
 		slog.String("base_branch", cfg.BaseBranch),
 	)
@@ -36,7 +36,7 @@ func BuildGitService(cfg config.ReviewConfig, logger *slog.Logger) gitclient.Ser
 
 // BuildGeminiService は、アプリケーションの設定に基づいて geminiclient.Service の実装を構築します。
 // NewClient は context.Context を必要とするため、引数に追加します。
-func BuildGeminiService(ctx context.Context, cfg config.ReviewConfig, logger *slog.Logger) (geminiclient.Service, error) {
+func BuildGeminiService(ctx context.Context, cfg config.ReviewConfig) (geminiclient.Service, error) {
 
 	// geminiclient.NewClient を呼び出してインスタンスを構築
 	geminiClient, err := geminiclient.NewClient(ctx, cfg.GeminiModel)
@@ -45,7 +45,7 @@ func BuildGeminiService(ctx context.Context, cfg config.ReviewConfig, logger *sl
 		return nil, err
 	}
 
-	logger.Debug("GeminiServiceを構築しました。",
+	slog.Debug("GeminiServiceを構築しました。",
 		slog.String("model", cfg.GeminiModel),
 	)
 

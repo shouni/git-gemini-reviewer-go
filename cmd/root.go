@@ -14,10 +14,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// --- グローバル変数 ---
+// ReviewConfig は、レビュー実行のパラメータです
 var ReviewConfig config.ReviewConfig
 
-// --- 定数 ---
 const defaultHTTPTimeout = 30 * time.Second
 
 // clientKey は context.Context に httpkit.Client を格納・取得するための非公開キー
@@ -30,8 +29,6 @@ func GetHTTPClient(ctx context.Context) (*httpkit.Client, error) {
 	}
 	return nil, fmt.Errorf("contextからhttpkit.Clientを取得できませんでした。rootコマンドの初期化を確認してください。")
 }
-
-// --- 初期化ロジック ---
 
 // initAppPreRunE は、アプリケーション固有のPersistentPreRunEです。
 func initAppPreRunE(cmd *cobra.Command, args []string) error {

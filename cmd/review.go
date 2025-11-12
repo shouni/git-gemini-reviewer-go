@@ -15,12 +15,11 @@ import (
 func executeReviewPipeline(
 	ctx context.Context,
 	cfg config.ReviewConfig,
-	logger *slog.Logger,
 ) (string, error) {
 
 	// --- 1. 依存関係の構築（Builder パッケージを使用） ---
-	gitService := builder.BuildGitService(cfg, logger)
-	geminiService, err := builder.BuildGeminiService(ctx, cfg, logger)
+	gitService := builder.BuildGitService(cfg)
+	geminiService, err := builder.BuildGeminiService(ctx, cfg)
 	if err != nil {
 		return "", fmt.Errorf("Gemini Service の構築に失敗しました: %w", err)
 	}
@@ -38,7 +37,7 @@ func executeReviewPipeline(
 
 	// --- 3. 結果の返却 ---
 	if reviewResult == "" {
-		logger.Info("Diff がないためレビューをスキップしました。")
+		slog.Info("Diff がないためレビューをスキップしました。")
 		return "", nil
 	}
 
