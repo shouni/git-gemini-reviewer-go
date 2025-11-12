@@ -1,0 +1,66 @@
+package prompts
+
+import (
+	_ "embed"
+	"fmt"
+	"strings"
+	"text/template"
+)
+
+//go:embed prompt_release.md
+var ReleasePromptTemplate string
+
+//go:embed prompt_detail.md
+var DetailPromptTemplate string
+
+// ----------------------------------------------------------------
+// テンプレート構造体
+// ----------------------------------------------------------------
+
+// ReviewTemplateData はレビュープロンプトのテンプレートに渡すデータ構造です。
+type ReviewTemplateData struct {
+	DiffContent string
+}
+
+// ----------------------------------------------------------------
+// ビルダー実装
+// ----------------------------------------------------------------
+
+// ReviewPromptBuilder はレビュープロンプトの構成を管理します。
+type ReviewPromptBuilder struct {
+	// 差分を埋め込むための text/template を保持します
+	tmpl *template.Template
+	err  error
+}
+
+// NewReviewPromptBuilder は ReviewPromptBuilder を初期化します。
+// テンプレート文字列を受け取り、それをパースして *template.Template を保持します。
+func NewReviewPromptBuilder(name string, templateContent string) *ReviewPromptBuilder {
+	if templateContent == "" {
+		return &ReviewPromptBuilder{err: fmt.Errorf("prompt template content is empty")}
+	}
+
+	// テンプレートをパース
+	tmpl, err := template.New(name).Parse(templateContent)
+	return &ReviewPromptBuilder{tmpl: tmpl, err: err}
+}
+
+// Err は PromptBuilder の初期化（テンプレートパース）時に発生したエラーを返します。
+func (b *ReviewPromptBuilder) Err() error {
+	return b.err
+}
+
+// Build は ReviewTemplateData を埋め込み、Geminiへ送るための最終的なプロンプト文字列を完成させます。
+func (b *ReviewPromptBuilder) Build(data ReviewTemplateData) (string, error) {
+	if b.tmpl == nil || b.err != nil {
+		return "", fmt.Errorf("review prompt template is not properly initialized: %w", b.err)
+	}
+
+	// テンプレートを実行し、結果を strings.Builder に書き込む
+	var sb strings.Builder
+	if err := b.tmpl.Execute(&sb, data); err != nil {
+		return "", fmt.Errorf("レビュープロンプトの実行に失敗しました: %w", err)
+	}
+
+	return sb.String(), nil
+}

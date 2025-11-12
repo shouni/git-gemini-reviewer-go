@@ -19,10 +19,20 @@ func executeReviewPipeline(
 
 	// --- 1. 依存関係の構築（Builder パッケージを使用） ---
 	gitService := builder.BuildGitService(cfg)
+
 	geminiService, err := builder.BuildGeminiService(ctx, cfg)
 	if err != nil {
 		return "", fmt.Errorf("Gemini Service の構築に失敗しました: %w", err)
 	}
+
+	// eviewPromptBuilder の構築
+	// cfg.ReviewMode に基づいて適切なテンプレートを選択し、ビルダーを初期化します。
+	promptBuilder, err := builder.BuildReviewPromptBuilder(cfg)
+	if err != nil {
+		return "", fmt.Errorf("Prompt Builder の構築に失敗しました: %w", err)
+	}
+
+	slog.Info("レビューパイプラインを開始します。")
 
 	// --- 2. 共通ロジック (Pipeline) の実行 ---
 	reviewResult, err := pipeline.RunReviewAndGetResult(
@@ -30,6 +40,7 @@ func executeReviewPipeline(
 		cfg,
 		gitService,
 		geminiService,
+		promptBuilder,
 	)
 	if err != nil {
 		return "", err

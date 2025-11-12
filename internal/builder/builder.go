@@ -2,11 +2,13 @@ package builder
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"git-gemini-reviewer-go/internal/config"
 	"git-gemini-reviewer-go/internal/geminiclient"
 	"git-gemini-reviewer-go/internal/gitclient"
+	"git-gemini-reviewer-go/internal/prompts"
 )
 
 // 既存の BuildGitService 関数を修正して依存パスを調整
@@ -51,4 +53,31 @@ func BuildGeminiService(ctx context.Context, cfg config.ReviewConfig) (geminicli
 
 	// geminiclient.Serviceインターフェースとして返却
 	return geminiClient, nil
+}
+
+// BuildReviewPromptBuilder は、レビューの種類に応じて適切な ReviewPromptBuilder を構築します。
+// レビューの種類（リリースノート用か詳細レビュー用か）は ReviewConfig から決定されると仮定します。
+func BuildReviewPromptBuilder(cfg config.ReviewConfig) (*prompts.ReviewPromptBuilder, error) {
+	var name string
+	var template string
+
+	// 適切なテンプレートを選択するロジック
+	switch cfg.ReviewMode {
+	case "release":
+		name = "detail_review"
+		template = prompts.DetailPromptTemplate
+	case "detail":
+		name = "release_review"
+		template = prompts.ReleasePromptTemplate
+	default:
+	}
+
+	builder := prompts.NewReviewPromptBuilder(name, template)
+	if err := builder.Err(); err != nil {
+		return nil, fmt.Errorf("レビュープロンプトビルダーの初期化エラー: %w", err)
+	}
+
+	slog.Debug("ReviewPromptBuilderを構築しました。", slog.String("template_name", name))
+
+	return builder, nil
 }

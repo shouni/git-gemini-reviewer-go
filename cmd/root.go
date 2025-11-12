@@ -51,23 +51,17 @@ func initAppPreRunE(cmd *cobra.Command, args []string) error {
 	ctx := context.WithValue(cmd.Context(), clientKey{}, httpClient)
 	cmd.SetContext(ctx)
 
-	// 3. レビューモードに基づき、プロンプトを含む設定を構築
-	newConfig, err := CreateReviewConfig(ReviewConfig)
-	if err != nil {
-		// 設定構築エラーが発生した場合、処理を停止
-		slog.Error("アプリケーション設定の初期化に失敗しました。", "error", err)
-		return fmt.Errorf("application configuration initialization failed: %w", err)
+	// --- 3. フラグ値の検証 ---
+	// フラグは既に ReviewConfig にバインドされているため、直接参照する
+	switch ReviewConfig.ReviewMode {
+	case "release", "detail":
+		// 有効な値 -> 次へ
+	default:
+		// 無効な値
+		return fmt.Errorf("無効なレビューモードが指定されました: '%s'。'release' または 'detail' を選択してください。", ReviewConfig.ReviewMode)
 	}
 
-	// 更新された設定をグローバル変数に反映
-	ReviewConfig = newConfig
-
-	// Verbose ログ
-	slog.Debug("アプリケーション設定", "config", ReviewConfig) // 修正済み
-
-	// 設定完了ログ
-	// 【修正 4】行番号 50: mode フィールドを削除
-	slog.Info("アプリケーション設定初期化完了")
+	slog.Info("アプリケーション設定初期化完了", slog.String("mode", ReviewConfig.ReviewMode))
 
 	return nil
 }
