@@ -3,12 +3,10 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"git-gemini-reviewer-go/internal/pipeline"
 	"log/slog"
 	"os"
 
 	"git-gemini-reviewer-go/internal/config"
-	"git-gemini-reviewer-go/internal/services"
 
 	"github.com/shouni/go-notifier/pkg/factory"
 	"github.com/spf13/cobra"
@@ -56,16 +54,10 @@ func runBacklogCommand(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("Backlog連携には環境変数 BACKLOG_API_KEY および BACKLOG_SPACE_URL が必須です")
 	}
 
-	// 2. 共通ロジックを実行し、結果を取得 (ReviewConfig は PersistentPreRunE で構築済み)
-	reviewResult, err := pipeline.RunReviewAndGetResult(ctx, ReviewConfig)
+	// 2. パイプラインを実行し、結果を受け取る
+	reviewResult, err := executeReviewPipeline(cmd.Context(), ReviewConfig, slog.Default())
 	if err != nil {
 		return err
-	}
-
-	if reviewResult == "" {
-		// 【slogへ移行】絵文字を削除し、構造化
-		slog.Info("Diffがないためレビューをスキップしました。", "mode", ReviewConfig.ReviewMode)
-		return nil // Diffなしでスキップ
 	}
 
 	// 3. no-post フラグによる出力分岐
