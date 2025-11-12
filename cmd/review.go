@@ -26,8 +26,6 @@ func executeReviewPipeline(
 	}
 
 	// --- 2. 共通ロジック (Pipeline) の実行 ---
-
-	// 依存サービスを注入して RunReviewAndGetResult を呼び出す
 	reviewResult, err := pipeline.RunReviewAndGetResult(
 		ctx,
 		cfg,
