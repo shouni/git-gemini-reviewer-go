@@ -19,7 +19,7 @@ func RunReviewAndGetResult(
 	cfg config.ReviewConfig,
 	gitService gitclient.Service,
 	geminiService geminiclient.Service,
-) (string, error) { // config.ReviewConfig は設定値として維持
+) (string, error) {
 
 	slog.Info("Gitリポジトリのセットアップと差分取得を開始します。")
 	// 2.1. クローン/アップデート
