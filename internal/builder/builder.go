@@ -61,16 +61,11 @@ func BuildReviewPromptBuilder(cfg config.ReviewConfig) (*prompts.ReviewPromptBui
 	var name string
 	var templateContent string
 
-	switch cfg.ReviewMode {
-	case "release":
-		name = "release_review"
-		templateContent = prompts.ReleasePromptTemplate
-	case "detail":
-		name = "detail_review"
-		templateContent = prompts.DetailPromptTemplate
-	default:
-		// cmdパッケージで既に検出されるが、builderの堅牢性を高めるためにここでもエラーを返す
-		return nil, fmt.Errorf("無効なレビューモードが指定されました: '%s'。'release' または 'detail' を選択してください。", cfg.ReviewMode)
+	// ロジックを prompts パッケージに移譲し、テンプレート名と内容を取得
+	name, templateContent, err := prompts.GetReviewTemplate(cfg.ReviewMode)
+	if err != nil {
+		// 無効なモードのエラーを受け取る
+		return nil, err
 	}
 
 	builder, err := prompts.NewReviewPromptBuilder(name, templateContent)
