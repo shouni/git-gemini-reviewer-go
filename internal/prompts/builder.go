@@ -35,6 +35,7 @@ type ReviewPromptBuilder struct {
 
 // NewReviewPromptBuilder は ReviewPromptBuilder を初期化します。
 // テンプレート文字列を受け取り、それをパースして *template.Template を保持します。
+// name はテンプレートの名前であり、主にデバッグやエラーメッセージの識別に利用されます。
 func NewReviewPromptBuilder(name string, templateContent string) *ReviewPromptBuilder {
 	if templateContent == "" {
 		return &ReviewPromptBuilder{err: fmt.Errorf("prompt template content is empty")}
