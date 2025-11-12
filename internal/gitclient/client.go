@@ -102,7 +102,7 @@ func (c *Client) CloneOrUpdate(repositoryURL string) (*git.Repository, error) {
 		return nil, fmt.Errorf("go-git用の認証情報取得に失敗しました: %w", err)
 	}
 	c.auth = auth
-	slog.Info("Go-git用の認証情報がクライアントに正常に設定されました。")
+	slog.Info("go-git用の認証情報がクライアントに正常に設定されました。")
 
 	return repo, nil
 }
@@ -131,7 +131,7 @@ func (c *Client) Fetch(repo *git.Repository) error {
 
 // GetCodeDiff は指定された2つのブランチ間の純粋な差分を、go-gitのみで取得します。
 func (c *Client) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch string) (string, error) {
-	slog.Info("Go-gitを使用して差分を計算しています。", "path", c.LocalPath, "base_branch", baseBranch, "feature_branch", featureBranch)
+	slog.Info("go-gitを使用して差分を計算しています。", "path", c.LocalPath, "base_branch", baseBranch, "feature_branch", featureBranch)
 
 	// 1. ブランチ参照を解決
 	baseRefName := plumbing.NewRemoteReferenceName("origin", baseBranch)
