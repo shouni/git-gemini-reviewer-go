@@ -37,12 +37,12 @@ type ReviewPromptBuilder struct {
 // name はテンプレートの名前であり、主にデバッグやエラーメッセージの識別に利用されます。
 func NewReviewPromptBuilder(name string, templateContent string) (*ReviewPromptBuilder, error) {
 	if templateContent == "" {
-		return nil, fmt.Errorf("prompt template content is empty")
+		return nil, fmt.Errorf("プロンプトテンプレートの内容が空です")
 	}
 
 	tmpl, err := template.New(name).Parse(templateContent)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse prompt template: %w", err)
+		return nil, fmt.Errorf("プロンプトテンプレートの解析に失敗しました: %w", err)
 	}
 	return &ReviewPromptBuilder{tmpl: tmpl}, nil
 }
@@ -50,7 +50,7 @@ func NewReviewPromptBuilder(name string, templateContent string) (*ReviewPromptB
 // Build は ReviewTemplateData を埋め込み、Geminiへ送るための最終的なプロンプト文字列を完成させます。
 func (b *ReviewPromptBuilder) Build(data ReviewTemplateData) (string, error) {
 	if b.tmpl == nil {
-		return "", fmt.Errorf("review prompt template is not properly initialized") // エラーメッセージも簡略化
+		return "", fmt.Errorf("レビュープロンプトテンプレートが適切に初期化されていません。NewReviewPromptBuilderが正しく呼び出されたか確認してください")
 	}
 
 	var sb strings.Builder

@@ -78,7 +78,7 @@ func BuildReviewPromptBuilder(cfg config.ReviewConfig) (*prompts.ReviewPromptBui
 		return nil, fmt.Errorf("レビュープロンプトビルダーの初期化エラー: %w", err)
 	}
 
-	slog.Debug("ReviewPromptBuilderを構築しました。", slog.String("template_name", name))
+	slog.Debug("ReviewPromptBuilderを構築しました。", slog.String("prompt_builder_id", name))
 
 	return builder, nil
 }
