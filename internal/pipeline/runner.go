@@ -29,10 +29,11 @@ func RunReviewAndGetResult(
 		return "", fmt.Errorf("Gitリポジトリのクローン/更新に失敗しました: %w", err)
 	}
 
-	// defer処理
 	defer func() {
-		if cleanupErr := gitService.Cleanup(repo); cleanupErr != nil {
-			slog.Warn("ローカルリポジトリのクリーンアップに失敗しました。", "error", cleanupErr)
+		if repo != nil { // repoがnilでないことを確認
+			if cleanupErr := gitService.Cleanup(repo); cleanupErr != nil {
+				slog.Warn("ローカルリポジトリのクリーンアップに失敗しました。", "error", cleanupErr)
+			}
 		}
 	}()
 
