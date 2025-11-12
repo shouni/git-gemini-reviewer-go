@@ -24,7 +24,6 @@ type Service interface {
 // Client は go-ai-client の gemini.Client をラップし、
 // Service インターフェースを実装する具体的な構造体です。
 type Client struct {
-	// 汎用的な gemini.Client を組み込む
 	client    *gemini.Client
 	modelName string
 }
