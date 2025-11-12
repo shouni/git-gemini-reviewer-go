@@ -64,12 +64,14 @@ func BuildReviewPromptBuilder(cfg config.ReviewConfig) (*prompts.ReviewPromptBui
 	// 適切なテンプレートを選択するロジック
 	switch cfg.ReviewMode {
 	case "release":
-		name = "detail_review"
-		template = prompts.DetailPromptTemplate
-	case "detail":
 		name = "release_review"
 		template = prompts.ReleasePromptTemplate
+	case "detail":
+		name = "detail_review"
+		template = prompts.DetailPromptTemplate
 	default:
+		// ここではエラーを返さない設計になっているようですが、
+		// cmdパッケージのPreRunEで無効なモードは既に検出されるため、現状維持とします。
 	}
 
 	builder := prompts.NewReviewPromptBuilder(name, template)
