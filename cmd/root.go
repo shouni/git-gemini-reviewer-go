@@ -135,5 +135,6 @@ func Execute() {
 		genericCmd,
 		backlogCmd,
 		slackCmd,
+		gcsSaveCmd,
 	)
 }
