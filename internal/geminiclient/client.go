@@ -19,6 +19,7 @@ const (
 type Service interface {
 	// ReviewCodeDiff は完成されたプロンプトを基にGeminiにレビューを依頼します。
 	ReviewCodeDiff(ctx context.Context, finalPrompt string) (string, error)
+	GenerateText(ctx context.Context, prompt string) (string, error)
 }
 
 // Client は go-ai-client の gemini.Client をラップし、
@@ -74,6 +75,20 @@ func (c *Client) ReviewCodeDiff(ctx context.Context, finalPrompt string) (string
 	if err != nil {
 		// リトライ上限到達などのエラーを含む
 		return "", fmt.Errorf("Gemini code review failed: %w", err)
+	}
+
+	// 成功レスポンスからテキストを返す
+	return resp.Text, nil
+}
+
+// GenerateText は Service インターフェースを満たします。
+func (c *Client) GenerateText(ctx context.Context, prompt string) (string, error) {
+	// 汎用クライアントの GenerateContent メソッドを呼び出す
+	resp, err := c.client.GenerateContent(ctx, prompt, c.modelName)
+
+	if err != nil {
+		// リトライ上限到達などのエラーを含む
+		return "", fmt.Errorf("Gemini text generation failed: %w", err)
 	}
 
 	// 成功レスポンスからテキストを返す

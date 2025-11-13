@@ -7,6 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"git-gemini-reviewer-go/internal/builder"
+	"git-gemini-reviewer-go/prompts"
 	"github.com/shouni/go-remote-io/pkg/factory"
 )
 
@@ -30,8 +32,8 @@ var gcsSaveCmd = &cobra.Command{
 
 func init() {
 	// フラグの初期化
-	gcsSaveCmd.Flags().StringVarP(&gcsSaveFlags.ContentType, "content-type", "t", "text/markdown; charset=utf-8", "GCSに保存する際のMIMEタイプ")
-	gcsSaveCmd.Flags().StringVar(&gcsSaveFlags.GCSURI, "gcs-uri", "gs://git-gemini-reviewer-go/ReviewResult/result.md", "GCSへ保存する際の宛先URI (例: gs://bucket/path/to/result.md)")
+	gcsSaveCmd.Flags().StringVarP(&gcsSaveFlags.ContentType, "content-type", "t", "text/html; charset=utf-8", "GCSに保存する際のMIMEタイプ")
+	gcsSaveCmd.Flags().StringVar(&gcsSaveFlags.GCSURI, "gcs-uri", "gs://git-gemini-reviewer-go/ReviewResult/result.html", "GCSへ保存する際の宛先URI (例: gs://bucket/path/to/result.html)")
 }
 
 // runGcsSave は gcs-save コマンドの実行ロジックです。
@@ -42,19 +44,35 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 	// 1. AIレビューパイプラインを実行し、結果の文字列を受け取る
 	slog.Info("Git/Geminiレビューパイプラインを実行中...")
 	// executeReviewPipeline と ReviewConfig はこのパッケージ内の他のファイルで定義されている前提
-	reviewResult, err := executeReviewPipeline(ctx, ReviewConfig)
+	reviewResultMarkdown, err := executeReviewPipeline(ctx, ReviewConfig)
 	if err != nil {
 		return fmt.Errorf("レビューパイプラインの実行に失敗しました: %w", err)
 	}
 
 	// レビュー結果が空の場合は、警告を出して終了
-	if reviewResult == "" {
+	if reviewResultMarkdown == "" {
 		slog.Warn("AIレビュー結果が空文字列でした。GCSへの保存をスキップします。", "uri", gcsURI)
 		return nil
 	}
 
+	// 2. Gemini Clientの取得
+	// 依存関係である GeminiService を builder パッケージから直接取得する
+	// ReviewConfigはコマンド全体で利用可能な設定構造体と仮定
+	geminiService, err := builder.BuildGeminiService(ctx, ReviewConfig)
+	if err != nil {
+		return fmt.Errorf("Gemini Serviceの構築に失敗しました: %w", err)
+	}
+
+	// 3. 第二のAI呼び出し: Markdownをスタイル付きHTMLに変換
+	slog.Info("レビュー結果のMarkdownをスタイル付きHTMLに変換中...", "model", ReviewConfig.GeminiModel)
+
+	// 最終プロンプトを作成
+	finalPrompt := fmt.Sprintf(prompts.HTMLPromptTemplate, reviewResultMarkdown)
+
+	// AIにHTMLを生成させる (修正: GenerateTextを呼び出す)
+	htmlResult, err := geminiService.GenerateText(ctx, finalPrompt)
+
 	// 2. ClientFactory の取得
-	// NOTE: rootCmdでfactoryがContextに注入されている場合、NewClientFactory(ctx)ではなくGetClientFactory(ctx)を使用すべき
 	clientFactory, err := factory.NewClientFactory(ctx)
 	if err != nil {
 		return err
@@ -81,7 +99,7 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 	objectPath := parts[1]
 
 	// 5. レビュー結果文字列を io.Reader に変換
-	contentReader := strings.NewReader(reviewResult)
+	contentReader := strings.NewReader(htmlResult)
 
 	// 6. GCSへの書き込み実行 (io.Reader を渡す)
 	// 修正: slog.Info を使用し、構造化されたロギングに置き換える
