@@ -20,7 +20,7 @@ var gcsSaveFlags GcsSaveFlags
 
 // gcsSaveCmd は 'gcs-save' サブコマンドを定義します。
 var gcsSaveCmd = &cobra.Command{
-	Use:   "gcs-save",
+	Use:   "gcs",
 	Short: "AIレビュー結果を実行し、その結果を指定されたGCS URIに保存します。",
 	Long: `このコマンドは、指定されたGitリポジトリのブランチ間の差分をAIでレビューし、その結果をgo-remote-io を利用してGCSにアップロードします。
 宛先 URI は '--gcs-uri' フラグで指定する必要があり、'gs://bucket-name/object-path' の形式である必要があります。`,
@@ -31,7 +31,7 @@ var gcsSaveCmd = &cobra.Command{
 func init() {
 	// フラグの初期化
 	gcsSaveCmd.Flags().StringVarP(&gcsSaveFlags.ContentType, "content-type", "t", "text/markdown; charset=utf-8", "GCSに保存する際のMIMEタイプ")
-	gcsSaveCmd.Flags().StringVarP(&gcsSaveFlags.GCSURI, "gcs-uri", "s", "gs://git-gemini-reviewer-go/ReviewResult/result.md", "GCSへ保存する際の宛先URI (例: gs://bucket/path/to/result.md)")
+	gcsSaveCmd.Flags().StringVar(&gcsSaveFlags.GCSURI, "gcs-uri", "gs://git-gemini-reviewer-go/ReviewResult/result.md", "GCSへ保存する際の宛先URI (例: gs://bucket/path/to/result.md)")
 }
 
 // runGcsSave は gcs-save コマンドの実行ロジックです。
