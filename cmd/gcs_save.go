@@ -66,7 +66,19 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 	// 3. 第二のAI呼び出し: Markdownをスタイル付きHTMLに変換
 	slog.Info("レビュー結果のMarkdownをスタイル付きHTMLに変換中...", "model", ReviewConfig.GeminiModel)
 
-	// 最終プロンプトを作成
+	/*
+		builder, err := prompts.NewReviewPromptBuilder("html", prompts.HTMLPromptTemplate)
+		reviewData := prompts.ReviewTemplateData{
+			DiffContent: reviewResultMarkdown,
+		}
+		promptBuilder, err := builder.BuildReviewPromptBuilder(ctx, ReviewConfig)
+		finalPrompt, err := promptBuilder.Build(reviewData)
+		if err != nil {
+			slog.Error("プロンプトの組み立てエラー。", "error", err)
+			return "", fmt.Errorf("プロンプトの組み立てに失敗しました: %w", err)
+		}
+	*/
+
 	finalPrompt := fmt.Sprintf(prompts.HTMLPromptTemplate, reviewResultMarkdown)
 
 	// AIにHTMLを生成させる (修正: GenerateTextを呼び出す)
