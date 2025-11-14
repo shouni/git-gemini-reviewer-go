@@ -199,14 +199,12 @@ export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
   --repo-url "ssh://github.com/owner/repo-name.git" \
   --base-branch "main" \
   --feature-branch "feature/slack-notify" 
-  # --slack-webhook-url は環境変数 SLACK_WEBHOOK_URL から取得されます
 ```
 
 #### 固有フラグ (Slack連携)
 
 | フラグ | 説明 | 必須 | デフォルト値 |
 | :--- | :--- | :--- | :--- |
-| `--slack-webhook-url` | レビュー結果を投稿する Slack Webhook URL | **投稿時のみ✅** | 環境変数 `SLACK_WEBHOOK_URL` |
 | `--no-post` | Slack への投稿をスキップし、結果を標準出力する | ❌ | `false` |
 
 -----
