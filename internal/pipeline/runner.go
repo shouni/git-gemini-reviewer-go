@@ -25,9 +25,9 @@ func RunReviewAndGetResult(
 	slog.Info("Gitリポジトリのセットアップと差分取得を開始します。")
 	// 2.1. クローン/アップデート
 	// ... (Git 処理は変更なし) ...
-	repo, err := gitService.CloneOrUpdate(cfg.GitCloneURL)
+	repo, err := gitService.CloneOrUpdate(cfg.RepoURL)
 	if err != nil {
-		slog.Error("Gitリポジトリのセットアップに失敗しました。", "error", err, "url", cfg.GitCloneURL)
+		slog.Error("Gitリポジトリのセットアップに失敗しました。", "error", err, "url", cfg.RepoURL)
 		return "", fmt.Errorf("Gitリポジトリのクローン/更新に失敗しました: %w", err)
 	}
 

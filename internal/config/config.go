@@ -6,7 +6,7 @@ type ReviewConfig struct {
 	ReviewMode       string
 	GeminiModel      string
 	PromptContent    string
-	GitCloneURL      string
+	RepoURL          string
 	BaseBranch       string
 	FeatureBranch    string
 	SSHKeyPath       string

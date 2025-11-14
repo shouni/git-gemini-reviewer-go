@@ -35,7 +35,7 @@ var backlogCmd = &cobra.Command{
 }
 
 func init() {
-	backlogCmd.Flags().StringVar(&backlogIssueID, "issue-id", "", "コメントを投稿するBacklog課題ID（例: PROJECT-123）")
+	backlogCmd.Flags().StringVarP(&backlogIssueID, "i", "issue-id", "", "コメントを投稿するBacklog課題ID（例: PROJECT-123）")
 	backlogCmd.Flags().BoolVar(&noPost, "no-post", false, "投稿をスキップし、結果を標準出力する")
 }
 

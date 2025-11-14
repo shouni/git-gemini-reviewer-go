@@ -25,7 +25,7 @@ func executeReviewPipeline(
 		return "", fmt.Errorf("Gemini Service の構築に失敗しました: %w", err)
 	}
 
-	// eviewPromptBuilder の構築
+	// promptBuilder の構築
 	// cfg.ReviewMode に基づいて適切なテンプレートを選択し、ビルダーを初期化します。
 	promptBuilder, err := builder.BuildReviewPromptBuilder(cfg)
 	if err != nil {
