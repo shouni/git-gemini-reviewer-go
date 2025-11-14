@@ -38,10 +38,28 @@ func init() {
 	gcsSaveCmd.Flags().StringVar(&gcsSaveFlags.GCSURI, "gcs-uri", "gs://git-gemini-reviewer-go/review/result.html", "GCSの保存先")
 }
 
+// validateGcsURI は GCS URIの検証と解析を行うヘルパー関数です。
+func validateGcsURI(gcsURI string) (bucketName, objectPath string, err error) {
+	if !strings.HasPrefix(gcsURI, "gs://") {
+		return "", "", fmt.Errorf("無効なGCS URIです。'gs://' で始まる必要があります: %s", gcsURI)
+	}
+	pathWithoutScheme := gcsURI[5:]
+	parts := strings.SplitN(pathWithoutScheme, "/", 2)
+
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", fmt.Errorf("無効なGCS URIフォーマットです。バケット名とオブジェクトパスが不足しています: %s", gcsURI)
+	}
+	return parts[0], parts[1], nil
+}
+
 // runGcsSave は gcs-save コマンドの実行ロジックです。
 func runGcsSave(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	gcsURI := gcsSaveFlags.GCSURI
+	bucketName, objectPath, err := validateGcsURI(gcsURI)
+	if err != nil {
+		return err
+	}
 
 	// 1. AIレビューパイプラインを実行し、結果の文字列を受け取る
 	slog.Info("Git/Geminiレビューパイプラインを実行中...")
@@ -105,20 +123,6 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("GCSOutputWriterの取得に失敗しました: %w", err)
 	}
-
-	// 6. URIをバケット名とオブジェクトパスに分離し、検証
-	if !strings.HasPrefix(gcsURI, "gs://") {
-		return fmt.Errorf("無効なGCS URIです。'gs://' で始まる必要があります: %s", gcsURI)
-	}
-	pathWithoutScheme := gcsURI[5:]
-	parts := strings.SplitN(pathWithoutScheme, "/", 2)
-
-	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
-		return fmt.Errorf("無効なGCS URIフォーマットです。バケット名とオブジェクトパスが不足しています: %s", gcsURI)
-	}
-
-	bucketName := parts[0]
-	objectPath := parts[1]
 
 	// 7. レビュー結果文字列を io.Reader に変換
 	contentReader := strings.NewReader(htmlResult)
