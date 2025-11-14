@@ -9,6 +9,7 @@ import (
 
 	"git-gemini-reviewer-go/internal/builder"
 	"git-gemini-reviewer-go/prompts"
+
 	"github.com/shouni/go-remote-io/pkg/factory"
 )
 
@@ -43,7 +44,7 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 
 	// 1. AIレビューパイプラインを実行し、結果の文字列を受け取る
 	slog.Info("Git/Geminiレビューパイプラインを実行中...")
-	// executeReviewPipeline と ReviewConfig はこのパッケージ内の他のファイルで定義されている前提
+	// executeReviewPipeline の定義は外部にある前提。ReviewConfig の初期化・定義元を明確にすべき (指摘35)
 	reviewResultMarkdown, err := executeReviewPipeline(ctx, ReviewConfig)
 	if err != nil {
 		return fmt.Errorf("レビューパイプラインの実行に失敗しました: %w", err)
@@ -56,8 +57,6 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 	}
 
 	// 2. Gemini Clientの取得
-	// 依存関係である GeminiService を builder パッケージから直接取得する
-	// ReviewConfigはコマンド全体で利用可能な設定構造体と仮定
 	geminiService, err := builder.BuildGeminiService(ctx, ReviewConfig)
 	if err != nil {
 		return fmt.Errorf("Gemini Serviceの構築に失敗しました: %w", err)
@@ -66,37 +65,44 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 	// 3. 第二のAI呼び出し: Markdownをスタイル付きHTMLに変換
 	slog.Info("レビュー結果のMarkdownをスタイル付きHTMLに変換中...", "model", ReviewConfig.GeminiModel)
 
-	/*
-		builder, err := prompts.NewReviewPromptBuilder("html", prompts.HTMLPromptTemplate)
-		reviewData := prompts.ReviewTemplateData{
-			DiffContent: reviewResultMarkdown,
-		}
-		promptBuilder, err := builder.BuildReviewPromptBuilder(ctx, ReviewConfig)
-		finalPrompt, err := promptBuilder.Build(reviewData)
-		if err != nil {
-			slog.Error("プロンプトの組み立てエラー。", "error", err)
-			return "", fmt.Errorf("プロンプトの組み立てに失敗しました: %w", err)
-		}
-	*/
+	// 💡 修正: ReviewPromptBuilder を使用して構造的にプロンプトを組み立てる (指摘50に対応)
+	// prompts.HTMLPromptTemplate の内容に "%s" が含まれていることを前提とする
+	htmlPromptBuilder, err := prompts.NewReviewPromptBuilder("html", prompts.HTMLPromptTemplate)
+	if err != nil {
+		slog.Error("HTMLプロンプトビルダーの初期化エラー。", "error", err)
+		return fmt.Errorf("HTMLプロンプトビルダーの初期化に失敗しました: %w", err)
+	}
 
-	finalPrompt := fmt.Sprintf(prompts.HTMLPromptTemplate, reviewResultMarkdown)
+	reviewData := prompts.ReviewTemplateData{
+		DiffContent: reviewResultMarkdown, // Markdown結果をDiffContentとしてデータに渡す
+	}
 
-	// AIにHTMLを生成させる (修正: GenerateTextを呼び出す)
+	// Buildメソッドが内部でテンプレートを安全に処理する
+	finalPrompt, err := htmlPromptBuilder.Build(reviewData)
+	if err != nil {
+		slog.Error("HTML変換プロンプトの組み立てエラー。", "error", err)
+		return fmt.Errorf("HTML変換プロンプトの組み立てに失敗しました: %w", err)
+	}
+
+	// AIにHTMLを生成させる
 	htmlResult, err := geminiService.GenerateText(ctx, finalPrompt)
+	if err != nil {
+		return fmt.Errorf("GeminiによるHTML生成に失敗しました: %w", err)
+	}
 
-	// 2. ClientFactory の取得
+	// 4. ClientFactory の取得
 	clientFactory, err := factory.NewClientFactory(ctx)
 	if err != nil {
 		return err
 	}
 
-	// 3. GCSOutputWriter の取得
+	// 5. GCSOutputWriter の取得
 	writer, err := clientFactory.GetGCSOutputWriter()
 	if err != nil {
 		return fmt.Errorf("GCSOutputWriterの取得に失敗しました: %w", err)
 	}
 
-	// 4. URIをバケット名とオブジェクトパスに分離し、検証 (ロジックは前回修正を維持)
+	// 6. URIをバケット名とオブジェクトパスに分離し、検証
 	if !strings.HasPrefix(gcsURI, "gs://") {
 		return fmt.Errorf("無効なGCS URIです。'gs://' で始まる必要があります: %s", gcsURI)
 	}
@@ -110,11 +116,10 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 	bucketName := parts[0]
 	objectPath := parts[1]
 
-	// 5. レビュー結果文字列を io.Reader に変換
+	// 7. レビュー結果文字列を io.Reader に変換
 	contentReader := strings.NewReader(htmlResult)
 
-	// 6. GCSへの書き込み実行 (io.Reader を渡す)
-	// 修正: slog.Info を使用し、構造化されたロギングに置き換える
+	// 8. GCSへの書き込み実行
 	slog.Info("レビュー結果をGCSへアップロード中",
 		"uri", gcsURI,
 		"bucket", bucketName,
@@ -122,11 +127,9 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 		"content_type", gcsSaveFlags.ContentType)
 
 	if err := writer.WriteToGCS(ctx, bucketName, objectPath, contentReader, gcsSaveFlags.ContentType); err != nil {
-		// エラーログは呼び出し元で処理されるが、詳細なエラーを返す
 		return fmt.Errorf("GCSへの書き込みに失敗しました (URI: %s): %w", gcsURI, err)
 	}
 
-	// 修正: slog.Info を使用し、構造化されたロギングに置き換える
 	slog.Info("GCSへのアップロードが完了しました", "uri", gcsURI)
 
 	return nil
