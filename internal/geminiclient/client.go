@@ -17,7 +17,7 @@ const (
 
 // Service は、Gemini AIとの通信機能の抽象化を提供し、DIで使用されます。
 type Service interface {
-	// GenerateContent は完成されたプロンプトを基にGeminiにレビューを依頼します。
+	// GenerateContent は完成されたプロンプトを基にGeminiにコンテンツ生成を依頼します。
 	GenerateContent(ctx context.Context, finalPrompt string) (string, error)
 }
 

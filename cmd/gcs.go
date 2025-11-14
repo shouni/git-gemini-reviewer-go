@@ -15,8 +15,8 @@ import (
 
 // GcsSaveFlags は gcs-save コマンド固有のフラグを保持します。
 type GcsSaveFlags struct {
-	GCSURI      string // --gcs-uri 宛先 GCS URI (例: gs://bucket/path/to/result.md)
-	ContentType string // --content-type GCSに保存する際のMIMEタイプ
+	GCSURI      string // GCSへ保存する際の宛先URI (例: gs://bucket/path/to/result.html)
+	ContentType string // GCSに保存する際のMIMEタイプ
 }
 
 var gcsSaveFlags GcsSaveFlags
@@ -26,8 +26,8 @@ const PromptTypeHTML = "html"
 // gcsSaveCmd は 'gcs-save' サブコマンドを定義します。
 var gcsSaveCmd = &cobra.Command{
 	Use:   "gcs",
-	Short: "AIレビュー結果を実行し、その結果を指定されたGCS URIに保存します。",
-	Long: `このコマンドは、指定されたGitリポジトリのブランチ間の差分をAIでレビューし、その結果をgo-remote-io を利用してGCSにアップロードします。
+	Short: "AIレビュー結果をスタイル付きHTMLに変換し、その結果を指定されたGCS URIに保存します。",
+	Long: `このコマンドは、指定されたGitリポジトリのブランチ間の差分をAIでレビューし、その結果をさらにAIでスタイル付きHTMLに変換した後、go-remote-io を利用してGCSにアップロードします。
 宛先 URI は '--gcs-uri' フラグで指定する必要があり、'gs://bucket-name/object-path' の形式である必要があります。`,
 	Args: cobra.NoArgs,
 	RunE: runGcsSave,
@@ -35,7 +35,7 @@ var gcsSaveCmd = &cobra.Command{
 
 func init() {
 	gcsSaveCmd.Flags().StringVarP(&gcsSaveFlags.ContentType, "content-type", "t", "text/html; charset=utf-8", "GCSに保存する際のMIMEタイプ (デフォルトはHTML)")
-	gcsSaveCmd.Flags().StringVar(&gcsSaveFlags.GCSURI, "gcs-uri", "gs://git-gemini-reviewer-go/review/result.html", "GCSへ保存する際の宛先URI (デフォルトはHTMLファイル)")
+	gcsSaveCmd.Flags().StringVar(&gcsSaveFlags.GCSURI, "gcs-uri", "gs://git-gemini-reviewer-go/review/result.html", "GCSの保存先")
 }
 
 // runGcsSave は gcs-save コマンドの実行ロジックです。
@@ -45,7 +45,8 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 
 	// 1. AIレビューパイプラインを実行し、結果の文字列を受け取る
 	slog.Info("Git/Geminiレビューパイプラインを実行中...")
-	// executeReviewPipeline の定義は外部にある前提。ReviewConfig の初期化・定義元を明確にすべき (指摘35)
+	// executeReviewPipeline は cmd パッケージ内の他のファイルで定義されており、ReviewConfig は rootCmd で初期化されるグローバル変数です。
+	slog.Info("Git/Geminiレビューパイプラインを実行中 (Markdown生成)...")
 	reviewResultMarkdown, err := executeReviewPipeline(ctx, ReviewConfig)
 	if err != nil {
 		return fmt.Errorf("レビューパイプラインの実行に失敗しました: %w", err)
@@ -65,7 +66,6 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 
 	// 3. 第二のAI呼び出し: Markdownをスタイル付きHTMLに変換
 	slog.Info("レビュー結果のMarkdownをスタイル付きHTMLに変換中...", "model", ReviewConfig.GeminiModel)
-
 	htmlPromptBuilder, err := prompts.NewReviewPromptBuilder(PromptTypeHTML, prompts.HTMLPromptTemplate)
 	if err != nil {
 		slog.Error("HTMLプロンプトビルダーの初期化エラー。", "error", err)
