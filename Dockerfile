@@ -20,10 +20,10 @@ LABEL org.opencontainers.image.source=https://github.com/shouni/git-gemini-revie
       org.opencontainers.image.url="https://github.com/shouni/git-gemini-reviewer-go"
 
 # 実行可能なバイナリの配置場所を /usr/local/bin に設定
-WORKDIR /usr/local/bin
+WORKDIR /app
 
-# 修正: ビルドステージの相対パス (/app/bin/gemini_reviewer) からコピー
-COPY --from=builder /app/bin/gemini_reviewer /usr/local/bin/gemini_reviewer
+# ビルドステージの相対パス (/app/bin/gemini_reviewer) からコピー
+COPY --from=builder /app/bin/gemini_reviewer /app/gemini_reviewer
 
 # エントリポイントを定義
-ENTRYPOINT ["/usr/local/bin/gemini_reviewer"]
+ENTRYPOINT ["/app/gemini_reviewer"]
