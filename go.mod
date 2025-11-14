@@ -4,11 +4,12 @@ go 1.25
 
 require (
 	github.com/go-git/go-git/v5 v5.16.3
-	github.com/shouni/go-ai-client/v2 v2.0.2
+	github.com/shouni/go-ai-client/v2 v2.0.5
 	github.com/shouni/go-cli-base v1.0.5
 	github.com/shouni/go-http-kit v1.1.2
 	github.com/shouni/go-notifier v1.1.3
 	github.com/shouni/go-remote-io v1.0.1
+	github.com/shouni/go-utils v1.0.11
 	github.com/spf13/cobra v1.10.1
 	golang.org/x/crypto v0.44.0
 )
@@ -57,7 +58,6 @@ require (
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
-	github.com/shouni/go-utils v1.0.8 // indirect
 	github.com/skeema/knownhosts v1.3.1 // indirect
 	github.com/slack-go/slack v0.17.3 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
@@ -80,7 +80,7 @@ require (
 	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/api v0.247.0 // indirect
-	google.golang.org/genai v1.33.0 // indirect
+	google.golang.org/genai v1.34.0 // indirect
 	google.golang.org/genproto v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250818200422-3122310a409c // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250818200422-3122310a409c // indirect
