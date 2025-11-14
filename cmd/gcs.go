@@ -83,7 +83,7 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 	}
 
 	// AIにHTMLを生成させる
-	htmlResult, err := geminiService.ReviewCodeDiff(ctx, finalPrompt)
+	htmlResult, err := geminiService.GenerateContent(ctx, finalPrompt)
 	if err != nil {
 		return fmt.Errorf("GeminiによるHTML生成に失敗しました: %w", err)
 	}

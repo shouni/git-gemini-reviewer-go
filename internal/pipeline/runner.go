@@ -71,7 +71,7 @@ func RunReviewAndGetResult(
 
 	// --- 4. AIレビュー ---
 	slog.Info("Gemini AIによるコードレビューを開始します。", "model", cfg.GeminiModel)
-	reviewComment, err := geminiService.ReviewCodeDiff(ctx, finalPrompt)
+	reviewComment, err := geminiService.GenerateContent(ctx, finalPrompt)
 	if err != nil {
 		slog.Error("Geminiによるコードレビュー中にエラーが発生しました。", "error", err)
 		return "", fmt.Errorf("Geminiによるコードレビュー中にエラーが発生しました: %w", err)

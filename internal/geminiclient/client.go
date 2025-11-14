@@ -17,8 +17,8 @@ const (
 
 // Service は、Gemini AIとの通信機能の抽象化を提供し、DIで使用されます。
 type Service interface {
-	// ReviewCodeDiff は完成されたプロンプトを基にGeminiにレビューを依頼します。
-	ReviewCodeDiff(ctx context.Context, finalPrompt string) (string, error)
+	// GenerateContent は完成されたプロンプトを基にGeminiにレビューを依頼します。
+	GenerateContent(ctx context.Context, finalPrompt string) (string, error)
 }
 
 // Client は go-ai-client の gemini.Client をラップし、
@@ -66,8 +66,8 @@ func NewClient(ctx context.Context, modelName string) (Service, error) {
 	}, nil
 }
 
-// ReviewCodeDiff は Service インターフェースを満たします。
-func (c *Client) ReviewCodeDiff(ctx context.Context, finalPrompt string) (string, error) {
+// GenerateContent は Service インターフェースを満たします。
+func (c *Client) GenerateContent(ctx context.Context, finalPrompt string) (string, error) {
 	// 汎用クライアントの GenerateContent メソッドを呼び出す
 	resp, err := c.client.GenerateContent(ctx, finalPrompt, c.modelName)
 
