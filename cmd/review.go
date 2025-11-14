@@ -74,7 +74,7 @@ func executeReviewPipeline(
 // これは、ユーザーが --local-path を指定しなかった場合のデフォルト値を設定するために使用されます。
 func GenerateLocalPathFromURL(repoURL string) string {
 	// ベースディレクトリを設定 (例: /tmp/git-reviewer-repos)
-	tempBase := filepath.Join(os.TempDir(), "git-reviewer-repos")
+	tempBase := os.TempDir() + "/git-reviewer-repos"
 
 	// 1. スキームと.gitを削除してクリーンな名前を取得
 	name := strings.TrimSuffix(repoURL, ".git")
@@ -82,19 +82,27 @@ func GenerateLocalPathFromURL(repoURL string) string {
 	name = strings.TrimPrefix(name, "http://")
 	name = strings.TrimPrefix(name, "git@")
 
-	// 2. パスとして使用できない文字をハイフンに置換 (cleanURLRegex を使用)
-	// 例: github.com/user/repo -> github.com-user-repo
-	name = cleanURLRegex.ReplaceAllString(name, "-")
-	name = regexp.MustCompile(`-+`).ReplaceAllString(name, "-") // 連続するハイフンをまとめる
+	// 先頭と末尾のハイフンを削除 (後のステップで生成される可能性を排除)
+	// 例: "github.com:owner/repo" -> "github.com-owner/repo" (パス区切り文字はまだ残っている)
+	name = strings.Trim(name, "-")
 
-	// 3. 衝突防止のため、URL全体のSHA-256ハッシュの先頭8桁を追加
+	// 2. パスとして使用できない文字をハイフンに置換
+	// cleanURLRegex を使用して、ファイルシステムで安全でない文字を置換
+	name = cleanURLRegex.ReplaceAllString(name, "-")
+
+	// 3. 連続するハイフンを一つにまとめる (例: "repo--name" -> "repo-name")
+	// これにより、スキームやパス区切り文字が変換された結果の連続ハイフンがクリーンになる
+	name = regexp.MustCompile(`-+`).ReplaceAllString(name, "-")
+
+	// 4. 衝突防止のため、URL全体のSHA-256ハッシュの先頭8桁を追加
 	hasher := sha256.New()
 	hasher.Write([]byte(repoURL))
 	hash := fmt.Sprintf("%x", hasher.Sum(nil))[:8]
 
 	// パス名が長くなりすぎないように調整し、ハイフンをトリム
-	safeDirName := fmt.Sprintf("%s-%s", strings.Trim(name, "-"), hash)
+	safeDirName := fmt.Sprintf("%s-%s", name, hash)
+	// ※ Trim(name, "-") は、上記の処理順序により、ここでは不要になりました
 
-	// 4. ベースパスと結合して返す
+	// 5. ベースパスと結合して返す
 	return filepath.Join(tempBase, safeDirName)
 }
