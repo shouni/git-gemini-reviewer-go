@@ -35,7 +35,7 @@ var gcsSaveCmd = &cobra.Command{
 
 func init() {
 	gcsSaveCmd.Flags().StringVarP(&gcsSaveFlags.ContentType, "content-type", "t", "text/html; charset=utf-8", "GCSに保存する際のMIMEタイプ (デフォルトはHTML)")
-	gcsSaveCmd.Flags().StringVar(&gcsSaveFlags.GCSURI, "gcs-uri", "gs://git-gemini-reviewer-go/review/result.html", "GCSの保存先")
+	gcsSaveCmd.Flags().StringVarP(&gcsSaveFlags.GCSURI, "gcs-uri", "s", "gs://git-gemini-reviewer-go/review/result.html", "GCSの保存先")
 }
 
 // validateGcsURI は GCS URIの検証と解析を行うヘルパー関数です。

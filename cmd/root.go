@@ -61,67 +61,17 @@ func initAppPreRunE(cmd *cobra.Command, args []string) error {
 // addAppPersistentFlags は、アプリケーション固有の永続フラグをルートコマンドに追加します。
 func addAppPersistentFlags(rootCmd *cobra.Command) {
 	// ReviewConfig.ReviewMode にバインド
-	rootCmd.PersistentFlags().StringVarP(&ReviewConfig.ReviewMode,
-		"mode",
-		"m",
-		"detail",
-		"レビューモードを指定: 'release' (リリース判定) または 'detail' (詳細レビュー)",
-	)
-	rootCmd.PersistentFlags().StringVarP(
-		&ReviewConfig.GeminiModel,
-		"model",
-		"g",
-		"gemini-2.5-flash",
-		"Gemini model name to use for review (e.g., 'gemini-2.5-flash').",
-	)
-	rootCmd.PersistentFlags().StringVarP(
-		&ReviewConfig.GitCloneURL,
-		"git-clone-url",
-		"u",
-		"",
-		"The SSH URL of the Git repository to review.",
-	)
-	// 必須フラグのエラーハンドリング
-	rootCmd.MarkPersistentFlagRequired("git-clone-url")
+	rootCmd.PersistentFlags().StringVarP(&ReviewConfig.ReviewMode, "mode", "m", "detail", "レビューモードを指定: 'release' (リリース判定) または 'detail' (詳細レビュー)")
 
-	rootCmd.PersistentFlags().StringVarP(
-		&ReviewConfig.BaseBranch,
-		"base-branch",
-		"b",
-		"main",
-		"The base branch for diff comparison (e.g., 'main').",
-	)
-	rootCmd.PersistentFlags().StringVarP(
-		&ReviewConfig.FeatureBranch,
-		"feature-branch",
-		"f",
-		"",
-		"The feature branch to review (e.g., 'feature/my-branch').",
-	)
+	rootCmd.PersistentFlags().StringVarP(&ReviewConfig.RepoURL, "repo-url", "u", "", "レビュー対象の Git リポジトリの SSH URL。")
+	rootCmd.MarkPersistentFlagRequired("repo-url")
+	rootCmd.PersistentFlags().StringVarP(&ReviewConfig.BaseBranch, "base-branch", "b", "main", "差分比較の基準ブランチ (例: 'main').")
+	rootCmd.PersistentFlags().StringVarP(&ReviewConfig.FeatureBranch, "feature-branch", "f", "", "レビュー対象のフィーチャーブランチ (例: 'feature/my-branch').")
 	rootCmd.MarkPersistentFlagRequired("feature-branch")
-
-	// パスとホストキーチェックフラグ
-	rootCmd.PersistentFlags().StringVarP(
-		&ReviewConfig.LocalPath,
-		"local-path",
-		"l",
-		os.TempDir()+"/git-reviewer-repos/tmp",
-		"Local path to clone the repository.",
-	)
-	rootCmd.PersistentFlags().StringVarP(
-		&ReviewConfig.SSHKeyPath,
-		"ssh-key-path",
-		"k",
-		"~/.ssh/id_rsa",
-		"Path to the SSH private key for Git authentication.",
-	)
-	rootCmd.PersistentFlags().BoolVarP(
-		&ReviewConfig.SkipHostKeyCheck,
-		"skip-host-key-check",
-		"s",
-		false,
-		"CRITICAL WARNING: Disables SSH host key verification. This dramatically increases the risk of Man-in-the-Middle attacks. NEVER USE IN PRODUCTION. Only for controlled development/testing environments.",
-	)
+	rootCmd.PersistentFlags().StringVarP(&ReviewConfig.LocalPath, "local-path", "l", os.TempDir()+"/git-reviewer-repos/tmp", "リポジトリをクローンするローカルパス。")
+	rootCmd.PersistentFlags().StringVarP(&ReviewConfig.GeminiModel, "gemini", "g", "gemini-2.5-flash", "レビューに使用する Gemini モデル名 (例: 'gemini-2.5-flash').")
+	rootCmd.PersistentFlags().StringVarP(&ReviewConfig.SSHKeyPath, "ssh-key-path", "k", "~/.ssh/id_rsa", "Git 認証に使用する SSH 秘密鍵のパス。")
+	rootCmd.PersistentFlags().BoolVar(&ReviewConfig.SkipHostKeyCheck, "skip-host-key-check", false, "【🚨 危険な設定】 SSH ホストキーの検証を無効にします。中間者攻撃のリスクを劇的に高めるため、本番環境では絶対に使用しないでください。開発/テスト環境でのみ使用してください。")
 }
 
 // --- エントリポイント ---

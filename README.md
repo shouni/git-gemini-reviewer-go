@@ -30,7 +30,7 @@
 | **言語** | **Go (Golang)** | ツールの開発言語。クロスプラットフォームでの高速な実行を実現します。 |
 | **CLI フレームワーク** | **Cobra** | コマンドライン引数（フラグ）の解析とサブコマンド構造 (`generic`, `backlog`, `slack`, `gcs`) の構築に使用します。 |
 | **Git 操作** | **go-git** | クローン、フェッチ、**3-dot diff** (共通祖先からの差分) の取得まですべてを Go のコード内で完結させ、環境設定の手間を削減しました。 |
-| **I/O 連携** | **`github.com/shouni/go-remote-io`**  | GCSとローカルファイルシステムへのI/O操作を抽象化し、**GCSへのレビュー結果保存**を実現します。 |
+| **I/O 連携** | **`github.com/shouni/go-remote-io`** | GCSとローカルファイルシステムへのI/O操作を抽象化し、**GCSへのレビュー結果保存**を実現します。 |
 | **ロギング** | **log/slog** | 構造化されたログ (`key=value`) に完全移行。詳細なデバッグ情報が必要な際に、ログレベルを上げて柔軟に対応できます。 |
 | **AI モデル** | **Google Gemini API** | 取得したコード差分を分析し、レビューコメントを生成するために使用します。**（温度設定による応答制御を適用済み）** |
 | **堅牢性** | **cenkalti/backoff** (内部移植) | **AI API通信**、**Slack**、**Backlog**への投稿処理に**リトライ機構**を実装。一時的なネットワーク障害やAPIのレート制限からの自動回復を実現します。 |
@@ -105,16 +105,16 @@ export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 
 すべてのサブコマンド (`generic`, `backlog`, `slack`, `gcs`) で使用可能なフラグです。
 
-| フラグ | ショートカット  | 説明 | デフォルト値 | 必須 |
-| :--- |:---------| :--- | :--- | :--- |
+| フラグ | ショートカット | 説明 | デフォルト値 | 必須 |
+| :--- | :--- | :--- | :--- | :--- |
 | `--mode` | **`-m`** | レビューモードを指定: `'release'` (リリース判定) または `'detail'` (詳細レビュー) | `detail` | ❌ |
-| `--git-clone-url` | **`-u`** | レビュー対象の Git リポジトリの **SSH URL** | **なし** | ✅ |
+| `--repo-url` | **`-u`** | レビュー対象の Git リポジトリの **SSH URL** | **なし** | ✅ |
 | `--base-branch` | **`-b`** | 差分比較の基準ブランチ | `main` | ❌ |
 | `--feature-branch` | **`-f`** | レビュー対象のフィーチャーブランチ | **なし** | ✅ |
 | `--local-path` | **`-l`** | リポジトリをクローンするローカルパス | 一時ディレクトリ | ❌ |
-| `--ssh-key-path` | **`-k`** | Git 認証用の SSH 秘密鍵のパス | `~/.ssh/id_rsa` | ❌ |
-| `--skip-host-key-check` | **`-s`** | SSHホストキーチェックをスキップする (**非推奨**) | `false` | ❌ |
-| `--model` | **`-g`** | 使用する Gemini モデル名 (例: `gemini-2.5-flash`) | `gemini-2.5-flash` | ❌ |
+| `--gemini` | **`-g`** | 使用する Gemini モデル名 (例: `gemini-2.5-flash`) | `gemini-2.5-flash` | ❌ |
+| `--ssh-key-path` | **`-k`** | Git 認証用の SSH 秘密鍵のパス。**CI/CD環境ではシークレットマウント先の絶対パス**を指定してください。 | `~/.ssh/id_rsa` | ❌ |
+| `--skip-host-key-check` | なし | SSHホストキーチェックをスキップする (**非推奨**/**🚨危険な設定**) | `false` | ❌ |
 
 -----
 
@@ -128,7 +128,7 @@ export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 # main と develop の差分をリリース判定モードで実行
 ./bin/gemini_reviewer generic \
   -m "release" \
-  --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
+  --repo-url "git@example.backlog.jp:PROJECT/repo-name.git" \
   --base-branch "main" \
   --feature-branch "develop"
 ```
@@ -145,7 +145,7 @@ export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 # feature/gcs-save の差分をレビューし、GCSにHTML結果を保存
 ./bin/gemini_reviewer gcs \
   -m "detail" \
-  --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
+  --repo-url "git@example.backlog.jp:PROJECT/repo-name.git" \
   --base-branch "main" \
   --feature-branch "feature/gcs-save" \
   --gcs-uri "gs://review-archive-bucket/reviews/2025/latest_review.html" 
@@ -155,7 +155,7 @@ export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 
 | フラグ | ショートカット | 説明 | 必須 | デフォルト値 |
 | :--- | :--- | :--- | :--- | :--- |
-| `--gcs-uri` | **`-s`** | 書き込み先 GCS URI (例: `gs://bucket/path/to/result.html`) | ❌ | `gs://git-gemini-reviewer-go/ReviewResult/result.html` |
+| `--gcs-uri` | **`-s`** | 書き込み先 GCS URI (例: `gs://bucket/path/to/result.html`) | ❌ | `gs://git-gemini-reviewer-go/review/result.html` |
 | `--content-type` | **`-t`** | GCSに保存するファイルのMIMEタイプ | ❌ | **`text/html; charset=utf-8`** |
 
 -----
@@ -169,18 +169,18 @@ export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 ```bash
 # bugfix/issue-456 の差分をレビューし、PROJECT-123 に投稿
 ./bin/gemini_reviewer backlog \
-  --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
+  --repo-url "git@example.backlog.jp:PROJECT/repo-name.git" \
   --base-branch "main" \
   --feature-branch "bugfix/issue-456" \
-  --issue-id "PROJECT-123" 
+  -i "PROJECT-123" 
 ```
 
 #### 固有フラグ (Backlog連携)
 
-| フラグ | 説明 | 必須 | デフォルト値 |
-| :--- | :--- | :--- | :--- |
-| `--issue-id` | コメントを投稿する Backlog 課題 ID (例: PROJECT-123) | **投稿時のみ✅** | なし |
-| `--no-post` | Backlog への投稿をスキップし、結果を標準出力する | ❌ | `false` |
+| フラグ | ショートカット | 説明 | 必須 | デフォルト値 |
+| :--- | :--- | :--- | :--- | :--- |
+| `--issue-id` | **`-i`** | コメントを投稿する Backlog 課題 ID (例: PROJECT-123) | **投稿時のみ✅** | なし |
+| `--no-post` | なし | Backlog への投稿をスキップし、結果を標準出力する | ❌ | `false` |
 
 -----
 
@@ -196,17 +196,15 @@ export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 # feature/slack-notify の差分を詳細レビューモードで実行し、Slackに投稿
 ./bin/gemini_reviewer slack \
   -m "detail" \
-  --git-clone-url "https://github.com/owner/repo-name.git" \
+  --repo-url "ssh://github.com/owner/repo-name.git" \
   --base-branch "main" \
   --feature-branch "feature/slack-notify" 
-  # --slack-webhook-url は環境変数 SLACK_WEBHOOK_URL から取得されます
 ```
 
 #### 固有フラグ (Slack連携)
 
 | フラグ | 説明 | 必須 | デフォルト値 |
 | :--- | :--- | :--- | :--- |
-| `--slack-webhook-url` | レビュー結果を投稿する Slack Webhook URL | **投稿時のみ✅** | 環境変数 `SLACK_WEBHOOK_URL` |
 | `--no-post` | Slack への投稿をスキップし、結果を標準出力する | ❌ | `false` |
 
 -----

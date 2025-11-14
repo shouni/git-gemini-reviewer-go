@@ -11,11 +11,8 @@ import (
 	"git-gemini-reviewer-go/prompts"
 )
 
-// 既存の BuildGitService 関数を修正して依存パスを調整
 // BuildGitService は、アプリケーションの設定に基づいて gitclient.Service の実装を構築します。
 func BuildGitService(cfg config.ReviewConfig) gitclient.Service {
-	//
-
 	// 1. GitClientOptionの設定
 	skipHostKeyCheckOption := gitclient.WithInsecureSkipHostKeyCheck(cfg.SkipHostKeyCheck)
 	baseBranchOption := gitclient.WithBaseBranch(cfg.BaseBranch)
@@ -39,7 +36,6 @@ func BuildGitService(cfg config.ReviewConfig) gitclient.Service {
 // BuildGeminiService は、アプリケーションの設定に基づいて geminiclient.Service の実装を構築します。
 // NewClient は context.Context を必要とするため、引数に追加します。
 func BuildGeminiService(ctx context.Context, cfg config.ReviewConfig) (geminiclient.Service, error) {
-
 	// geminiclient.NewClient を呼び出してインスタンスを構築
 	geminiClient, err := geminiclient.NewClient(ctx, cfg.GeminiModel)
 	if err != nil {
