@@ -72,8 +72,7 @@ func (c *Client) GenerateContent(ctx context.Context, finalPrompt string) (strin
 	resp, err := c.client.GenerateContent(ctx, finalPrompt, c.modelName)
 
 	if err != nil {
-		// リトライ上限到達などのエラーを含む
-		return "", fmt.Errorf("Gemini code review failed: %w", err)
+		return "", fmt.Errorf("Gemini API call failed (Model: %s): %w", c.modelName, err)
 	}
 
 	// 成功レスポンスからテキストを返す
