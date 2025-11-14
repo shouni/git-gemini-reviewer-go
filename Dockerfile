@@ -15,7 +15,9 @@ RUN CGO_ENABLED=0 go build -o bin/gemini_reviewer .
 # STEP 2: 実行ステージ (実行専用の超軽量・セキュアなイメージ)
 # ----------------------------------------------------------------------
 FROM gcr.io/distroless/static-debian12
-LABEL org.opencontainers.image.source=https://github.com/shouni/git-gemini-reviewer-go
+LABEL org.opencontainers.image.source=https://github.com/shouni/git-gemini-reviewer-go \
+      org.opencontainers.image.description="A Go application for reviewing code diffs using Google Gemini." \
+      org.opencontainers.image.url="https://github.com/shouni/git-gemini-reviewer-go"
 
 # 実行可能なバイナリの配置場所を /usr/local/bin に設定
 WORKDIR /usr/local/bin
