@@ -19,9 +19,6 @@ LABEL org.opencontainers.image.source=https://github.com/shouni/git-gemini-revie
       org.opencontainers.image.description="A Go application for reviewing code diffs using Google Gemini." \
       org.opencontainers.image.url="https://github.com/shouni/git-gemini-reviewer-go"
 
-# 実行可能なバイナリの配置場所を /usr/local/bin に設定
-WORKDIR /app
-
 # ビルドステージの相対パス (/app/bin/gemini_reviewer) からコピー
 COPY --from=builder /app/bin/gemini_reviewer /app/gemini_reviewer
 
