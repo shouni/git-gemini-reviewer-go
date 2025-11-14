@@ -2,8 +2,8 @@ package gitclient
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
-	"os"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
@@ -119,7 +119,7 @@ func (c *Client) Fetch(repo *git.Repository) error {
 	err := repo.Fetch(&git.FetchOptions{
 		Auth:     c.auth,
 		RefSpecs: []config.RefSpec{refSpec},
-		Progress: os.Stdout,
+		Progress: io.Discard,
 	})
 
 	if err != nil && err != git.NoErrAlreadyUpToDate {

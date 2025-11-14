@@ -2,6 +2,7 @@ package gitclient
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -32,7 +33,7 @@ func (c *Client) cloneRepository(repositoryURL, localPath, branch string) error 
 		ReferenceName: plumbing.NewBranchReferenceName(branch),
 		SingleBranch:  true,
 		Auth:          auth,
-		Progress:      os.Stdout,
+		Progress:      io.Discard,
 	})
 	if err != nil {
 		return fmt.Errorf("go-git クローンに失敗しました: %w", err)
@@ -79,6 +80,7 @@ func (c *Client) updateExistingRepository(repo *git.Repository, repositoryURL st
 		ReferenceName: plumbing.NewBranchReferenceName(c.BaseBranch),
 		Auth:          authForPull,
 		SingleBranch:  true,
+		Progress:      io.Discard,
 	})
 
 	if pullErr == nil || pullErr == git.NoErrAlreadyUpToDate {
