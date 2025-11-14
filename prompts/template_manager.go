@@ -13,6 +13,9 @@ var ReleasePromptTemplate string
 //go:embed prompt_detail.md
 var DetailPromptTemplate string
 
+//go:embed html_prompt.md
+var HTMLPromptTemplate string
+
 // GetReviewTemplate は、レビューモードに基づいて、テンプレート名とその内容を返します。
 // エラーは、無効なモードが指定された場合に返されます。
 func GetReviewTemplate(reviewMode string) (name string, content string, err error) {
