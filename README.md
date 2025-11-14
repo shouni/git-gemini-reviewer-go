@@ -9,7 +9,7 @@
 
 **Git Gemini Reviewer Go** は、**Google Gemini の強力なAI**を活用し、**コードレビューを自動でお手伝い**するコマンドラインツールです。
 
-このツールを導入することで、開発チームは単なる作業の効率化を超え、より**創造的で価値の高い業務**に集中できるようになります。AIは煩雑な初期チェックを担う、**チームの優秀な新しいパートナー**のような存在です .
+このツールを導入することで、開発チームは単なる作業の効率化を超え、より**創造的で価値の高い業務**に集中できるようになります。AIは煩雑な初期チェックを担う、**チームの優秀な新しいパートナー**のような存在です。
 
 ### 🌸 導入がもたらすポジティブな変化
 
@@ -30,7 +30,7 @@
 | **言語** | **Go (Golang)** | ツールの開発言語。クロスプラットフォームでの高速な実行を実現します。 |
 | **CLI フレームワーク** | **Cobra** | コマンドライン引数（フラグ）の解析とサブコマンド構造 (`generic`, `backlog`, `slack`, `gcs`) の構築に使用します。 |
 | **Git 操作** | **go-git** | クローン、フェッチ、**3-dot diff** (共通祖先からの差分) の取得まですべてを Go のコード内で完結させ、環境設定の手間を削減しました。 |
-| **I/O 連携** | **`github.com/shouni/go-remote-io`** 🆕 | GCSとローカルファイルシステムへのI/O操作を抽象化し、**GCSへのレビュー結果保存**を実現します。 |
+| **I/O 連携** | **`github.com/shouni/go-remote-io`**  | GCSとローカルファイルシステムへのI/O操作を抽象化し、**GCSへのレビュー結果保存**を実現します。 |
 | **ロギング** | **log/slog** | 構造化されたログ (`key=value`) に完全移行。詳細なデバッグ情報が必要な際に、ログレベルを上げて柔軟に対応できます。 |
 | **AI モデル** | **Google Gemini API** | 取得したコード差分を分析し、レビューコメントを生成するために使用します。**（温度設定による応答制御を適用済み）** |
 | **堅牢性** | **cenkalti/backoff** (内部移植) | **AI API通信**、**Slack**、**Backlog**への投稿処理に**リトライ機構**を実装。一時的なネットワーク障害やAPIのレート制限からの自動回復を実現します。 |
@@ -137,26 +137,26 @@ export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 
 ### 2\. GCS 保存モード (`gcs`) 🆕
 
-リモートリポジトリのブランチ比較を行い、その結果を **Google Cloud Storage (GCS)** の指定された URI に保存します。このモードは、レビュー結果のアーカイブや、後続のシステム連携パイプラインでの利用を目的としています。
+リモートリポジトリのブランチ比較を行い、その結果を **Google Cloud Storage (GCS)** の指定された URI に、**AIが変換したスタイル付き HTML** として保存します。このモードは、レビュー結果のアーカイブや、CI/CDパイプラインでのレポート生成を目的としています。
 
 #### 実行コマンド例
 
 ```bash
-# feature/gcs-save の差分をレビューし、GCSに結果を保存
+# feature/gcs-save の差分をレビューし、GCSにHTML結果を保存
 ./bin/gemini_reviewer gcs \
   -m "detail" \
   --git-clone-url "git@example.backlog.jp:PROJECT/repo-name.git" \
   --base-branch "main" \
   --feature-branch "feature/gcs-save" \
-  --gcs-uri "gs://review-archive-bucket/reviews/2025/latest_review.md" 
+  --gcs-uri "gs://review-archive-bucket/reviews/2025/latest_review.html" 
 ```
 
 #### 固有フラグ (GCS連携)
 
 | フラグ | ショートカット | 説明 | 必須 | デフォルト値 |
 | :--- | :--- | :--- | :--- | :--- |
-| `--gcs-uri` | **`-s`** | 書き込み先 GCS URI (例: `gs://bucket/path/to/result.md`) | ❌ | `gs://git-gemini-reviewer-go/ReviewResult/result.md` |
-| `--content-type` | **`-t`** | GCSに保存するファイルのMIMEタイプ | ❌ | `text/markdown; charset=utf-8` |
+| `--gcs-uri` | **`-s`** | 書き込み先 GCS URI (例: `gs://bucket/path/to/result.html`) | ❌ | `gs://git-gemini-reviewer-go/ReviewResult/result.html` |
+| `--content-type` | **`-t`** | GCSに保存するファイルのMIMEタイプ | ❌ | **`text/html; charset=utf-8`** |
 
 -----
 
