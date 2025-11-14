@@ -88,6 +88,12 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("GeminiによるHTML生成に失敗しました: %w", err)
 	}
 
+	// HTML変換結果が空文字列の場合のチェックを追加
+	if htmlResult == "" {
+		slog.Warn("AIによるHTML変換結果が空文字列でした。GCSへの保存をスキップします。", "uri", gcsURI)
+		return nil
+	}
+
 	// 4. ClientFactory の取得
 	clientFactory, err := factory.NewClientFactory(ctx)
 	if err != nil {
