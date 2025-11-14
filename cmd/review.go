@@ -23,7 +23,7 @@ func executeReviewPipeline(
 	// LocalPathが指定されていない場合、RepoURLから動的に生成しcfgを更新します。
 	if cfg.LocalPath == "" {
 		cfg.LocalPath = urlpath.SanitizeURLToUniquePath(cfg.RepoURL)
-		slog.Debug("LocalPathが未指定のため、URLから動的にパスを生成しました。", "generated_path", cfg.LocalPath) // 🚨 修正: cfg.LocalPath を参照
+		slog.Debug("LocalPathが未指定のため、URLから動的にパスを生成しました。", "generatedPath", cfg.LocalPath) // 🚨 修正: cfg.LocalPath を参照
 	}
 
 	// --- 2. サービス依存関係の構築 ---
