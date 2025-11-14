@@ -8,7 +8,7 @@ RUN go mod download
 # アプリケーションのソースコード全体をコピー (main.go を含む)
 COPY . .
 # 実行ファイルが ルート直下の main.go を起点としているため、ビルド対象をルート (.) に指定
-# 実行ファイルは ./app/bin/llm_cleaner に出力されます
+# 実行ファイルは ./app/bin/gemini_reviewer に出力されます
 RUN CGO_ENABLED=0 go build -o bin/gemini_reviewer .
 
 # ----------------------------------------------------------------------
