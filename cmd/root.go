@@ -62,7 +62,6 @@ func initAppPreRunE(cmd *cobra.Command, args []string) error {
 func addAppPersistentFlags(rootCmd *cobra.Command) {
 	// ReviewConfig.ReviewMode にバインド
 	rootCmd.PersistentFlags().StringVarP(&ReviewConfig.ReviewMode, "mode", "m", "detail", "レビューモードを指定: 'release' (リリース判定) または 'detail' (詳細レビュー)")
-
 	rootCmd.PersistentFlags().StringVarP(&ReviewConfig.RepoURL, "repo-url", "u", "", "レビュー対象の Git リポジトリの SSH URL。")
 	rootCmd.MarkPersistentFlagRequired("repo-url")
 	rootCmd.PersistentFlags().StringVarP(&ReviewConfig.BaseBranch, "base-branch", "b", "main", "差分比較の基準ブランチ (例: 'main').")
