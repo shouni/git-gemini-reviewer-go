@@ -25,13 +25,14 @@ func executeReviewPipeline(
 	cfg config.ReviewConfig,
 ) (string, error) {
 
-	// --- 1. 依存関係の構築（Builder パッケージを使用） ---
-	if ReviewConfig.LocalPath == "" {
-		ReviewConfig.LocalPath = GenerateLocalPathFromURL(cfg.RepoURL)
-		slog.Debug("LocalPathが未指定のため、URLから動的にパスを生成しました。", "generated_path", ReviewConfig.LocalPath)
+	// --- 1. ローカルパスの決定 ---
+	// LocalPathが指定されていない場合、RepoURLから動的に生成しcfgを更新します。
+	if cfg.LocalPath == "" {
+		cfg.LocalPath = GenerateLocalPathFromURL(cfg.RepoURL)
+		slog.Debug("LocalPathが未指定のため、URLから動的にパスを生成しました。", "generated_path", cfg.LocalPath) // 🚨 修正: cfg.LocalPath を参照
 	}
 
-	// --- 2. 依存関係の構築（Builder パッケージを使用） ---
+	// --- 2. サービス依存関係の構築 ---
 	gitService := builder.BuildGitService(cfg)
 
 	geminiService, err := builder.BuildGeminiService(ctx, cfg)
@@ -39,7 +40,7 @@ func executeReviewPipeline(
 		return "", fmt.Errorf("Gemini Service の構築に失敗しました: %w", err)
 	}
 
-	// --- 3. promptBuilder の構築
+	// --- 3. Prompt Builder の構築 ---
 	// cfg.ReviewMode に基づいて適切なテンプレートを選択し、ビルダーを初期化します。
 	promptBuilder, err := builder.BuildReviewPromptBuilder(cfg)
 	if err != nil {
@@ -73,7 +74,7 @@ func executeReviewPipeline(
 // これは、ユーザーが --local-path を指定しなかった場合のデフォルト値を設定するために使用されます。
 func GenerateLocalPathFromURL(repoURL string) string {
 	// ベースディレクトリを設定 (例: /tmp/git-reviewer-repos)
-	tempBase := os.TempDir() + "/git-reviewer-repos"
+	tempBase := filepath.Join(os.TempDir(), "git-reviewer-repos")
 
 	// 1. スキームと.gitを削除してクリーンな名前を取得
 	name := strings.TrimSuffix(repoURL, ".git")
