@@ -82,8 +82,10 @@ func GenerateLocalPathFromURL(repoURL string) string {
 	name = strings.TrimPrefix(name, "http://")
 	name = strings.TrimPrefix(name, "git@")
 
-	// 2. パスとして使用できない文字をハイフンに置換
-	name = regexp.MustCompile(`-+`).ReplaceAllString(name, "-")
+	// 2. パスとして使用できない文字をハイフンに置換 (cleanURLRegex を使用)
+	// 例: github.com/user/repo -> github.com-user-repo
+	name = cleanURLRegex.ReplaceAllString(name, "-")
+	name = regexp.MustCompile(`-+`).ReplaceAllString(name, "-") // 連続するハイフンをまとめる
 
 	// 3. 衝突防止のため、URL全体のSHA-256ハッシュの先頭8桁を追加
 	hasher := sha256.New()
