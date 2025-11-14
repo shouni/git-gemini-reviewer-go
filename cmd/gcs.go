@@ -21,6 +21,8 @@ type GcsSaveFlags struct {
 
 var gcsSaveFlags GcsSaveFlags
 
+const PromptTypeHTML = "html"
+
 // gcsSaveCmd は 'gcs-save' サブコマンドを定義します。
 var gcsSaveCmd = &cobra.Command{
 	Use:   "gcs",
@@ -32,9 +34,8 @@ var gcsSaveCmd = &cobra.Command{
 }
 
 func init() {
-	// フラグの初期化
-	gcsSaveCmd.Flags().StringVarP(&gcsSaveFlags.ContentType, "content-type", "t", "text/html; charset=utf-8", "GCSに保存する際のMIMEタイプ")
-	gcsSaveCmd.Flags().StringVar(&gcsSaveFlags.GCSURI, "gcs-uri", "gs://git-gemini-reviewer-go/ReviewResult/result.html", "GCSへ保存する際の宛先URI (例: gs://bucket/path/to/result.html)")
+	gcsSaveCmd.Flags().StringVarP(&gcsSaveFlags.ContentType, "content-type", "t", "text/html; charset=utf-8", "GCSに保存する際のMIMEタイプ (デフォルトはHTML)")
+	gcsSaveCmd.Flags().StringVar(&gcsSaveFlags.GCSURI, "gcs-uri", "gs://git-gemini-reviewer-go/ReviewResult/result.html", "GCSへ保存する際の宛先URI (デフォルトはHTMLファイル)")
 }
 
 // runGcsSave は gcs-save コマンドの実行ロジックです。
@@ -65,16 +66,13 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 	// 3. 第二のAI呼び出し: Markdownをスタイル付きHTMLに変換
 	slog.Info("レビュー結果のMarkdownをスタイル付きHTMLに変換中...", "model", ReviewConfig.GeminiModel)
 
-	// 💡 修正: ReviewPromptBuilder を使用して構造的にプロンプトを組み立てる (指摘50に対応)
-	// prompts.HTMLPromptTemplate の内容に "%s" が含まれていることを前提とする
-	htmlPromptBuilder, err := prompts.NewReviewPromptBuilder("html", prompts.HTMLPromptTemplate)
+	htmlPromptBuilder, err := prompts.NewReviewPromptBuilder(PromptTypeHTML, prompts.HTMLPromptTemplate)
 	if err != nil {
 		slog.Error("HTMLプロンプトビルダーの初期化エラー。", "error", err)
 		return fmt.Errorf("HTMLプロンプトビルダーの初期化に失敗しました: %w", err)
 	}
-
 	reviewData := prompts.ReviewTemplateData{
-		DiffContent: reviewResultMarkdown, // Markdown結果をDiffContentとしてデータに渡す
+		DiffContent: reviewResultMarkdown,
 	}
 
 	// Buildメソッドが内部でテンプレートを安全に処理する
