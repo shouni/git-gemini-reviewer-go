@@ -35,7 +35,7 @@ var gcsSaveCmd = &cobra.Command{
 
 func init() {
 	gcsSaveCmd.Flags().StringVarP(&gcsSaveFlags.ContentType, "content-type", "t", "text/html; charset=utf-8", "GCSに保存する際のMIMEタイプ (デフォルトはHTML)")
-	gcsSaveCmd.Flags().StringVar(&gcsSaveFlags.GCSURI, "gcs-uri", "gs://git-gemini-reviewer-go/reviewResult/result.html", "GCSへ保存する際の宛先URI (デフォルトはHTMLファイル)")
+	gcsSaveCmd.Flags().StringVar(&gcsSaveFlags.GCSURI, "gcs-uri", "gs://git-gemini-reviewer-go/review/result.html", "GCSへ保存する際の宛先URI (デフォルトはHTMLファイル)")
 }
 
 // runGcsSave は gcs-save コマンドの実行ロジックです。
