@@ -9,6 +9,7 @@ require (
 	github.com/shouni/go-http-kit v1.1.2
 	github.com/shouni/go-notifier v1.1.3
 	github.com/shouni/go-remote-io v1.0.1
+	github.com/shouni/go-text-format v1.0.1
 	github.com/shouni/go-utils v1.0.11
 	github.com/spf13/cobra v1.10.1
 	golang.org/x/crypto v0.44.0
@@ -63,6 +64,7 @@ require (
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
+	github.com/yuin/goldmark v1.7.13 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.36.0 // indirect
