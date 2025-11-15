@@ -62,19 +62,23 @@ func runGcsCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	// ヘッダー文字列の作成 (ブランチ情報を結合)
-	title := fmt.Sprintf(
-		"AIコードレビュー結果 (ブランチ: `%s` ← `%s`)",
+	htmlTitle := fmt.Sprintf("AIコードレビュー結果")
+	summaryMarkdown := fmt.Sprintf(
+		"レビュー対象リポジトリ: `%s`\n\n**ブランチ差分:** `%s` ← `%s`\n\n",
+		ReviewConfig.RepoURL,
 		ReviewConfig.BaseBranch,
 		ReviewConfig.FeatureBranch,
 	)
-	// タイトルとMarkdownコンテンツを結合
 	var combinedContentBuffer bytes.Buffer
-	combinedContentBuffer.WriteString("## " + title)
+	combinedContentBuffer.WriteString("## AIコードレビュー結果")
 	combinedContentBuffer.WriteString("\n\n")
+	// 要約情報をヘッダーの下に配置
+	combinedContentBuffer.WriteString(summaryMarkdown)
+	// レビュー結果の本文を追加
 	combinedContentBuffer.WriteString(reviewResultMarkdown)
 
 	// 2. HTML変換
-	htmlBuffer, err := convertMarkdownToHtml(ctx, title, combinedContentBuffer.String())
+	htmlBuffer, err := convertMarkdownToHtml(ctx, htmlTitle, combinedContentBuffer.String())
 	if err != nil {
 		return fmt.Errorf("レビュー結果をHTML変換に失敗しました: %w", err)
 	}
@@ -110,7 +114,7 @@ func convertMarkdownToHtml(ctx context.Context, title string, reviewResultMarkdo
 		return nil, err
 	}
 
-	return mk2html.ConvertMarkdownToHtml(ctx, title, combinedContentBuffer.Bytes())
+	return mk2html.ConvertMarkdownToHtml(ctx, title, []byte(reviewResultMarkdown))
 }
 
 // uploadToGCS はレンダリングされたHTMLをGCSにアップロードします。
