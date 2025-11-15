@@ -61,7 +61,7 @@ func gcsSaveCommand(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// ヘッダー文字列の作成 (ブランチ情報を結合)
+	// ヘッダー文字列の作成
 	htmlTitle := fmt.Sprintf("AIコードレビュー結果")
 	summaryMarkdown := fmt.Sprintf(
 		"レビュー対象リポジトリ: `%s`\n\n**ブランチ差分:** `%s` ← `%s`\n\n",
@@ -70,7 +70,7 @@ func gcsSaveCommand(cmd *cobra.Command, args []string) error {
 		ReviewConfig.FeatureBranch,
 	)
 	var combinedContentBuffer bytes.Buffer
-	combinedContentBuffer.WriteString("## AIコードレビュー結果")
+	combinedContentBuffer.WriteString("## " + htmlTitle)
 	combinedContentBuffer.WriteString("\n\n")
 	// 要約情報をヘッダーの下に配置
 	combinedContentBuffer.WriteString(summaryMarkdown)
