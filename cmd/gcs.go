@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -74,16 +75,22 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 
 	mk2html, err := htmlBuilder.BuildMarkdownToHtmlRunner()
 	if err != nil {
-		slog.Error("HTML変換ビルダーの初期化に失敗しました。", "error", err)
-		return fmt.Errorf("HTML変換ビルダーの初期化に失敗しました: %w", err)
+		// slog.Error("Markdown-to-HTMLランナーの構築に失敗しました。", "error", err)
+		return fmt.Errorf("Markdown-to-HTMLランナーの構築に失敗しました: %w", err)
 	}
 
 	// ヘッダー文字列の作成 (ブランチ情報を結合)
 	title := fmt.Sprintf(
-		"# AIコードレビュー結果 (ブランチ: `%s` ← `%s`)",
+		"AIコードレビュー結果 (ブランチ: `%s` ← `%s`)",
 		ReviewConfig.BaseBranch,
 		ReviewConfig.FeatureBranch,
 	)
+	// タイトルとMarkdownコンテンツを結合
+	var combinedContentBuffer bytes.Buffer
+	combinedContentBuffer.WriteString("# " + title)
+	combinedContentBuffer.WriteString("\n\n")
+	combinedContentBuffer.WriteString(reviewResultMarkdown)
+
 	htmlBuffer, err := mk2html.ConvertMarkdownToHtml(ctx, title, []byte(reviewResultMarkdown))
 	if err != nil {
 		slog.Error("HTMLレンダリングエラー。", "error", err)
