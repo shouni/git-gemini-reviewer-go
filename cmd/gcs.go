@@ -13,13 +13,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// GcsFlags は gcs-save コマンド固有のフラグを保持します。
-type GcsFlags struct {
-	GCSUrl      string // GCSへ保存する際の宛先URI (例: gs://bucket/path/to/result.html)
+// GCSFlags は gcs コマンド固有のフラグを保持します。
+type GCSFlags struct {
+	GCSURI      string // GCSへ保存する際の宛先URI (例: gs://bucket/path/to/result.html)
 	ContentType string // GCSに保存する際のMIMEタイプ
 }
 
-var gcsFlags GcsFlags
+var gcsFlags GCSFlags
 
 // gcsSaveCmd は 'gcs' サブコマンドを定義します。
 var gcsSaveCmd = &cobra.Command{
@@ -33,7 +33,7 @@ var gcsSaveCmd = &cobra.Command{
 
 func init() {
 	gcsSaveCmd.Flags().StringVarP(&gcsFlags.ContentType, "content-type", "t", "text/html; charset=utf-8", "GCSに保存する際のMIMEタイプ (デフォルトはHTML)")
-	gcsSaveCmd.Flags().StringVarP(&gcsFlags.GCSUrl, "gcs-uri", "s", "gs://git-gemini-reviewer-go/review/result.html", "GCSの保存先")
+	gcsSaveCmd.Flags().StringVarP(&gcsFlags.GCSURI, "gcs-uri", "s", "gs://git-gemini-reviewer-go/review/result.html", "GCSの保存先")
 }
 
 // --------------------------------------------------------------------------
@@ -43,7 +43,7 @@ func init() {
 // runGcsSave は gcs コマンドの実行ロジックです。
 func gcsSaveCommand(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	gcsURI := gcsFlags.GCSUrl
+	gcsURI := gcsFlags.GCSURI
 
 	bucketName, objectPath, err := validateGcsURI(gcsURI)
 	if err != nil {
@@ -78,7 +78,7 @@ func gcsSaveCommand(cmd *cobra.Command, args []string) error {
 	combinedContentBuffer.WriteString(reviewResultMarkdown)
 
 	// 2. HTML変換
-	htmlBuffer, err := convertMarkdownToHtml(ctx, htmlTitle, combinedContentBuffer.Bytes())
+	htmlBuffer, err := convertMarkdownToHTML(ctx, htmlTitle, combinedContentBuffer.Bytes())
 	if err != nil {
 		return fmt.Errorf("レビュー結果をHTML変換に失敗しました: %w", err)
 	}
@@ -102,8 +102,8 @@ func gcsSaveCommand(cmd *cobra.Command, args []string) error {
 // ヘルパー関数
 // --------------------------------------------------------------------------
 
-// convertMarkdownToHtml Markdown形式の入力データを受け取り、HTML形式のデータに変換する。
-func convertMarkdownToHtml(ctx context.Context, title string, reviewResultMarkdown []byte) (*bytes.Buffer, error) {
+// convertMarkdownToHTML Markdown形式の入力データを受け取り、HTML形式のデータに変換する。
+func convertMarkdownToHTML(ctx context.Context, title string, reviewResultMarkdown []byte) (*bytes.Buffer, error) {
 	htmlBuilder, err := builder.NewBuilder()
 	if err != nil {
 		return nil, err
