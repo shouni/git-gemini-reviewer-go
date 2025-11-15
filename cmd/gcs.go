@@ -13,37 +13,37 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// GcsSaveFlags は gcs-save コマンド固有のフラグを保持します。
-type GcsSaveFlags struct {
-	GcsURI      string // GCSへ保存する際の宛先URI (例: gs://bucket/path/to/result.html)
+// GcsFlags は gcs-save コマンド固有のフラグを保持します。
+type GcsFlags struct {
+	GCSUrl      string // GCSへ保存する際の宛先URI (例: gs://bucket/path/to/result.html)
 	ContentType string // GCSに保存する際のMIMEタイプ
 }
 
-var gcsSaveFlags GcsSaveFlags
+var gcsFlags GcsFlags
 
-// gcsSaveCmd は 'gcs-save' サブコマンドを定義します。
+// gcsSaveCmd は 'gcs' サブコマンドを定義します。
 var gcsSaveCmd = &cobra.Command{
 	Use:   "gcs",
 	Short: "AIレビュー結果をスタイル付きHTMLに変換し、その結果を指定されたGCS URIに保存します。",
 	Long: `このコマンドは、指定されたGitリポジトリのブランチ間の差分をAIでレビューし、その結果をさらにAIでスタイル付きHTMLに変換した後、go-remote-io を利用してGCSにアップロードします。
 宛先 URI は '--gcs-uri' フラグで指定する必要があり、'gs://bucket-name/object-path' の形式である必要があります。`,
 	Args: cobra.NoArgs,
-	RunE: runGcsCommand,
+	RunE: gcsSaveCommand,
 }
 
 func init() {
-	gcsSaveCmd.Flags().StringVarP(&gcsSaveFlags.ContentType, "content-type", "t", "text/html; charset=utf-8", "GCSに保存する際のMIMEタイプ (デフォルトはHTML)")
-	gcsSaveCmd.Flags().StringVarP(&gcsSaveFlags.GcsURI, "gcs-uri", "s", "gs://git-gemini-reviewer-go/review/result.html", "GCSの保存先")
+	gcsSaveCmd.Flags().StringVarP(&gcsFlags.ContentType, "content-type", "t", "text/html; charset=utf-8", "GCSに保存する際のMIMEタイプ (デフォルトはHTML)")
+	gcsSaveCmd.Flags().StringVarP(&gcsFlags.GCSUrl, "gcs-uri", "s", "gs://git-gemini-reviewer-go/review/result.html", "GCSの保存先")
 }
 
 // --------------------------------------------------------------------------
 // コマンドの実行ロジック
 // --------------------------------------------------------------------------
 
-// runGcsSave は gcs-save コマンドの実行ロジックです。
-func runGcsCommand(cmd *cobra.Command, args []string) error {
+// runGcsSave は gcs コマンドの実行ロジックです。
+func gcsSaveCommand(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	gcsURI := gcsSaveFlags.GcsURI
+	gcsURI := gcsFlags.GCSUrl
 
 	bucketName, objectPath, err := validateGcsURI(gcsURI)
 	if err != nil {
@@ -78,7 +78,7 @@ func runGcsCommand(cmd *cobra.Command, args []string) error {
 	combinedContentBuffer.WriteString(reviewResultMarkdown)
 
 	// 2. HTML変換
-	htmlBuffer, err := convertMarkdownToHtml(ctx, htmlTitle, combinedContentBuffer.String())
+	htmlBuffer, err := convertMarkdownToHtml(ctx, htmlTitle, combinedContentBuffer.Bytes())
 	if err != nil {
 		return fmt.Errorf("レビュー結果をHTML変換に失敗しました: %w", err)
 	}
@@ -88,7 +88,7 @@ func runGcsCommand(cmd *cobra.Command, args []string) error {
 		"uri", gcsURI,
 		"bucket", bucketName,
 		"object", objectPath,
-		"content_type", gcsSaveFlags.ContentType)
+		"content_type", gcsFlags.ContentType)
 	err = uploadToGCS(ctx, bucketName, objectPath, htmlBuffer)
 	if err != nil {
 		return fmt.Errorf("GCSへの書き込みに失敗しました (URI: %s): %w", gcsURI, err)
@@ -103,7 +103,7 @@ func runGcsCommand(cmd *cobra.Command, args []string) error {
 // --------------------------------------------------------------------------
 
 // convertMarkdownToHtml Markdown形式の入力データを受け取り、HTML形式のデータに変換する。
-func convertMarkdownToHtml(ctx context.Context, title string, reviewResultMarkdown string) (*bytes.Buffer, error) {
+func convertMarkdownToHtml(ctx context.Context, title string, reviewResultMarkdown []byte) (*bytes.Buffer, error) {
 	htmlBuilder, err := builder.NewBuilder()
 	if err != nil {
 		return nil, err
@@ -114,7 +114,7 @@ func convertMarkdownToHtml(ctx context.Context, title string, reviewResultMarkdo
 		return nil, err
 	}
 
-	return mk2html.ConvertMarkdownToHtml(ctx, title, []byte(reviewResultMarkdown))
+	return mk2html.ConvertMarkdownToHtml(ctx, title, reviewResultMarkdown)
 }
 
 // uploadToGCS はレンダリングされたHTMLをGCSにアップロードします。
@@ -128,7 +128,7 @@ func uploadToGCS(ctx context.Context, bucketName, objectPath string, content io.
 		return err
 	}
 
-	return writer.WriteToGCS(ctx, bucketName, objectPath, content, gcsSaveFlags.ContentType)
+	return writer.WriteToGCS(ctx, bucketName, objectPath, content, gcsFlags.ContentType)
 }
 
 // validateGcsURI は GCS URIの検証と解析を行うヘルパー関数です。
