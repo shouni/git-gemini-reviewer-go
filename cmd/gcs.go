@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
 
 	"github.com/shouni/go-remote-io/pkg/factory"
 	mk2html "github.com/shouni/go-text-format/pkg/builder"
 	"github.com/spf13/cobra"
 )
+
+const DefaultLocale = "ja-jp" // ファイルの先頭や適切な定数ファイルに定義
 
 // GcsSaveFlags は gcs-save コマンド固有のフラグを保持します。
 type GcsSaveFlags struct {
@@ -76,7 +77,7 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 	htmlBuilder, err := mk2html.NewBuilder()
 	if err != nil {
 		slog.Error("HTML変換ビルダーの初期化に失敗しました。", "error", err)
-		os.Exit(1)
+		return fmt.Errorf("HTML変換ビルダーの初期化に失敗しました: %w", err)
 	}
 
 	converterService := htmlBuilder.ConverterService
@@ -93,7 +94,7 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 		ReviewConfig.FeatureBranch,
 	)
 	var htmlBuffer bytes.Buffer
-	err = rendererService.Render(&htmlBuffer, htmlFragment, "ja-jp", title)
+	err = rendererService.Render(&htmlBuffer, htmlFragment, DefaultLocale, title)
 	if err != nil {
 		slog.Error("HTML変換プロンプトの組み立てエラー。", "error", err)
 		return fmt.Errorf("HTML変換プロンプトの組み立てに失敗しました: %w", err)
