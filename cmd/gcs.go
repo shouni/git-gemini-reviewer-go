@@ -1,16 +1,15 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 
-	"github.com/spf13/cobra"
-
-	"git-gemini-reviewer-go/internal/builder"
-	"git-gemini-reviewer-go/prompts"
-
 	"github.com/shouni/go-remote-io/pkg/factory"
+	mk2html "github.com/shouni/go-text-format/pkg/builder"
+	"github.com/spf13/cobra"
 )
 
 // GcsSaveFlags は gcs-save コマンド固有のフラグを保持します。
@@ -76,38 +75,34 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// 2. Gemini Clientの取得
-	geminiService, err := builder.BuildGeminiService(ctx, ReviewConfig)
+	htmlBuilder, err := mk2html.NewBuilder()
 	if err != nil {
-		return fmt.Errorf("Gemini Serviceの構築に失敗しました: %w", err)
+		slog.Error("HTML変換ビルダーの初期化に失敗しました。", "error", err)
+		os.Exit(1)
 	}
 
-	// 3. 第二のAI呼び出し: Markdownをスタイル付きHTMLに変換
-	slog.Info("レビュー結果のMarkdownをスタイル付きHTMLに変換中...", "model", ReviewConfig.GeminiModel)
-	htmlPromptBuilder, err := prompts.NewReviewPromptBuilder(PromptTypeHTML, prompts.HTMLPromptTemplate)
+	converterService := htmlBuilder.ConverterService
+	rendererService := htmlBuilder.RendererService
+	htmlFragment, err := converterService.Convert(ctx, []byte(reviewResultMarkdown))
 	if err != nil {
-		slog.Error("HTMLプロンプトビルダーの初期化エラー。", "error", err)
-		return fmt.Errorf("HTMLプロンプトビルダーの初期化に失敗しました: %w", err)
-	}
-	reviewData := prompts.ReviewTemplateData{
-		DiffContent: reviewResultMarkdown,
+		return fmt.Errorf("HTMLフラグメント生成エラー: %w", err)
 	}
 
-	// Buildメソッドが内部でテンプレートを安全に処理する
-	finalPrompt, err := htmlPromptBuilder.Build(reviewData)
+	// ヘッダー文字列の作成 (ブランチ情報を結合)
+	title := fmt.Sprintf(
+		"AIコードレビュー結果 (ブランチ: `%s` ← `%s`)",
+		ReviewConfig.BaseBranch,
+		ReviewConfig.FeatureBranch,
+	)
+	var htmlBuffer bytes.Buffer
+	err = rendererService.Render(&htmlBuffer, htmlFragment, "ja-jp", title)
 	if err != nil {
 		slog.Error("HTML変換プロンプトの組み立てエラー。", "error", err)
 		return fmt.Errorf("HTML変換プロンプトの組み立てに失敗しました: %w", err)
 	}
 
-	// AIにHTMLを生成させる
-	htmlResult, err := geminiService.GenerateContent(ctx, finalPrompt)
-	if err != nil {
-		return fmt.Errorf("GeminiによるHTML生成に失敗しました: %w", err)
-	}
-
 	// HTML変換結果が空文字列の場合のチェックを追加
-	if htmlResult == "" {
+	if htmlBuffer.Len() == 0 {
 		slog.Warn("AIによるHTML変換結果が空文字列でした。GCSへの保存をスキップします。", "uri", gcsURI)
 		return nil
 	}
@@ -125,7 +120,7 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 	}
 
 	// 7. レビュー結果文字列を io.Reader に変換
-	contentReader := strings.NewReader(htmlResult)
+	contentReader := strings.NewReader(htmlBuffer.String())
 
 	// 8. GCSへの書き込み実行
 	slog.Info("レビュー結果をGCSへアップロード中",
