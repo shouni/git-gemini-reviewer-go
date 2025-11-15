@@ -13,9 +13,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// DefaultLocale はHTMLレンダリングに使用されるロケールです。
-const DefaultLocale = "ja-jp"
-
 // GcsSaveFlags は gcs-save コマンド固有のフラグを保持します。
 type GcsSaveFlags struct {
 	GcsURI      string // GCSへ保存する際の宛先URI (例: gs://bucket/path/to/result.html)
@@ -71,6 +68,7 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 
 	// convertMarkdownToHTML が nil を返した場合（スキップ処理）、エラーなしで終了する
 	if htmlBuffer == nil {
+		slog.Warn("AIレビュー結果が空文字列でした。GCSへの保存をスキップします。", "uri", gcsURI)
 		return nil
 	}
 
@@ -89,6 +87,7 @@ func executeAndPrepareMarkdown(ctx context.Context, gcsURI string) (markdownCont
 		return nil, "", fmt.Errorf("レビューパイプラインの実行に失敗しました: %w", err)
 	}
 
+	// ここでは、空文字列の場合に警告を出力しない。呼び出し元で gcsURI と共に警告を出力する。
 	if reviewResultMarkdown == "" {
 		slog.Warn("AIレビュー結果が空文字列でした。GCSへの保存をスキップします。", "uri", gcsURI)
 		return nil, "", nil
@@ -107,7 +106,6 @@ func executeAndPrepareMarkdown(ctx context.Context, gcsURI string) (markdownCont
 	combinedContentBuffer.WriteString("\n\n")
 	combinedContentBuffer.WriteString(reviewResultMarkdown)
 
-	// 戻り値を修正
 	return combinedContentBuffer.Bytes(), title, nil
 }
 
@@ -160,19 +158,16 @@ func convertMarkdownToHTML(ctx context.Context, gcsURI string) (*bytes.Buffer, e
 
 // uploadToGCS はレンダリングされたHTMLをGCSにアップロードします。
 func uploadToGCS(ctx context.Context, bucketName, objectPath string, content io.Reader, gcsURI string) error {
-	// 1. ClientFactory の取得
 	clientFactory, err := factory.NewClientFactory(ctx)
 	if err != nil {
 		return err
 	}
 
-	// 2. GCSOutputWriter の取得
 	writer, err := clientFactory.GetGCSOutputWriter()
 	if err != nil {
 		return fmt.Errorf("GCSOutputWriterの取得に失敗しました: %w", err)
 	}
 
-	// 3. GCSへの書き込み実行
 	slog.Info("レビュー結果をGCSへアップロード中",
 		"uri", gcsURI,
 		"bucket", bucketName,
