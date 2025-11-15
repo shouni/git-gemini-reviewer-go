@@ -20,8 +20,6 @@ type GcsSaveFlags struct {
 
 var gcsSaveFlags GcsSaveFlags
 
-const PromptTypeHTML = "html"
-
 // gcsSaveCmd は 'gcs-save' サブコマンドを定義します。
 var gcsSaveCmd = &cobra.Command{
 	Use:   "gcs",
