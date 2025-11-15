@@ -89,9 +89,9 @@ func gcsSaveCommand(cmd *cobra.Command, args []string) error {
 		"bucket", bucketName,
 		"object", objectPath,
 		"content_type", gcsFlags.ContentType)
-	err = uploadToGCS(ctx, bucketName, objectPath, htmlBuffer)
+	err = uploadToGCS(ctx, bucketName, objectPath, htmlBuffer, gcsFlags.ContentType)
 	if err != nil {
-		return fmt.Errorf("GCSへの書き込みに失敗しました (URI: %s): %w", gcsURI, err)
+		return fmt.Errorf("GCSへの書き込みに失敗しました (URI: %s): %w", gcsFlags.GCSURI, err)
 	}
 	slog.Info("GCSへのアップロードが完了しました。")
 
@@ -118,7 +118,7 @@ func convertMarkdownToHTML(ctx context.Context, title string, reviewResultMarkdo
 }
 
 // uploadToGCS はレンダリングされたHTMLをGCSにアップロードします。
-func uploadToGCS(ctx context.Context, bucketName, objectPath string, content io.Reader) error {
+func uploadToGCS(ctx context.Context, bucketName, objectPath string, content io.Reader, contentType string) error {
 	clientFactory, err := factory.NewClientFactory(ctx)
 	if err != nil {
 		return err
@@ -128,7 +128,7 @@ func uploadToGCS(ctx context.Context, bucketName, objectPath string, content io.
 		return err
 	}
 
-	return writer.WriteToGCS(ctx, bucketName, objectPath, content, gcsFlags.ContentType)
+	return writer.WriteToGCS(ctx, bucketName, objectPath, content, contentType)
 }
 
 // validateGcsURI は GCS URIの検証と解析を行うヘルパー関数です。
