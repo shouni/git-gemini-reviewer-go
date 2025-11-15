@@ -37,4 +37,3 @@ reviewer-go
 /bin/
 /var/
 /.env
-/known_hosts
