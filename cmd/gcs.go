@@ -67,9 +67,14 @@ func runGcsCommand(cmd *cobra.Command, args []string) error {
 		ReviewConfig.BaseBranch,
 		ReviewConfig.FeatureBranch,
 	)
+	// タイトルとMarkdownコンテンツを結合
+	var combinedContentBuffer bytes.Buffer
+	combinedContentBuffer.WriteString("## " + title)
+	combinedContentBuffer.WriteString("\n\n")
+	combinedContentBuffer.WriteString(reviewResultMarkdown)
 
 	// 2. HTML変換
-	htmlBuffer, err := convertMarkdownToHtml(ctx, title, reviewResultMarkdown)
+	htmlBuffer, err := convertMarkdownToHtml(ctx, title, combinedContentBuffer.String())
 	if err != nil {
 		return fmt.Errorf("レビュー結果をHTML変換に失敗しました: %w", err)
 	}
@@ -104,12 +109,6 @@ func convertMarkdownToHtml(ctx context.Context, title string, reviewResultMarkdo
 	if err != nil {
 		return nil, err
 	}
-
-	// タイトルとMarkdownコンテンツを結合
-	var combinedContentBuffer bytes.Buffer
-	combinedContentBuffer.WriteString("# " + title)
-	combinedContentBuffer.WriteString("\n\n")
-	combinedContentBuffer.WriteString(reviewResultMarkdown)
 
 	return mk2html.ConvertMarkdownToHtml(ctx, title, combinedContentBuffer.Bytes())
 }
