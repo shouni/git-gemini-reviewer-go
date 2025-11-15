@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"strings"
 
@@ -11,11 +13,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const DefaultLocale = "ja-jp" // ファイルの先頭や適切な定数ファイルに定義
+// DefaultLocale はこのファイルで定義されていると仮定
+const DefaultLocale = "ja-jp"
 
 // GcsSaveFlags は gcs-save コマンド固有のフラグを保持します。
 type GcsSaveFlags struct {
-	GCSURI      string // GCSへ保存する際の宛先URI (例: gs://bucket/path/to/result.html)
+	GcsURI      string // GCSへ保存する際の宛先URI (例: gs://bucket/path/to/result.html)
 	ContentType string // GCSに保存する際のMIMEタイプ
 }
 
@@ -33,7 +36,7 @@ var gcsSaveCmd = &cobra.Command{
 
 func init() {
 	gcsSaveCmd.Flags().StringVarP(&gcsSaveFlags.ContentType, "content-type", "t", "text/html; charset=utf-8", "GCSに保存する際のMIMEタイプ (デフォルトはHTML)")
-	gcsSaveCmd.Flags().StringVarP(&gcsSaveFlags.GCSURI, "gcs-uri", "s", "gs://git-gemini-reviewer-go/review/result.html", "GCSの保存先")
+	gcsSaveCmd.Flags().StringVarP(&gcsSaveFlags.GcsURI, "gcs-uri", "s", "gs://git-gemini-reviewer-go/review/result.html", "GCSの保存先")
 }
 
 // validateGcsURI は GCS URIの検証と解析を行うヘルパー関数です。
@@ -53,97 +56,130 @@ func validateGcsURI(gcsURI string) (bucketName, objectPath string, err error) {
 // runGcsSave は gcs-save コマンドの実行ロジックです。
 func runGcsSave(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
-	gcsURI := gcsSaveFlags.GCSURI
+	gcsURI := gcsSaveFlags.GcsURI
+
 	bucketName, objectPath, err := validateGcsURI(gcsURI)
 	if err != nil {
 		return err
 	}
 
-	// 1. AIレビューパイプラインを実行し、結果の文字列を受け取る
-	slog.Info("Git/Geminiレビューパイプラインを実行中...")
-	// executeReviewPipeline は cmd パッケージ内の他のファイルで定義されており、ReviewConfig は rootCmd で初期化されるグローバル変数です。
-	slog.Info("Git/Geminiレビューパイプラインを実行中 (Markdown生成)...")
-	reviewResultMarkdown, err := executeReviewPipeline(ctx, ReviewConfig)
+	// 1. レビューパイプラインを実行し、HTMLドキュメントを bytes.Buffer にレンダリング
+	htmlBuffer, err := convertMarkdownToHTML(ctx, gcsURI)
 	if err != nil {
-		return fmt.Errorf("レビューパイプラインの実行に失敗しました: %w", err)
+		return err
 	}
 
-	// レビュー結果が空の場合は、警告を出して終了
+	// convertMarkdownToHTML が nil を返した場合（スキップ処理）、エラーなしで終了する
+	if htmlBuffer == nil {
+		return nil
+	}
+
+	// 2. GCSへのアップロード
+	return uploadToGCS(ctx, bucketName, objectPath, htmlBuffer, gcsURI)
+}
+
+// executeAndPrepareMarkdown はレビューパイプラインを実行し、ブランチ情報を付加したMarkdownと、生成されたタイトルを返します。
+// 戻り値: (Markdownの []byte, タイトルの string, error)
+func executeAndPrepareMarkdown(ctx context.Context, gcsURI string) (markdownContent []byte, title string, err error) {
+	slog.Info("Git/Geminiレビューパイプラインを実行中 (Markdown生成)...")
+
+	// executeReviewPipeline の戻り値は string であるため、そのまま受け取る
+	reviewResultMarkdown, err := executeReviewPipeline(ctx, ReviewConfig)
+	if err != nil {
+		return nil, "", fmt.Errorf("レビューパイプラインの実行に失敗しました: %w", err)
+	}
+
 	if reviewResultMarkdown == "" {
 		slog.Warn("AIレビュー結果が空文字列でした。GCSへの保存をスキップします。", "uri", gcsURI)
-		return nil
+		return nil, "", nil
 	}
 
 	// ヘッダー文字列の作成 (ブランチ情報を結合)
-	title := fmt.Sprintf(
+	title = fmt.Sprintf(
 		"# AIコードレビュー結果 (ブランチ: `%s` ← `%s`)",
-		ReviewConfig.BaseBranch,    // ReviewConfig の変数名を使用
-		ReviewConfig.FeatureBranch, // ReviewConfig の変数名を使用
-	)
-	titleBytes := []byte(title)
-
-	// 2. タイトルとMarkdownコンテンツを結合
-	combinedMarkdownBytes := bytes.Join(
-		[][]byte{
-			titleBytes,
-			[]byte("\n\n"),
-			[]byte(reviewResultMarkdown),
-		},
-		[]byte{}, // 区切り文字は使用しない (そのまま連結)
+		ReviewConfig.BaseBranch,
+		ReviewConfig.FeatureBranch,
 	)
 
-	// string 型の reviewResultMarkdown に []byte を再代入するために string にキャストし直す
-	// この後、Markdownの整形（`go-text-format`のコンバータへの入力）に進むと想定
-	reviewResultMarkdown = string(combinedMarkdownBytes)
+	// タイトルとMarkdownコンテンツを結合
+	var combinedContentBuffer bytes.Buffer
+	combinedContentBuffer.WriteString(title)
+	combinedContentBuffer.WriteString("\n\n")
+	combinedContentBuffer.WriteString(reviewResultMarkdown)
+
+	// 戻り値を修正
+	return combinedContentBuffer.Bytes(), title, nil
+}
+
+// convertMarkdownToHTML はMarkdownバイトスライスを受け取り、HTMLドキュメントを bytes.Buffer にレンダリングします。
+// 戻り値: (*bytes.Buffer, error)
+func convertMarkdownToHTML(ctx context.Context, gcsURI string) (*bytes.Buffer, error) {
+	// 1. Markdownコンテンツとタイトルの取得と準備
+	markdownToConvert, finalTitle, err := executeAndPrepareMarkdown(ctx, gcsURI)
+	if err != nil {
+		return nil, err
+	}
+	// executeAndPrepareMarkdown が nil を返した場合（スキップ処理）
+	if len(markdownToConvert) == 0 {
+		return nil, nil
+	}
+
+	// 2. ビルダーによるサービスの初期化
 	htmlBuilder, err := mk2html.NewBuilder()
 	if err != nil {
 		slog.Error("HTML変換ビルダーの初期化に失敗しました。", "error", err)
-		return fmt.Errorf("HTML変換ビルダーの初期化に失敗しました: %w", err)
+		return nil, fmt.Errorf("HTML変換ビルダーの初期化に失敗しました: %w", err)
 	}
 
-	converterService := htmlBuilder.ConverterService
-	rendererService := htmlBuilder.RendererService
-	htmlFragment, err := converterService.Convert(ctx, []byte(reviewResultMarkdown))
+	cService := htmlBuilder.ConverterService
+	rService := htmlBuilder.RendererService
+
+	// 3. MarkdownをHTMLフラグメントに変換
+	htmlFragment, err := cService.Convert(ctx, markdownToConvert)
 	if err != nil {
-		return fmt.Errorf("HTMLフラグメント生成エラー: %w", err)
+		return nil, fmt.Errorf("HTMLフラグメント生成エラー: %w", err)
 	}
 
+	// 4. HTMLドキュメントのレンダリング
 	var htmlBuffer bytes.Buffer
-	err = rendererService.Render(&htmlBuffer, htmlFragment, DefaultLocale, title)
+
+	// finalTitle を `<title>` タグなどに使用してレンダリング
+	err = rService.Render(&htmlBuffer, htmlFragment, DefaultLocale, finalTitle)
 	if err != nil {
-		slog.Error("HTML変換プロンプトの組み立てエラー。", "error", err)
-		return fmt.Errorf("HTML変換プロンプトの組み立てに失敗しました: %w", err)
+		slog.Error("HTMLレンダリングエラー。", "error", err)
+		return nil, fmt.Errorf("HTMLレンダリングに失敗しました: %w", err)
 	}
 
-	// HTML変換結果が空文字列の場合のチェックを追加
 	if htmlBuffer.Len() == 0 {
-		slog.Warn("AIによるHTML変換結果が空文字列でした。GCSへの保存をスキップします。", "uri", gcsURI)
-		return nil
+		slog.Warn("HTMLレンダリング結果が空文字列でした。GCSへの保存をスキップします。", "uri", gcsURI)
+		return nil, nil
 	}
 
-	// 4. ClientFactory の取得
+	return &htmlBuffer, nil
+}
+
+// uploadToGCS はレンダリングされたHTMLをGCSにアップロードします。
+func uploadToGCS(ctx context.Context, bucketName, objectPath string, content io.Reader, gcsURI string) error {
+	// 1. ClientFactory の取得
 	clientFactory, err := factory.NewClientFactory(ctx)
 	if err != nil {
 		return err
 	}
 
-	// 5. GCSOutputWriter の取得
+	// 2. GCSOutputWriter の取得
 	writer, err := clientFactory.GetGCSOutputWriter()
 	if err != nil {
 		return fmt.Errorf("GCSOutputWriterの取得に失敗しました: %w", err)
 	}
 
-	// 7. レビュー結果文字列を io.Reader に変換
-	contentReader := strings.NewReader(htmlBuffer.String())
-
-	// 8. GCSへの書き込み実行
+	// 3. GCSへの書き込み実行
 	slog.Info("レビュー結果をGCSへアップロード中",
 		"uri", gcsURI,
 		"bucket", bucketName,
 		"object", objectPath,
 		"content_type", gcsSaveFlags.ContentType)
 
-	if err := writer.WriteToGCS(ctx, bucketName, objectPath, contentReader, gcsSaveFlags.ContentType); err != nil {
+	if err := writer.WriteToGCS(ctx, bucketName, objectPath, content, gcsSaveFlags.ContentType); err != nil {
 		return fmt.Errorf("GCSへの書き込みに失敗しました (URI: %s): %w", gcsURI, err)
 	}
 
