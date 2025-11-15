@@ -27,7 +27,7 @@ var gcsCmd = &cobra.Command{
 	Short: "AIレビュー結果をスタイル付きHTMLに変換し、その結果を指定されたGCS URIに保存します。",
 	Long:  `このコマンドは、指定されたGitリポジトリのブランチ間の差分をAIでレビューし、その結果をさらにAIでスタイル付きHTMLに変換した後、go-remote-io を利用してGCSにアップロードします。`,
 	Args:  cobra.NoArgs,
-	RunE:  gcsSaveCommand,
+	RunE:  gcsCommand,
 }
 
 func init() {
@@ -39,8 +39,8 @@ func init() {
 // コマンドの実行ロジック
 // --------------------------------------------------------------------------
 
-// runGcsSave は gcs コマンドの実行ロジックです。
-func gcsSaveCommand(cmd *cobra.Command, args []string) error {
+// gcsCommand は gcs コマンドの実行ロジックです。
+func gcsCommand(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	gcsURI := gcsFlags.GCSURI
 
@@ -63,7 +63,7 @@ func gcsSaveCommand(cmd *cobra.Command, args []string) error {
 	// ヘッダー文字列の作成
 	htmlTitle := fmt.Sprintf("AIコードレビュー結果")
 	summaryMarkdown := fmt.Sprintf(
-		"レビュー対象リポジトリ: `%s`\n\n**ブランチ差分:** `%s` ← `%s`\n\n",
+		"**レビュー対象リポジトリ:** `%s`\n\n**ブランチ差分:** `%s` ← `%s`\n\n",
 		ReviewConfig.RepoURL,
 		ReviewConfig.BaseBranch,
 		ReviewConfig.FeatureBranch,
