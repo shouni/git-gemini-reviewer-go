@@ -61,6 +61,9 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 
 	// 1. レビューパイプラインを実行
 	reviewResultMarkdown, err := executeReviewPipeline(ctx, ReviewConfig)
+	if err != nil {
+		return err
+	}
 
 	// 2. ビルダーによるサービスの初期化
 	htmlBuilder, err := builder.NewBuilder()
@@ -100,7 +103,7 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("GCSへの書き込みに失敗しました (URI: %s): %w", gcsURI, err)
 	}
-	slog.Info("GCSへのアップロードが完了しました")
+	slog.Info("GCSへのアップロードが完了しました。")
 
 	return nil
 }
