@@ -56,6 +56,11 @@ func runGcsCommand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if reviewResultMarkdown == "" {
+		slog.Warn("AIレビュー結果が空文字列でした。GCSへの保存をスキップします。", "uri", gcsURI)
+		return nil
+	}
+
 	// ヘッダー文字列の作成 (ブランチ情報を結合)
 	title := fmt.Sprintf(
 		"AIコードレビュー結果 (ブランチ: `%s` ← `%s`)",
@@ -66,7 +71,7 @@ func runGcsCommand(cmd *cobra.Command, args []string) error {
 	// 2. HTML変換
 	htmlBuffer, err := convertMarkdownToHtml(ctx, title, reviewResultMarkdown)
 	if err != nil {
-		return fmt.Errorf("レビュー結果をHTML変換に失敗しました。", err)
+		return fmt.Errorf("レビュー結果をHTML変換に失敗しました: %w", err)
 	}
 
 	// 3. レビュー結果をGCSへアップロードを実行
