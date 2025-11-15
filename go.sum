@@ -148,8 +148,8 @@ github.com/shouni/go-notifier v1.1.3 h1:W2abclTa7lvAcrZcvYTFni5IlCBnTelVYYWqT7sA
 github.com/shouni/go-notifier v1.1.3/go.mod h1:Gxs5gZcu0FNVm4Ph5D7xC7aY7DesrfbFdXgztiJfHpY=
 github.com/shouni/go-remote-io v1.0.1 h1:hD1Do/LXTMPNPRYlHNIlZjOTaI9123twu+p2rsQNUv0=
 github.com/shouni/go-remote-io v1.0.1/go.mod h1:YGdhD9dK8TMwcrp5mL+lgfqoWEAbsNQeckWik3yopG8=
-github.com/shouni/go-text-format v1.0.1 h1:6eWwO0wQETSzMLRAjIOy7eT3N7PzQmeFSfOXXYI9RMg=
-github.com/shouni/go-text-format v1.0.1/go.mod h1:jgavvaEGvDoHRh9NRTmFepROeAKTlDbqUNEquZfiMQE=
+github.com/shouni/go-text-format v1.0.3 h1:1BZI07JrXGE2z+5UQV8VKYPnZwzXAgD328o78YUS1Zw=
+github.com/shouni/go-text-format v1.0.3/go.mod h1:jgavvaEGvDoHRh9NRTmFepROeAKTlDbqUNEquZfiMQE=
 github.com/shouni/go-utils v1.0.11 h1:X818DZWQZqEH5BPqWPhJP89k9r234aTJzzkmoU2y0cs=
 github.com/shouni/go-utils v1.0.11/go.mod h1:dQxOuVTvWFHWEH/G6izteLh+tubkI5Sl1jpDWlCSkBU=
 github.com/sirupsen/logrus v1.7.0/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=

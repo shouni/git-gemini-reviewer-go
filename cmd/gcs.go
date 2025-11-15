@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -9,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/shouni/go-remote-io/pkg/factory"
-	mk2html "github.com/shouni/go-text-format/pkg/builder"
+	"github.com/shouni/go-text-format/pkg/builder"
 	"github.com/spf13/cobra"
 )
 
@@ -60,121 +59,62 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// 1. レビューパイプラインを実行し、HTMLドキュメントを bytes.Buffer にレンダリング
-	htmlBuffer, err := convertMarkdownToHTML(ctx, gcsURI)
+	// 1. レビューパイプラインを実行
+	reviewResultMarkdown, err := executeReviewPipeline(ctx, ReviewConfig)
+
+	// 2. ビルダーによるサービスの初期化
+	htmlBuilder, err := builder.NewBuilder()
 	if err != nil {
-		return err
+		slog.Error("HTML変換ビルダーの初期化に失敗しました。", "error", err)
+		return fmt.Errorf("HTML変換ビルダーの初期化に失敗しました: %w", err)
 	}
 
+	mk2html, err := htmlBuilder.BuildMarkdownToHtmlRunner()
+	if err != nil {
+		slog.Error("HTML変換ビルダーの初期化に失敗しました。", "error", err)
+		return fmt.Errorf("HTML変換ビルダーの初期化に失敗しました: %w", err)
+	}
+
+	// ヘッダー文字列の作成 (ブランチ情報を結合)
+	title := fmt.Sprintf(
+		"# AIコードレビュー結果 (ブランチ: `%s` ← `%s`)",
+		ReviewConfig.BaseBranch,
+		ReviewConfig.FeatureBranch,
+	)
+	htmlBuffer, err := mk2html.ConvertMarkdownToHtml(ctx, title, []byte(reviewResultMarkdown))
+	if err != nil {
+		slog.Error("HTMLレンダリングエラー。", "error", err)
+		return fmt.Errorf("HTMLレンダリングに失敗しました: %w", err)
+	}
 	// convertMarkdownToHTML が nil を返した場合（スキップ処理）、エラーなしで終了する
 	if htmlBuffer == nil {
 		slog.Warn("AIレビュー結果が空文字列でした。GCSへの保存をスキップします。", "uri", gcsURI)
 		return nil
 	}
-
-	// 2. GCSへのアップロード
-	return uploadToGCS(ctx, bucketName, objectPath, htmlBuffer, gcsURI)
-}
-
-// executeAndPrepareMarkdown はレビューパイプラインを実行し、ブランチ情報を付加したMarkdownと、生成されたタイトルを返します。
-// 戻り値: (Markdownの []byte, タイトルの string, error)
-func executeAndPrepareMarkdown(ctx context.Context, gcsURI string) (markdownContent []byte, title string, err error) {
-	slog.Info("Git/Geminiレビューパイプラインを実行中 (Markdown生成)...")
-
-	// executeReviewPipeline の戻り値は string であるため、そのまま受け取る
-	reviewResultMarkdown, err := executeReviewPipeline(ctx, ReviewConfig)
-	if err != nil {
-		return nil, "", fmt.Errorf("レビューパイプラインの実行に失敗しました: %w", err)
-	}
-
-	// ここでは、空文字列の場合に警告を出力しない。呼び出し元で gcsURI と共に警告を出力する。
-	if reviewResultMarkdown == "" {
-		slog.Warn("AIレビュー結果が空文字列でした。GCSへの保存をスキップします。", "uri", gcsURI)
-		return nil, "", nil
-	}
-
-	// ヘッダー文字列の作成 (ブランチ情報を結合)
-	title = fmt.Sprintf(
-		"# AIコードレビュー結果 (ブランチ: `%s` ← `%s`)",
-		ReviewConfig.BaseBranch,
-		ReviewConfig.FeatureBranch,
-	)
-
-	// タイトルとMarkdownコンテンツを結合
-	var combinedContentBuffer bytes.Buffer
-	combinedContentBuffer.WriteString(title)
-	combinedContentBuffer.WriteString("\n\n")
-	combinedContentBuffer.WriteString(reviewResultMarkdown)
-
-	return combinedContentBuffer.Bytes(), title, nil
-}
-
-// convertMarkdownToHTML はMarkdownバイトスライスを受け取り、HTMLドキュメントを bytes.Buffer にレンダリングします。
-// 戻り値: (*bytes.Buffer, error)
-func convertMarkdownToHTML(ctx context.Context, gcsURI string) (*bytes.Buffer, error) {
-	const defaultLocale = "ja-jp"
-	// 1. Markdownコンテンツとタイトルの取得と準備
-	markdownToConvert, finalTitle, err := executeAndPrepareMarkdown(ctx, gcsURI)
-	if err != nil {
-		return nil, err
-	}
-	// executeAndPrepareMarkdown が nil を返した場合（スキップ処理）
-	if len(markdownToConvert) == 0 {
-		return nil, nil
-	}
-
-	// 2. ビルダーによるサービスの初期化
-	htmlBuilder, err := mk2html.NewBuilder()
-	if err != nil {
-		slog.Error("HTML変換ビルダーの初期化に失敗しました。", "error", err)
-		return nil, fmt.Errorf("HTML変換ビルダーの初期化に失敗しました: %w", err)
-	}
-
-	cService := htmlBuilder.ConverterService
-	rService := htmlBuilder.RendererService
-
-	// 3. MarkdownをHTMLフラグメントに変換
-	htmlFragment, err := cService.Convert(ctx, markdownToConvert)
-	if err != nil {
-		return nil, fmt.Errorf("HTMLフラグメント生成エラー: %w", err)
-	}
-
-	// 4. HTMLドキュメントのレンダリング
-	var htmlBuffer bytes.Buffer
-
-	// finalTitle を `<title>` タグなどに使用してレンダリング
-	err = rService.Render(&htmlBuffer, htmlFragment, defaultLocale, finalTitle)
-	if err != nil {
-		slog.Error("HTMLレンダリングエラー。", "error", err)
-		return nil, fmt.Errorf("HTMLレンダリングに失敗しました: %w", err)
-	}
-
-	return &htmlBuffer, nil
-}
-
-// uploadToGCS はレンダリングされたHTMLをGCSにアップロードします。
-func uploadToGCS(ctx context.Context, bucketName, objectPath string, content io.Reader, gcsURI string) error {
-	clientFactory, err := factory.NewClientFactory(ctx)
-	if err != nil {
-		return err
-	}
-
-	writer, err := clientFactory.GetGCSOutputWriter()
-	if err != nil {
-		return fmt.Errorf("GCSOutputWriterの取得に失敗しました: %w", err)
-	}
-
 	slog.Info("レビュー結果をGCSへアップロード中",
 		"uri", gcsURI,
 		"bucket", bucketName,
 		"object", objectPath,
 		"content_type", gcsSaveFlags.ContentType)
-
-	if err := writer.WriteToGCS(ctx, bucketName, objectPath, content, gcsSaveFlags.ContentType); err != nil {
+	err = uploadToGCS(ctx, bucketName, objectPath, htmlBuffer)
+	if err != nil {
 		return fmt.Errorf("GCSへの書き込みに失敗しました (URI: %s): %w", gcsURI, err)
 	}
-
-	slog.Info("GCSへのアップロードが完了しました", "uri", gcsURI)
+	slog.Info("GCSへのアップロードが完了しました")
 
 	return nil
+}
+
+// uploadToGCS はレンダリングされたHTMLをGCSにアップロードします。
+func uploadToGCS(ctx context.Context, bucketName, objectPath string, content io.Reader) error {
+	clientFactory, err := factory.NewClientFactory(ctx)
+	if err != nil {
+		return err
+	}
+	writer, err := clientFactory.GetGCSOutputWriter()
+	if err != nil {
+		return fmt.Errorf("GCSOutputWriterの取得に失敗しました: %w", err)
+	}
+
+	return writer.WriteToGCS(ctx, bucketName, objectPath, content, gcsSaveFlags.ContentType)
 }
