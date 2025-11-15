@@ -116,7 +116,7 @@ func uploadToGCS(ctx context.Context, bucketName, objectPath string, content io.
 	}
 	writer, err := clientFactory.GetGCSOutputWriter()
 	if err != nil {
-		return fmt.Errorf("GCSOutputWriterの取得に失敗しました: %w", err)
+		return err
 	}
 
 	return writer.WriteToGCS(ctx, bucketName, objectPath, content, gcsSaveFlags.ContentType)
