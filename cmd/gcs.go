@@ -21,19 +21,18 @@ type GCSFlags struct {
 
 var gcsFlags GCSFlags
 
-// gcsSaveCmd は 'gcs' サブコマンドを定義します。
-var gcsSaveCmd = &cobra.Command{
+// gcsCmd は 'gcs' サブコマンドを定義します。
+var gcsCmd = &cobra.Command{
 	Use:   "gcs",
 	Short: "AIレビュー結果をスタイル付きHTMLに変換し、その結果を指定されたGCS URIに保存します。",
-	Long: `このコマンドは、指定されたGitリポジトリのブランチ間の差分をAIでレビューし、その結果をさらにAIでスタイル付きHTMLに変換した後、go-remote-io を利用してGCSにアップロードします。
-宛先 URI は '--gcs-uri' フラグで指定する必要があり、'gs://bucket-name/object-path' の形式である必要があります。`,
-	Args: cobra.NoArgs,
-	RunE: gcsSaveCommand,
+	Long:  `このコマンドは、指定されたGitリポジトリのブランチ間の差分をAIでレビューし、その結果をさらにAIでスタイル付きHTMLに変換した後、go-remote-io を利用してGCSにアップロードします。`,
+	Args:  cobra.NoArgs,
+	RunE:  gcsSaveCommand,
 }
 
 func init() {
-	gcsSaveCmd.Flags().StringVarP(&gcsFlags.ContentType, "content-type", "t", "text/html; charset=utf-8", "GCSに保存する際のMIMEタイプ (デフォルトはHTML)")
-	gcsSaveCmd.Flags().StringVarP(&gcsFlags.GCSURI, "gcs-uri", "s", "gs://git-gemini-reviewer-go/review/result.html", "GCSの保存先")
+	gcsCmd.Flags().StringVarP(&gcsFlags.ContentType, "content-type", "t", "text/html; charset=utf-8", "GCSに保存する際のMIMEタイプ (デフォルトはHTML)")
+	gcsCmd.Flags().StringVarP(&gcsFlags.GCSURI, "gcs-uri", "s", "gs://git-gemini-reviewer-go/review/result.html", "GCSの保存先")
 }
 
 // --------------------------------------------------------------------------
@@ -93,7 +92,7 @@ func gcsSaveCommand(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("GCSへの書き込みに失敗しました (URI: %s): %w", gcsFlags.GCSURI, err)
 	}
-	slog.Info("GCSへのアップロードが完了しました。")
+	slog.Info("GCSへのアップロードが完了しました。", "uri", gcsFlags.GCSURI)
 
 	return nil
 }
@@ -125,7 +124,7 @@ func uploadToGCS(ctx context.Context, bucketName, objectPath string, content io.
 	}
 	writer, err := clientFactory.GetGCSOutputWriter()
 	if err != nil {
-		return err
+		return fmt.Errorf("GCSOutputWriterの取得に失敗しました: %w", err)
 	}
 
 	return writer.WriteToGCS(ctx, bucketName, objectPath, content, contentType)
