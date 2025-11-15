@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// DefaultLocale はこのファイルで定義されていると仮定
+// DefaultLocale はHTMLレンダリングに使用されるロケールです。
 const DefaultLocale = "ja-jp"
 
 // GcsSaveFlags は gcs-save コマンド固有のフラグを保持します。
