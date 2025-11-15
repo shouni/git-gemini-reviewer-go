@@ -74,6 +74,14 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// ヘッダー文字列の作成 (ブランチ情報を結合)
+	title := fmt.Sprintf(
+		"AIコードレビュー結果 (ブランチ: `%s` ← `%s`)",
+		ReviewConfig.BaseBranch,
+		ReviewConfig.FeatureBranch,
+	)
+	reviewResultMarkdown = title + "\n\n" + reviewResultMarkdown
+
 	htmlBuilder, err := mk2html.NewBuilder()
 	if err != nil {
 		slog.Error("HTML変換ビルダーの初期化に失敗しました。", "error", err)
@@ -87,12 +95,6 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("HTMLフラグメント生成エラー: %w", err)
 	}
 
-	// ヘッダー文字列の作成 (ブランチ情報を結合)
-	title := fmt.Sprintf(
-		"AIコードレビュー結果 (ブランチ: `%s` ← `%s`)",
-		ReviewConfig.BaseBranch,
-		ReviewConfig.FeatureBranch,
-	)
 	var htmlBuffer bytes.Buffer
 	err = rendererService.Render(&htmlBuffer, htmlFragment, DefaultLocale, title)
 	if err != nil {
