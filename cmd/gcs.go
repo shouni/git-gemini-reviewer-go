@@ -112,6 +112,7 @@ func executeAndPrepareMarkdown(ctx context.Context, gcsURI string) (markdownCont
 // convertMarkdownToHTML はMarkdownバイトスライスを受け取り、HTMLドキュメントを bytes.Buffer にレンダリングします。
 // 戻り値: (*bytes.Buffer, error)
 func convertMarkdownToHTML(ctx context.Context, gcsURI string) (*bytes.Buffer, error) {
+	const defaultLocale = "ja-jp"
 	// 1. Markdownコンテンツとタイトルの取得と準備
 	markdownToConvert, finalTitle, err := executeAndPrepareMarkdown(ctx, gcsURI)
 	if err != nil {
@@ -142,7 +143,7 @@ func convertMarkdownToHTML(ctx context.Context, gcsURI string) (*bytes.Buffer, e
 	var htmlBuffer bytes.Buffer
 
 	// finalTitle を `<title>` タグなどに使用してレンダリング
-	err = rService.Render(&htmlBuffer, htmlFragment, DefaultLocale, finalTitle)
+	err = rService.Render(&htmlBuffer, htmlFragment, defaultLocale, finalTitle)
 	if err != nil {
 		slog.Error("HTMLレンダリングエラー。", "error", err)
 		return nil, fmt.Errorf("HTMLレンダリングに失敗しました: %w", err)
