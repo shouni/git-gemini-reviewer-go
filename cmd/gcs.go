@@ -76,12 +76,25 @@ func runGcsSave(cmd *cobra.Command, args []string) error {
 
 	// ヘッダー文字列の作成 (ブランチ情報を結合)
 	title := fmt.Sprintf(
-		"AIコードレビュー結果 (ブランチ: `%s` ← `%s`)",
-		ReviewConfig.BaseBranch,
-		ReviewConfig.FeatureBranch,
+		"# AIコードレビュー結果 (ブランチ: `%s` ← `%s`)",
+		ReviewConfig.BaseBranch,    // ReviewConfig の変数名を使用
+		ReviewConfig.FeatureBranch, // ReviewConfig の変数名を使用
 	)
-	reviewResultMarkdown = title + "\n\n" + reviewResultMarkdown
+	titleBytes := []byte(title)
 
+	// 2. タイトルとMarkdownコンテンツを結合
+	combinedMarkdownBytes := bytes.Join(
+		[][]byte{
+			titleBytes,
+			[]byte("\n\n"),
+			[]byte(reviewResultMarkdown),
+		},
+		[]byte{}, // 区切り文字は使用しない (そのまま連結)
+	)
+
+	// string 型の reviewResultMarkdown に []byte を再代入するために string にキャストし直す
+	// この後、Markdownの整形（`go-text-format`のコンバータへの入力）に進むと想定
+	reviewResultMarkdown = string(combinedMarkdownBytes)
 	htmlBuilder, err := mk2html.NewBuilder()
 	if err != nil {
 		slog.Error("HTML変換ビルダーの初期化に失敗しました。", "error", err)
