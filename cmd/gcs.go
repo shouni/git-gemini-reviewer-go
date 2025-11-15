@@ -149,11 +149,6 @@ func convertMarkdownToHTML(ctx context.Context, gcsURI string) (*bytes.Buffer, e
 		return nil, fmt.Errorf("HTMLレンダリングに失敗しました: %w", err)
 	}
 
-	if htmlBuffer.Len() == 0 {
-		slog.Warn("HTMLレンダリング結果が空文字列でした。GCSへの保存をスキップします。", "uri", gcsURI)
-		return nil, nil
-	}
-
 	return &htmlBuffer, nil
 }
 
