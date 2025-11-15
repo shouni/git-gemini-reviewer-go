@@ -106,15 +106,15 @@ func gcsSaveCommand(cmd *cobra.Command, args []string) error {
 func convertMarkdownToHTML(ctx context.Context, title string, reviewResultMarkdown []byte) (*bytes.Buffer, error) {
 	htmlBuilder, err := builder.NewBuilder()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("HTML変換ビルダーの初期化に失敗しました: %w", err)
 	}
 
-	mk2html, err := htmlBuilder.BuildMarkdownToHtmlRunner()
+	mk2htmlRunner, err := htmlBuilder.BuildMarkdownToHtmlRunner()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("MarkdownToHtmlRunnerの構築に失敗しました: %w", err)
 	}
 
-	return mk2html.ConvertMarkdownToHtml(ctx, title, reviewResultMarkdown)
+	return mk2htmlRunner.ConvertMarkdownToHtml(ctx, title, reviewResultMarkdown)
 }
 
 // uploadToGCS はレンダリングされたHTMLをGCSにアップロードします。
