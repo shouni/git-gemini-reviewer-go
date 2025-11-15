@@ -63,7 +63,7 @@ func gcsCommand(cmd *cobra.Command, args []string) error {
 	// ヘッダー文字列の作成
 	htmlTitle := fmt.Sprintf("AIコードレビュー結果")
 	summaryMarkdown := fmt.Sprintf(
-		"**レビュー対象リポジトリ:** `%s`\n\n**ブランチ差分:** `%s` ← `%s`\n\n",
+		"レビュー対象リポジトリ: `%s`\n\nブランチ差分: `%s` ← `%s`\n\n",
 		ReviewConfig.RepoURL,
 		ReviewConfig.BaseBranch,
 		ReviewConfig.FeatureBranch,
