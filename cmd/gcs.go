@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"git-gemini-reviewer-go/internal/config"
 	"io"
 	"log/slog"
 
@@ -49,13 +50,18 @@ func gcsCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	// 1. レビューパイプラインを実行
-	reviewResultMarkdown, err := executeReviewPipeline(ctx, ReviewConfig)
+	reviewResult, err := executeReviewPipeline(ctx, ReviewConfig)
 	if err != nil {
 		return err
 	}
 
+	if reviewResult == "" {
+		slog.Warn("レビュー結果の内容が空のため、GCSへの保存をスキップします。", "uri", gcsURI)
+		return nil
+	}
+
 	// 2. HTML変換
-	htmlBuffer, err := convertMarkdownToHTML(ctx, reviewResultMarkdown)
+	htmlBuffer, err := convertMarkdownToHTML(ctx, reviewResult, ReviewConfig)
 	if err != nil {
 		return fmt.Errorf("レビュー結果をHTML変換に失敗しました: %w", err)
 	}
@@ -81,7 +87,7 @@ func gcsCommand(cmd *cobra.Command, args []string) error {
 // --------------------------------------------------------------------------
 
 // convertMarkdownToHTML Markdown形式の入力データを受け取り、HTML形式のデータに変換する。
-func convertMarkdownToHTML(ctx context.Context, reviewMarkdown string) (*bytes.Buffer, error) {
+func convertMarkdownToHTML(ctx context.Context, reviewMarkdown string, opt config.ReviewConfig) (*bytes.Buffer, error) {
 	htmlBuilder, err := builder.NewBuilder()
 	if err != nil {
 		return nil, fmt.Errorf("HTML変換ビルダーの初期化に失敗しました: %w", err)
@@ -95,9 +101,9 @@ func convertMarkdownToHTML(ctx context.Context, reviewMarkdown string) (*bytes.B
 	htmlTitle := fmt.Sprintf("AIコードレビュー結果")
 	summaryMarkdown := fmt.Sprintf(
 		"レビュー対象リポジトリ: `%s`\n\nブランチ差分: `%s` ← `%s`\n\n",
-		ReviewConfig.RepoURL,
-		ReviewConfig.BaseBranch,
-		ReviewConfig.FeatureBranch,
+		opt.RepoURL,
+		opt.BaseBranch,
+		opt.FeatureBranch,
 	)
 	var combinedContentBuffer bytes.Buffer
 	combinedContentBuffer.WriteString("## " + htmlTitle)

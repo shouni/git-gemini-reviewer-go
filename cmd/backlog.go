@@ -60,6 +60,11 @@ func runBacklogCommand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if reviewResult == "" {
+		slog.Warn("レビュー結果の内容が空のため、Backlogへの投稿ををスキップします。")
+		return nil
+	}
+
 	// 3. no-post フラグによる出力分岐
 	if noPost {
 		printReviewResult(reviewResult)

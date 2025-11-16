@@ -60,6 +60,11 @@ func runSlackCommand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if reviewResult == "" {
+		slog.Warn("レビュー結果の内容が空のため、Slackへのメッセージ投稿ををスキップします。")
+		return nil
+	}
+
 	// 3. no-post フラグによる出力分岐
 	if noPostSlack {
 		printReviewResult(reviewResult)
