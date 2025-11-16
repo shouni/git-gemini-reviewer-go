@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"strings"
 
 	"github.com/shouni/go-remote-io/pkg/factory"
+	"github.com/shouni/go-remote-io/pkg/remoteio"
 	"github.com/shouni/go-text-format/pkg/builder"
 	"github.com/spf13/cobra"
 )
@@ -43,8 +43,7 @@ func init() {
 func gcsCommand(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
 	gcsURI := gcsFlags.GCSURI
-
-	bucketName, objectPath, err := validateGcsURI(gcsURI)
+	bucketName, objectPath, err := remoteio.ParseGCSURI(gcsURI)
 	if err != nil {
 		return err
 	}
@@ -55,9 +54,41 @@ func gcsCommand(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if reviewResultMarkdown == "" {
-		slog.Warn("AIレビュー結果が空文字列でした。GCSへの保存をスキップします。", "uri", gcsURI)
-		return nil
+	// 2. HTML変換
+	htmlBuffer, err := convertMarkdownToHTML(ctx, reviewResultMarkdown)
+	if err != nil {
+		return fmt.Errorf("レビュー結果をHTML変換に失敗しました: %w", err)
+	}
+
+	// 3. レビュー結果をGCSへアップロードを実行
+	slog.Info("レビュー結果をGCSへアップロード中",
+		"uri", gcsURI,
+		"bucket", bucketName,
+		"object", objectPath,
+		"content_type", gcsFlags.ContentType)
+
+	err = uploadToGCS(ctx, bucketName, objectPath, htmlBuffer, gcsFlags.ContentType)
+	if err != nil {
+		return fmt.Errorf("GCSへの書き込みに失敗しました (URI: %s): %w", gcsFlags.GCSURI, err)
+	}
+	slog.Info("GCSへのアップロードが完了しました。", "uri", gcsFlags.GCSURI)
+
+	return nil
+}
+
+// --------------------------------------------------------------------------
+// ヘルパー関数
+// --------------------------------------------------------------------------
+
+// convertMarkdownToHTML Markdown形式の入力データを受け取り、HTML形式のデータに変換する。
+func convertMarkdownToHTML(ctx context.Context, reviewMarkdown string) (*bytes.Buffer, error) {
+	htmlBuilder, err := builder.NewBuilder()
+	if err != nil {
+		return nil, fmt.Errorf("HTML変換ビルダーの初期化に失敗しました: %w", err)
+	}
+	mk2html, err := htmlBuilder.BuildMarkdownToHtmlRunner()
+	if err != nil {
+		return nil, fmt.Errorf("MarkdownToHtmlRunnerの構築に失敗しました: %w", err)
 	}
 
 	// ヘッダー文字列の作成
@@ -73,47 +104,11 @@ func gcsCommand(cmd *cobra.Command, args []string) error {
 	combinedContentBuffer.WriteString("\n\n")
 	// 要約情報をヘッダーの下に配置
 	combinedContentBuffer.WriteString(summaryMarkdown)
+	combinedContentBuffer.WriteString("\n\n")
 	// レビュー結果の本文を追加
-	combinedContentBuffer.WriteString(reviewResultMarkdown)
+	combinedContentBuffer.WriteString(reviewMarkdown)
 
-	// 2. HTML変換
-	htmlBuffer, err := convertMarkdownToHTML(ctx, htmlTitle, combinedContentBuffer.Bytes())
-	if err != nil {
-		return fmt.Errorf("レビュー結果をHTML変換に失敗しました: %w", err)
-	}
-
-	// 3. レビュー結果をGCSへアップロードを実行
-	slog.Info("レビュー結果をGCSへアップロード中",
-		"uri", gcsURI,
-		"bucket", bucketName,
-		"object", objectPath,
-		"content_type", gcsFlags.ContentType)
-	err = uploadToGCS(ctx, bucketName, objectPath, htmlBuffer, gcsFlags.ContentType)
-	if err != nil {
-		return fmt.Errorf("GCSへの書き込みに失敗しました (URI: %s): %w", gcsFlags.GCSURI, err)
-	}
-	slog.Info("GCSへのアップロードが完了しました。", "uri", gcsFlags.GCSURI)
-
-	return nil
-}
-
-// --------------------------------------------------------------------------
-// ヘルパー関数
-// --------------------------------------------------------------------------
-
-// convertMarkdownToHTML Markdown形式の入力データを受け取り、HTML形式のデータに変換する。
-func convertMarkdownToHTML(ctx context.Context, title string, reviewResultMarkdown []byte) (*bytes.Buffer, error) {
-	htmlBuilder, err := builder.NewBuilder()
-	if err != nil {
-		return nil, fmt.Errorf("HTML変換ビルダーの初期化に失敗しました: %w", err)
-	}
-
-	mk2htmlRunner, err := htmlBuilder.BuildMarkdownToHtmlRunner()
-	if err != nil {
-		return nil, fmt.Errorf("MarkdownToHtmlRunnerの構築に失敗しました: %w", err)
-	}
-
-	return mk2htmlRunner.ConvertMarkdownToHtml(ctx, title, reviewResultMarkdown)
+	return mk2html.ConvertMarkdownToHtml(ctx, htmlTitle, combinedContentBuffer.Bytes())
 }
 
 // uploadToGCS はレンダリングされたHTMLをGCSにアップロードします。
@@ -122,24 +117,10 @@ func uploadToGCS(ctx context.Context, bucketName, objectPath string, content io.
 	if err != nil {
 		return err
 	}
-	writer, err := clientFactory.GetGCSOutputWriter()
+	writer, err := clientFactory.NewOutputWriter()
 	if err != nil {
 		return fmt.Errorf("GCSOutputWriterの取得に失敗しました: %w", err)
 	}
 
 	return writer.WriteToGCS(ctx, bucketName, objectPath, content, contentType)
-}
-
-// validateGcsURI は GCS URIの検証と解析を行うヘルパー関数です。
-func validateGcsURI(gcsURI string) (bucketName, objectPath string, err error) {
-	if !strings.HasPrefix(gcsURI, "gs://") {
-		return "", "", fmt.Errorf("無効なGCS URIです。'gs://' で始まる必要があります: %s", gcsURI)
-	}
-	pathWithoutScheme := gcsURI[5:]
-	parts := strings.SplitN(pathWithoutScheme, "/", 2)
-
-	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
-		return "", "", fmt.Errorf("無効なGCS URIフォーマットです。バケット名とオブジェクトパスが不足しています: %s", gcsURI)
-	}
-	return parts[0], parts[1], nil
 }
