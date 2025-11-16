@@ -9,7 +9,7 @@ require (
 	github.com/shouni/go-http-kit v1.1.2
 	github.com/shouni/go-notifier v1.1.3
 	github.com/shouni/go-remote-io v1.0.6
-	github.com/shouni/go-text-format v1.0.3
+	github.com/shouni/go-text-format v1.0.4
 	github.com/shouni/go-utils v1.0.11
 	github.com/spf13/cobra v1.10.1
 	golang.org/x/crypto v0.44.0
