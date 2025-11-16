@@ -86,7 +86,7 @@ func convertMarkdownToHTML(ctx context.Context, reviewMarkdown string) (*bytes.B
 	if err != nil {
 		return nil, fmt.Errorf("HTML変換ビルダーの初期化に失敗しました: %w", err)
 	}
-	mk2html, err := htmlBuilder.BuildMarkdownToHtmlRunner()
+	converter, err := htmlBuilder.BuildMarkdownToHtmlRunner()
 	if err != nil {
 		return nil, fmt.Errorf("MarkdownToHtmlRunnerの構築に失敗しました: %w", err)
 	}
@@ -108,7 +108,7 @@ func convertMarkdownToHTML(ctx context.Context, reviewMarkdown string) (*bytes.B
 	// レビュー結果の本文を追加
 	combinedContentBuffer.WriteString(reviewMarkdown)
 
-	return mk2html.ConvertMarkdownToHtml(ctx, htmlTitle, combinedContentBuffer.Bytes())
+	return converter.ConvertMarkdownToHtml(ctx, htmlTitle, combinedContentBuffer.Bytes())
 }
 
 // uploadToGCS はレンダリングされたHTMLをGCSにアップロードします。
