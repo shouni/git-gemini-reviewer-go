@@ -18,14 +18,12 @@ func executeReviewPipeline(
 	cfg config.ReviewConfig,
 ) (string, error) {
 
-	// --- 1. ローカルパスの決定 ---
 	// LocalPathが指定されていない場合、RepoURLから動的に生成しcfgを更新します。
 	if cfg.LocalPath == "" {
 		cfg.LocalPath = urlpath.SanitizeURLToUniquePath(cfg.RepoURL)
 		slog.Debug("LocalPathが未指定のため、URLから動的にパスを生成しました。", "generatedPath", cfg.LocalPath)
 	}
 
-	// --- 2. 実行ロジック (Runner層) の構築 ---
 	reviewRunner, err := builder.BuildReviewRunner(ctx, cfg)
 	if err != nil {
 		// BuildReviewRunner が内部でアダプタやビルダーの構築エラーをラップして返す
@@ -34,13 +32,11 @@ func executeReviewPipeline(
 
 	slog.Info("レビューパイプラインを開始します。")
 
-	// --- 3. 実行ロジック (Runner層) の実行 ---
 	reviewResult, err := reviewRunner.Run(ctx, cfg)
 	if err != nil {
 		return "", err
 	}
 
-	// --- 4. 結果の返却 ---
 	if reviewResult == "" {
 		slog.Info("Diff がないためレビューをスキップしました。")
 		return "", nil
