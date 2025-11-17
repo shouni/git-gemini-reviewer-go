@@ -84,13 +84,13 @@ func (ga *GitAdapter) CloneOrUpdate(repositoryURL string) (*git.Repository, erro
 	var err error
 
 	// 認証情報の取得と保持を最初に行う
-	// NOTE: getAuthMethodは未定義のヘルパー関数なので、ユーザーが別途実装する必要があります。
-	// auth, err := ga.getAuthMethod(repositoryURL)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("go-git用の認証情報取得に失敗しました: %w", err)
-	// }
-	// ga.auth = auth // 認証情報を Adapter に設定
-	// slog.Info("go-git用の認証情報がアダプタに設定されました。")
+	//NOTE: getAuthMethodは未定義のヘルパー関数なので、ユーザーが別途実装する必要があります。
+	auth, err := ga.getAuthMethod(repositoryURL)
+	if err != nil {
+		return nil, fmt.Errorf("go-git用の認証情報取得に失敗しました: %w", err)
+	}
+	ga.auth = auth // 認証情報を Adapter に設定
+	slog.Info("go-git用の認証情報がアダプタに設定されました。")
 
 	// --- クローン・更新ロジック ---
 
