@@ -62,10 +62,6 @@ func NewGitAdapter(localPath string, sshKeyPath string, opts ...Option) GitServi
 		LocalPath:  localPath,
 		SSHKeyPath: sshKeyPath,
 	}
-	// デフォルトのBaseBranch設定
-	if adapter.BaseBranch == "" {
-		adapter.BaseBranch = "main" // ユーザーの記憶にあるデフォルトブランチ
-	}
 
 	for _, opt := range opts {
 		opt(adapter)
@@ -128,7 +124,12 @@ func (ga *GitAdapter) CloneOrUpdate(repositoryURL string) (*git.Repository, erro
 		if err != nil && err != git.NoErrAlreadyUpToDate {
 			if strings.Contains(err.Error(), "pull failed, reclone required") {
 				slog.Info("リカバリのための再クローンを開始します...")
-				return ga.recloneRepository(repositoryURL, ga.LocalPath, ga.BaseBranch)
+				repo, err = ga.recloneRepository(repositoryURL, ga.LocalPath, ga.BaseBranch)
+				if err != nil {
+					return nil, err // 再クローン失敗時はエラーを返す
+				}
+			} else {
+				return nil, fmt.Errorf("既存リポジトリの更新 (Pull) に失敗しました: %w", err) // エラーメッセージを明確化
 			}
 		}
 	} else {
