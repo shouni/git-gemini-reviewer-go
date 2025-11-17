@@ -39,18 +39,18 @@ type GitAdapter struct {
 }
 
 // Option はGitAdapterの初期化オプションを設定するための関数です。
-type Option func(*GitAdapter) // <-- *Client から *GitAdapter に修正
+type Option func(*GitAdapter)
 
 // WithInsecureSkipHostKeyCheck はSSHホストキーチェックをスキップするオプションを設定します。
 func WithInsecureSkipHostKeyCheck(skip bool) Option {
-	return func(ga *GitAdapter) { // <-- *Client から *GitAdapter に修正
+	return func(ga *GitAdapter) {
 		ga.InsecureSkipHostKeyCheck = skip
 	}
 }
 
 // WithBaseBranch はベースブランチを設定するオプションです。
 func WithBaseBranch(branch string) Option {
-	return func(ga *GitAdapter) { // <-- *Client から *GitAdapter に修正
+	return func(ga *GitAdapter) {
 		ga.BaseBranch = branch
 	}
 }
@@ -78,7 +78,7 @@ func (ga *GitAdapter) CloneOrUpdate(repositoryURL string) (*git.Repository, erro
 	var err error
 
 	// 認証情報の取得と保持を最初に行う
-	//NOTE: getAuthMethodは未定義のヘルパー関数なので、ユーザーが別途実装する必要があります。
+	// NOTE: getAuthMethodは internal/adapters/git_auth.go で定義されています。
 	auth, err := ga.getAuthMethod(repositoryURL)
 	if err != nil {
 		return nil, fmt.Errorf("go-git用の認証情報取得に失敗しました: %w", err)
@@ -140,7 +140,7 @@ func (ga *GitAdapter) CloneOrUpdate(repositoryURL string) (*git.Repository, erro
 }
 
 // Fetch はリモートから最新の変更を取得します。
-func (ga *GitAdapter) Fetch(repo *git.Repository) error { // <-- c *Client から ga *GitAdapter に修正
+func (ga *GitAdapter) Fetch(repo *git.Repository) error {
 	slog.Info("リモートから最新の変更をフェッチしています...", "path", ga.LocalPath)
 	if ga.auth == nil {
 		slog.Warn("認証情報が設定されていません。プライベートリポジトリの場合、Fetchは失敗します。")
@@ -164,7 +164,7 @@ func (ga *GitAdapter) Fetch(repo *git.Repository) error { // <-- c *Client か�
 }
 
 // GetCodeDiff は指定された2つのブランチ間の純粋な差分を、go-gitのみで取得します。
-func (ga *GitAdapter) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch string) (string, error) { // <-- c *Client から ga *GitAdapter に修正
+func (ga *GitAdapter) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch string) (string, error) {
 	slog.Info("go-gitを使用して差分を計算しています。", "path", ga.LocalPath, "base_branch", baseBranch, "feature_branch", featureBranch)
 
 	// 1. ブランチ参照を解決 (リモート参照を使用)
@@ -229,7 +229,7 @@ func (ga *GitAdapter) GetCodeDiff(repo *git.Repository, baseBranch, featureBranc
 }
 
 // CheckRemoteBranchExists は指定されたブランチがリモート 'origin' に存在するか確認します。
-func (ga *GitAdapter) CheckRemoteBranchExists(repo *git.Repository, branch string) (bool, error) { // <-- c *Client から ga *GitAdapter に修正
+func (ga *GitAdapter) CheckRemoteBranchExists(repo *git.Repository, branch string) (bool, error) {
 	if branch == "" {
 		return false, fmt.Errorf("リモートブランチの存在確認に失敗しました: ブランチ名が空です")
 	}
