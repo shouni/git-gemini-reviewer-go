@@ -7,8 +7,7 @@ import (
 
 	"git-gemini-reviewer-go/internal/builder"
 	"git-gemini-reviewer-go/internal/config"
-	"git-gemini-reviewer-go/internal/pipeline"
-
+	"git-gemini-reviewer-go/internal/runner"
 	"github.com/shouni/go-utils/urlpath"
 )
 
@@ -26,36 +25,22 @@ func executeReviewPipeline(
 		slog.Debug("LocalPathが未指定のため、URLから動的にパスを生成しました。", "generatedPath", cfg.LocalPath)
 	}
 
-	// --- 2. サービス依存関係の構築 ---
-	gitService := builder.BuildGitService(cfg)
-
-	geminiService, err := builder.BuildGeminiService(ctx, cfg)
+	// --- 2. 実行ロジック (Runner層) の構築 ---
+	reviewRunner, err := builder.BuildReviewRunner(ctx, cfg)
 	if err != nil {
-		return "", fmt.Errorf("Gemini Service の構築に失敗しました: %w", err)
-	}
-
-	// --- 3. Prompt Builder の構築 ---
-	// cfg.ReviewMode に基づいて適切なテンプレートを選択し、ビルダーを初期化します。
-	promptBuilder, err := builder.BuildReviewPromptBuilder(cfg)
-	if err != nil {
-		return "", fmt.Errorf("Prompt Builder の構築に失敗しました: %w", err)
+		// BuildReviewRunner が内部でアダプタやビルダーの構築エラーをラップして返す
+		return "", fmt.Errorf("レビュー実行器の構築に失敗しました: %w", err)
 	}
 
 	slog.Info("レビューパイプラインを開始します。")
 
-	// --- 4. 共通ロジック (Pipeline) の実行 ---
-	reviewResult, err := pipeline.RunReviewAndGetResult(
-		ctx,
-		cfg,
-		gitService,
-		geminiService,
-		promptBuilder,
-	)
+	// --- 3. 実行ロジック (Runner層) の実行 ---
+	reviewResult, err := reviewRunner.Run(ctx, cfg)
 	if err != nil {
 		return "", err
 	}
 
-	// --- 5. 結果の返却 ---
+	// --- 4. 結果の返却 ---
 	if reviewResult == "" {
 		slog.Info("Diff がないためレビューをスキップしました。")
 		return "", nil

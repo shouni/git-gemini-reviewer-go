@@ -1,4 +1,4 @@
-package gitclient
+package adapters
 
 import (
 	"fmt"
@@ -12,8 +12,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport"
 )
 
-// Service はGitリポジトリ操作の抽象化を提供します。
-type Service interface {
+// GitService はGitリポジトリ操作の抽象化を提供します。
+type GitService interface {
 	// CloneOrUpdate はリポジトリをクローンまたは更新し、go-gitリポジトリオブジェクトを返します。
 	CloneOrUpdate(repositoryURL string) (*git.Repository, error)
 	// Fetch はリモートから最新の変更を取得します。
@@ -26,13 +26,13 @@ type Service interface {
 	Cleanup(repo *git.Repository) error
 }
 
-// Client は Service インターフェースを実装する具体的な構造体です。
-type Client struct {
+// GitAdapter は Service インターフェースを実装する具体的な構造体です。
+type GitAdapter struct {
 	LocalPath                string
 	SSHKeyPath               string
 	BaseBranch               string
 	InsecureSkipHostKeyCheck bool
-	auth                     transport.AuthMethod // auth.go で設定される認証メソッド
+	auth                     transport.AuthMethod // git_auth.go で設定される認証メソッド
 }
 
 // Option はClientの初期化オプションを設定するための関数です。
@@ -52,17 +52,17 @@ func WithBaseBranch(branch string) Option {
 	}
 }
 
-// NewClient はClientを初期化します。
-// Serviceインターフェースを返します。
-func NewClient(localPath string, sshKeyPath string, opts ...Option) Service {
-	client := &Client{
+// NewGitAdapter は GitAdapter を初期化します。
+// GitService インターフェースを返します。
+func NewGitAdapter(localPath string, sshKeyPath string, opts ...Option) GitService {
+	adapter := &GitAdapter{
 		LocalPath:  localPath,
 		SSHKeyPath: sshKeyPath,
 	}
 	for _, opt := range opts {
-		opt(client)
+		opt(adapter)
 	}
-	return client
+	return adapter
 }
 
 // CloneOrUpdate はリポジトリをクローンするか、既に存在する場合は go-git pull で更新します。
