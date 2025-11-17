@@ -67,12 +67,12 @@ func NewGeminiAdapter(ctx context.Context, modelName string) (CodeReviewAI, erro
 }
 
 // ReviewCodeDiff は CodeReviewAI インターフェースを満たします。
-func (c *GeminiAdapter) ReviewCodeDiff(ctx context.Context, finalPrompt string) (string, error) {
+func (ga *GeminiAdapter) ReviewCodeDiff(ctx context.Context, finalPrompt string) (string, error) {
 	// 汎用クライアントの GenerateContent メソッドを呼び出す
-	resp, err := c.client.GenerateContent(ctx, finalPrompt, c.modelName)
+	resp, err := ga.client.GenerateContent(ctx, finalPrompt, ga.modelName)
 
 	if err != nil {
-		return "", fmt.Errorf("Gemini API call failed (Model: %s): %w", c.modelName, err)
+		return "", fmt.Errorf("Gemini API call failed (Model: %s): %w", ga.modelName, err)
 	}
 
 	// 成功レスポンスからテキストを返す
