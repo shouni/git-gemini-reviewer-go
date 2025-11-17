@@ -1,4 +1,4 @@
-package geminiclient
+package adapters
 
 import (
 	"context"
@@ -15,23 +15,23 @@ const (
 	defaultGeminiMaxRetries = uint64(3)
 )
 
-// Service は、Gemini AIとの通信機能の抽象化を提供し、DIで使用されます。
-type Service interface {
-	// GenerateContent は完成されたプロンプトを基にGeminiにコンテンツ生成を依頼します。
-	GenerateContent(ctx context.Context, finalPrompt string) (string, error)
+// CodeReviewAI は、Gemini AIとの通信機能の抽象化を提供し、DIで使用されます。
+type CodeReviewAI interface {
+	// ReviewCodeDiff は完成されたプロンプトを基にGeminiにレビューを依頼します。
+	ReviewCodeDiff(ctx context.Context, finalPrompt string) (string, error)
 }
 
-// Client は go-ai-client の gemini.Client をラップし、
-// Service インターフェースを実装する具体的な構造体です。
-type Client struct {
+// GeminiAdapter は go-ai-client の gemini.Client をラップし、
+// CodeReviewAI インターフェースを実装する具体的な構造体です。
+type GeminiAdapter struct {
 	client    *gemini.Client
 	modelName string
 }
 
-// NewClient はClientを初期化し、Serviceインターフェースとして返します。
+// NewGeminiAdapter はGeminiAdapterを初期化し、CodeReviewAIインターフェースとして返します。
 // 温度 0.2 を明示的に指定するため、gemini.NewClientFromEnv ではなく gemini.NewClient を直接利用します。
 // APIキーは環境変数から取得し、リトライ回数はデフォルトの3回を設定します。
-func NewClient(ctx context.Context, modelName string) (Service, error) {
+func NewGeminiAdapter(ctx context.Context, modelName string) (CodeReviewAI, error) {
 
 	// 1. APIキーを環境変数から取得
 	apiKey := os.Getenv("GEMINI_API_KEY")
@@ -59,20 +59,20 @@ func NewClient(ctx context.Context, modelName string) (Service, error) {
 		return nil, fmt.Errorf("failed to initialize underlying gemini client: %w", err)
 	}
 
-	// Client構造体のインスタンスを Serviceインターフェースとして返す
-	return &Client{
+	// GeminiAdapter構造体のインスタンスを CodeReviewAIインターフェースとして返す
+	return &GeminiAdapter{
 		client:    gClient,
 		modelName: modelName,
 	}, nil
 }
 
-// GenerateContent は Service インターフェースを満たします。
-func (c *Client) GenerateContent(ctx context.Context, finalPrompt string) (string, error) {
+// ReviewCodeDiff は CodeReviewAI インターフェースを満たします。
+func (ga *GeminiAdapter) ReviewCodeDiff(ctx context.Context, finalPrompt string) (string, error) {
 	// 汎用クライアントの GenerateContent メソッドを呼び出す
-	resp, err := c.client.GenerateContent(ctx, finalPrompt, c.modelName)
+	resp, err := ga.client.GenerateContent(ctx, finalPrompt, ga.modelName)
 
 	if err != nil {
-		return "", fmt.Errorf("Gemini API call failed (Model: %s): %w", c.modelName, err)
+		return "", fmt.Errorf("Gemini API call failed (Model: %s): %w", ga.modelName, err)
 	}
 
 	// 成功レスポンスからテキストを返す
