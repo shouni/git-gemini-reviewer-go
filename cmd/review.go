@@ -7,7 +7,7 @@ import (
 
 	"git-gemini-reviewer-go/internal/builder"
 	"git-gemini-reviewer-go/internal/config"
-	"git-gemini-reviewer-go/internal/runner"
+
 	"github.com/shouni/go-utils/urlpath"
 )
 
