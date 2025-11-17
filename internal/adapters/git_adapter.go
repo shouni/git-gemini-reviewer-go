@@ -5,6 +5,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
@@ -13,7 +15,6 @@ import (
 )
 
 // GitService はGitリポジトリ操作の抽象化を提供します。
-// (インターフェースの変更はありません)
 type GitService interface {
 	// CloneOrUpdate はリポジトリをクローンまたは更新し、go-gitリポジトリオブジェクトを返します。
 	CloneOrUpdate(repositoryURL string) (*git.Repository, error)
@@ -74,10 +75,8 @@ func NewGitAdapter(localPath string, sshKeyPath string, opts ...Option) GitServi
 	return adapter
 }
 
-// --- 実装メソッド (GitAdapterに修正) ---
-
 // CloneOrUpdate はリポジトリをクローンするか、既に存在する場合は go-git pull で更新します。
-func (ga *GitAdapter) CloneOrUpdate(repositoryURL string) (*git.Repository, error) { // <-- c *Client から ga *GitAdapter に修正
+func (ga *GitAdapter) CloneOrUpdate(repositoryURL string) (*git.Repository, error) {
 	localPath := ga.LocalPath
 	var repo *git.Repository
 	var err error
@@ -127,10 +126,10 @@ func (ga *GitAdapter) CloneOrUpdate(repositoryURL string) (*git.Repository, erro
 		})
 
 		if err != nil && err != git.NoErrAlreadyUpToDate {
-			// NOTE: pull失敗時の再クローンロジックは複雑なため、単純なエラー処理に置き換えます。
-			// if strings.HasPrefix(err.Error(), "pull failed, reclone required") { ... }
-			// 上記のロジックは、未定義のupdateExistingRepositoryに依存しているため削除し、シンプルなエラーを返します。
-			return nil, fmt.Errorf("既存リポジトリのPullに失敗しました: %w", err)
+			if strings.Contains(err.Error(), "pull failed, reclone required") {
+				slog.Info("リカバリのための再クローンを開始します...")
+				return ga.recloneRepository(repositoryURL, ga.LocalPath, ga.BaseBranch)
+			}
 		}
 	} else {
 		return nil, fmt.Errorf("ローカルパス '%s' の確認に失敗しました: %w", localPath, err)
@@ -166,8 +165,6 @@ func (ga *GitAdapter) Fetch(repo *git.Repository) error { // <-- c *Client か�
 // GetCodeDiff は指定された2つのブランチ間の純粋な差分を、go-gitのみで取得します。
 func (ga *GitAdapter) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch string) (string, error) { // <-- c *Client から ga *GitAdapter に修正
 	slog.Info("go-gitを使用して差分を計算しています。", "path", ga.LocalPath, "base_branch", baseBranch, "feature_branch", featureBranch)
-
-	// ... (ロジックは変更なし。 go-gitのロジックは正しいため。) ...
 
 	// 1. ブランチ参照を解決 (リモート参照を使用)
 	baseRefName := plumbing.NewRemoteReferenceName("origin", baseBranch)
@@ -250,7 +247,7 @@ func (ga *GitAdapter) CheckRemoteBranchExists(repo *git.Repository, branch strin
 }
 
 // Cleanup は処理後にローカルリポジトリをクリーンな状態に戻します。
-func (ga *GitAdapter) Cleanup(repo *git.Repository) error { // <-- c *Client から ga *GitAdapter に修正
+func (ga *GitAdapter) Cleanup(repo *git.Repository) error {
 	slog.Info("クリーンアップ: ベースブランチへのチェックアウトを開始します。", "base_branch", ga.BaseBranch)
 
 	w, err := repo.Worktree()
@@ -270,5 +267,55 @@ func (ga *GitAdapter) Cleanup(repo *git.Repository) error { // <-- c *Client か
 	}
 
 	slog.Info("クリーンアップ: ローカルリポジトリをベースブランチにリセットしました。", "base_branch", ga.BaseBranch)
+	return nil
+}
+
+// recloneRepository は、既存リポジトリを削除し、再クローンします。
+func (ga *GitAdapter) recloneRepository(repositoryURL, localPath, branch string) (*git.Repository, error) {
+	if _, err := os.Stat(localPath); err == nil {
+		if err := os.RemoveAll(localPath); err != nil {
+			return nil, fmt.Errorf("既存リポジトリディレクトリ (%s) の削除に失敗しました: %w", localPath, err)
+		}
+		slog.Info("再クローンのため、既存のリポジトリディレクトリを削除しました。", "path", localPath)
+	}
+
+	if err := ga.cloneRepository(repositoryURL, localPath, branch); err != nil {
+		return nil, fmt.Errorf("リポジトリのクローンに失敗しました: %w", err)
+	}
+
+	repo, err := git.PlainOpen(localPath)
+	if err != nil {
+		return nil, fmt.Errorf("クローン後のリポジトリのオープンに失敗しました: %w", err)
+	}
+	return repo, nil
+}
+
+// cloneRepository は go-git.PlainClone を使用してクローン処理を実行するヘルパー関数です。
+func (ga *GitAdapter) cloneRepository(repositoryURL, localPath, branch string) error {
+	parentDir := filepath.Dir(localPath)
+	if _, err := os.Stat(parentDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(parentDir, 0755); err != nil {
+			return fmt.Errorf("親ディレクトリの作成に失敗しました: %w", err)
+		}
+	}
+
+	slog.Info("Go-gitを使用してリポジトリのクローンを開始します。", "url", repositoryURL, "path", localPath)
+
+	auth, err := ga.getAuthMethod(repositoryURL)
+	if err != nil {
+		return fmt.Errorf("go-git クローン用の認証情報取得に失敗しました: %w", err)
+	}
+
+	_, err = git.PlainClone(localPath, false, &git.CloneOptions{
+		URL:           repositoryURL,
+		ReferenceName: plumbing.NewBranchReferenceName(branch),
+		SingleBranch:  true,
+		Auth:          auth,
+		Progress:      io.Discard,
+	})
+	if err != nil {
+		return fmt.Errorf("go-git クローンに失敗しました: %w", err)
+	}
+	slog.Info("Go-gitによるリポジトリのクローンに成功しました。")
 	return nil
 }
