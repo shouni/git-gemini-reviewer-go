@@ -7,6 +7,7 @@ import (
 	"git-gemini-reviewer-go/internal/config"
 	"git-gemini-reviewer-go/prompts"
 	"log/slog"
+	"strings"
 )
 
 // ReviewRunner はコードレビューのビジネスロジックを実行します。
@@ -63,13 +64,10 @@ func (r *ReviewRunner) Run(
 		return "", fmt.Errorf("コード差分の取得に失敗しました: %w", err)
 	}
 
-	if diffContent == "" {
-		// ログを出力
-		slog.Info("差分がないため、AIレビューをスキップし、規定のメッセージを返します。", "base_branch", cfg.BaseBranch, "feature_branch", cfg.FeatureBranch)
-
-		// 正常系としてプロンプト構造に準拠したメッセージを返す
-		return generateNoDiffMessage(cfg.BaseBranch, cfg.FeatureBranch), nil
+	if strings.TrimSpace(diffContent) == "" {
+		return "", nil
 	}
+	slog.Info("Git差分の取得に成功しました。", "size_bytes", len(diffContent))
 
 	// プロンプトの組み立て
 	// 注入されたビルダーと新しいデータ構造を使用
