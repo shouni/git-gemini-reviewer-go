@@ -70,7 +70,6 @@ func NewGitAdapter(localPath string, sshKeyPath string, opts ...Option) GitServi
 		opt(adapter)
 	}
 	// NOTE: ここで adapter.auth の初期化 (getAuthMethodの呼び出し) はまだできません。
-	// CloneOrUpdateの中でリポジトリURLを基に設定する必要があります。
 
 	return adapter
 }
