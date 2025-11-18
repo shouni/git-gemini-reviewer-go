@@ -3,9 +3,9 @@ package runner
 import (
 	"context"
 	"fmt"
-	"git-gemini-reviewer-go/internal/adapters"
 	"git-gemini-reviewer-go/internal/config"
-	"git-gemini-reviewer-go/prompts"
+	"git-gemini-reviewer-go/pkg/adapters"
+	"git-gemini-reviewer-go/pkg/prompts"
 	"log/slog"
 	"strings"
 )
@@ -15,7 +15,7 @@ import (
 type ReviewRunner struct {
 	gitService    adapters.GitService
 	geminiService adapters.CodeReviewAI
-	promptBuilder *prompts.ReviewPromptBuilder
+	promptBuilder prompts.ReviewPromptBuilder
 }
 
 // NewReviewRunner は ReviewRunner の新しいインスタンスを生成します。
@@ -23,7 +23,7 @@ type ReviewRunner struct {
 func NewReviewRunner(
 	git adapters.GitService,
 	gemini adapters.CodeReviewAI,
-	pb *prompts.ReviewPromptBuilder,
+	pb prompts.ReviewPromptBuilder,
 ) *ReviewRunner {
 	return &ReviewRunner{
 		gitService:    git,
@@ -41,41 +41,38 @@ func (r *ReviewRunner) Run(
 
 	slog.Info("Gitリポジトリのセットアップと差分取得を開始します。")
 	// Gitリポジトリのクローンまたは更新
-	repo, err := r.gitService.CloneOrUpdate(cfg.RepoURL)
+	err := r.gitService.CloneOrUpdate(ctx, cfg.RepoURL)
 	if err != nil {
 		return "", fmt.Errorf("リポジトリのセットアップに失敗しました: %w", err)
 	}
 
 	// クリーンアップを遅延実行 (常に実行を保証)
 	defer func() {
-		if cleanupErr := r.gitService.Cleanup(repo); cleanupErr != nil {
+		if cleanupErr := r.gitService.Cleanup(ctx); cleanupErr != nil {
 			slog.Error("Gitリポジトリのクリーンアップに失敗しました。", "error", cleanupErr)
 		}
 	}()
 
 	// リモートから最新の変更をフェッチ
-	if err := r.gitService.Fetch(repo); err != nil {
+	if err := r.gitService.Fetch(ctx); err != nil {
 		return "", fmt.Errorf("最新の変更のフェッチに失敗しました: %w", err)
 	}
 
 	// コード差分を取得
-	diffContent, err := r.gitService.GetCodeDiff(repo, cfg.BaseBranch, cfg.FeatureBranch)
+	codeDiff, err := r.gitService.GetCodeDiff(ctx, cfg.BaseBranch, cfg.FeatureBranch)
 	if err != nil {
 		return "", fmt.Errorf("コード差分の取得に失敗しました: %w", err)
 	}
 
-	if strings.TrimSpace(diffContent) == "" {
+	if strings.TrimSpace(codeDiff) == "" {
 		return "", nil
 	}
-	slog.Info("Git差分の取得に成功しました。", "size_bytes", len(diffContent))
+	slog.Info("Git差分の取得に成功しました。", "size_bytes", len(codeDiff))
 
-	// プロンプトの組み立て
-	// 注入されたビルダーと新しいデータ構造を使用
-	reviewData := prompts.ReviewTemplateData{
-		DiffContent: diffContent,
-	}
-
-	finalPrompt, err := r.promptBuilder.Build(reviewData)
+	// 5. プロンプトの生成
+	slog.InfoContext(ctx, "3. AIプロンプトを生成中...", "mode", cfg.ReviewMode)
+	templateData := prompts.TemplateData{DiffContent: codeDiff}
+	finalPrompt, err := r.promptBuilder.Build(cfg.ReviewMode, templateData)
 	if err != nil {
 		return "", fmt.Errorf("プロンプトの組み立てに失敗しました: %w", err)
 	}
@@ -90,16 +87,4 @@ func (r *ReviewRunner) Run(
 	}
 
 	return reviewResult, nil
-}
-
-// 差分がない場合に返す、最小限の静的Markdownメッセージ
-func generateNoDiffMessage(base, feature string) string {
-	// リリース可否判定や詳細な指摘事項は省略し、総評のみに集中する。
-	return fmt.Sprintf("### 1. レビュー結果の概要\n\n"+
-		"**【ステータス】** 正常終了 (No Diff)\n\n"+
-		"### 2. 総評 (Summary)\n\n"+
-		"ベースブランチ ('%s') とフィーチャーブランチ ('%s') 間に有効な差分が見つからなかったため、コードの品質に関する評価は実施できませんでした。AIレビューはスキップされました。\n",
-		base,
-		feature,
-	)
 }

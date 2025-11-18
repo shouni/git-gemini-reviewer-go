@@ -1,31 +1,33 @@
 package adapters
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
+	// NOTE: getAuthMethod の定義があるパッケージをインポートする必要がありますが、
+	// ここでは存在を前提とし、外部関数として扱います。
 )
 
 // GitService はGitリポジトリ操作の抽象化を提供します。
 type GitService interface {
-	// CloneOrUpdate はリポジトリをクローンまたは更新し、go-gitリポジトリオブジェクトを返します。
-	CloneOrUpdate(repositoryURL string) (*git.Repository, error)
+	// CloneOrUpdate はリポジトリをクローンまたは更新し、成功時に nil を返します。
+	CloneOrUpdate(ctx context.Context, repositoryURL string) error
 	// Fetch はリモートから最新の変更を取得します。
-	Fetch(repo *git.Repository) error
+	Fetch(ctx context.Context) error
 	// CheckRemoteBranchExists は指定されたブランチがリモートに存在するか確認します。
-	CheckRemoteBranchExists(repo *git.Repository, branch string) (bool, error)
+	CheckRemoteBranchExists(ctx context.Context, branch string) (bool, error)
 	// GetCodeDiff は指定された2つのブランチ間の純粋な差分を文字列として取得します。
-	GetCodeDiff(repo *git.Repository, baseBranch, featureBranch string) (string, error)
+	GetCodeDiff(ctx context.Context, baseBranch, featureBranch string) (string, error)
 	// Cleanup は処理後にローカルリポジトリをクリーンな状態に戻します。
-	Cleanup(repo *git.Repository) error
+	Cleanup(ctx context.Context) error
 }
 
 // GitAdapter は GitService インターフェースを実装する具体的な構造体です。
@@ -34,8 +36,8 @@ type GitAdapter struct {
 	SSHKeyPath               string
 	BaseBranch               string
 	InsecureSkipHostKeyCheck bool
-	auth                     transport.AuthMethod // git_auth.go で設定される認証メソッド
-	// NOTE: その他の内部状態（例：前回クローンしたURL）があればここに追加します。
+	auth                     transport.AuthMethod
+	repo                     *git.Repository
 }
 
 // Option はGitAdapterの初期化オプションを設定するための関数です。
@@ -56,7 +58,6 @@ func WithBaseBranch(branch string) Option {
 }
 
 // NewGitAdapter は GitAdapter を初期化します。
-// GitService インターフェースを返します。
 func NewGitAdapter(localPath string, sshKeyPath string, opts ...Option) GitService {
 	adapter := &GitAdapter{
 		LocalPath:  localPath,
@@ -66,22 +67,33 @@ func NewGitAdapter(localPath string, sshKeyPath string, opts ...Option) GitServi
 	for _, opt := range opts {
 		opt(adapter)
 	}
-	// NOTE: ここで adapter.auth の初期化 (getAuthMethodの呼び出し) はまだできません。
 
 	return adapter
 }
 
-// CloneOrUpdate はリポジトリをクローンするか、既に存在する場合は go-git pull で更新します。
-func (ga *GitAdapter) CloneOrUpdate(repositoryURL string) (*git.Repository, error) {
+// getRepository は、内部で保持しているリポジトリインスタンスを取得するヘルパー関数です。
+func (ga *GitAdapter) getRepository() (*git.Repository, error) {
+	if ga.repo == nil {
+		// リポジトリがまだオープンされていないか、クローンされていない場合
+		repo, err := git.PlainOpen(ga.LocalPath)
+		if err != nil {
+			return nil, fmt.Errorf("内部リポジトリのオープンに失敗: %w", err)
+		}
+		ga.repo = repo
+	}
+	return ga.repo, nil
+}
+
+// CloneOrUpdate はリポジトリをクローンするか、既に存在する場合は更新します。
+func (ga *GitAdapter) CloneOrUpdate(ctx context.Context, repositoryURL string) error {
 	localPath := ga.LocalPath
 	var repo *git.Repository
 	var err error
 
-	// 認証情報の取得と保持を最初に行う
-	// NOTE: getAuthMethodは internal/adapters/git_auth.go で定義されています。
+	// 認証情報の取得と保持を最初に行う (NOTE: getAuthMethod は外部関数と仮定)
 	auth, err := ga.getAuthMethod(repositoryURL)
 	if err != nil {
-		return nil, fmt.Errorf("go-git用の認証情報取得に失敗しました: %w", err)
+		return fmt.Errorf("go-git用の認証情報取得に失敗しました: %w", err)
 	}
 	ga.auth = auth // 認証情報を Adapter に設定
 	slog.Info("go-git用の認証情報がアダプタに設定されました。")
@@ -92,71 +104,62 @@ func (ga *GitAdapter) CloneOrUpdate(repositoryURL string) (*git.Repository, erro
 	if os.IsNotExist(err) {
 		// 1. ローカルパスが存在しない場合はクローン
 		slog.Info("リポジトリが存在しないため、クローンします。", "url", repositoryURL, "path", localPath, "branch", ga.BaseBranch)
-		repo, err = git.PlainClone(localPath, false, &git.CloneOptions{
+		repo, err = git.PlainCloneContext(ctx, localPath, false, &git.CloneOptions{
 			URL:           repositoryURL,
 			ReferenceName: plumbing.NewBranchReferenceName(ga.BaseBranch),
-			SingleBranch:  true,
-			Depth:         1,
-			Auth:          ga.auth, // 認証情報を渡す
+			SingleBranch:  false, // 修正済み: フル履歴を取得するため
+			Auth:          ga.auth,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("リポジトリのクローンに失敗しました (URL: %s): %w", repositoryURL, err)
+			return fmt.Errorf("リポジトリのクローンに失敗しました (URL: %s): %w", repositoryURL, err)
 		}
 	} else if err == nil {
-		// 2. 既に存在する場合はオープンして更新 (Pull)
+		// 2. 既に存在する場合はオープン
 		repo, err = git.PlainOpen(localPath)
 		if err != nil {
-			return nil, fmt.Errorf("既存リポジトリのオープンに失敗しました: %w", err)
+			return fmt.Errorf("既存リポジトリのオープンに失敗しました: %w", err)
+		}
+		// ⚠️ 修正適用: Pull の試行をスキップし、後続の Fetch に更新を委ねる
+		slog.Info("既存リポジトリをオープンしました。Pull はスキップし、後続の Fetch に更新を委ねます。", "path", localPath)
+
+		// Pull ロジックの代わりに、リモート情報を確認する (オプショナル)
+		remote, remoteErr := repo.Remote("origin")
+		if remoteErr != nil {
+			slog.Warn("リモート 'origin' の情報が見つかりません。Fetch 時にエラーになる可能性があります。", "error", remoteErr)
+		} else {
+			slog.Debug("リモート 'origin' を確認しました。", "urls", remote.Config().URLs)
 		}
 
-		w, err := repo.Worktree()
-		if err != nil {
-			return nil, fmt.Errorf("ワークツリーの取得に失敗しました: %w", err)
-		}
-
-		slog.Info("既存リポジトリを更新 (Pull) します。", "path", localPath)
-		err = w.Pull(&git.PullOptions{
-			RemoteName: "origin",
-			Auth:       ga.auth, // 認証情報を渡す
-			Progress:   io.Discard,
-		})
-
-		if err != nil && err != git.NoErrAlreadyUpToDate {
-			if strings.Contains(err.Error(), "pull failed, reclone required") {
-				slog.Info("リカバリのための再クローンを開始します...")
-				repo, err = ga.recloneRepository(repositoryURL, ga.LocalPath, ga.BaseBranch)
-				if err != nil {
-					return nil, err // 再クローン失敗時はエラーを返す
-				}
-			} else {
-				return nil, fmt.Errorf("既存リポジトリの更新 (Pull) に失敗しました: %w", err) // エラーメッセージを明確化
-			}
-		}
 	} else {
-		return nil, fmt.Errorf("ローカルパス '%s' の確認に失敗しました: %w", localPath, err)
+		return fmt.Errorf("ローカルパス '%s' の確認に失敗しました: %w", localPath, err)
 	}
 
-	return repo, nil
+	// 内部にリポジトリインスタンスを保持
+	ga.repo = repo
+	return nil
 }
 
 // Fetch はリモートから最新の変更を取得します。
-func (ga *GitAdapter) Fetch(repo *git.Repository) error {
+func (ga *GitAdapter) Fetch(ctx context.Context) error {
+	repo, err := ga.getRepository()
+	if err != nil {
+		return err
+	}
+
 	slog.Info("リモートから最新の変更をフェッチしています...", "path", ga.LocalPath)
 	if ga.auth == nil {
 		slog.Warn("認証情報が設定されていません。プライベートリポジトリの場合、Fetchは失敗します。")
-		// NOTE: 認証情報のチェックは警告に留めます。パブリックリポジトリのFetchは成功するためです。
 	}
 
 	refSpec := config.RefSpec("+refs/heads/*:refs/remotes/origin/*")
 
-	err := repo.Fetch(&git.FetchOptions{
-		Auth:     ga.auth, // ga.auth を使用
+	err = repo.FetchContext(ctx, &git.FetchOptions{ // Contextを使用
+		Auth:     ga.auth,
 		RefSpecs: []config.RefSpec{refSpec},
 		Progress: io.Discard,
 	})
 
 	if err != nil && err != git.NoErrAlreadyUpToDate {
-		// リモートが見つからない場合など、認証以外のエラーも考慮
 		return fmt.Errorf("リモートからのフェッチに失敗しました: %w", err)
 	}
 
@@ -164,10 +167,33 @@ func (ga *GitAdapter) Fetch(repo *git.Repository) error {
 }
 
 // GetCodeDiff は指定された2つのブランチ間の純粋な差分を、go-gitのみで取得します。
-func (ga *GitAdapter) GetCodeDiff(repo *git.Repository, baseBranch, featureBranch string) (string, error) {
+func (ga *GitAdapter) GetCodeDiff(ctx context.Context, baseBranch, featureBranch string) (string, error) {
+	repo, err := ga.getRepository()
+	if err != nil {
+		return "", err
+	}
+
 	slog.Info("go-gitを使用して差分を計算しています。", "path", ga.LocalPath, "base_branch", baseBranch, "feature_branch", featureBranch)
 
-	// 1. ブランチ参照を解決 (リモート参照を使用)
+	// --- 1. Feature Branch と Base Branch のフェッチ ---
+	fetchRefSpecs := []config.RefSpec{
+		config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/remotes/origin/%s", featureBranch, featureBranch)),
+		config.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/remotes/origin/%s", baseBranch, baseBranch)), // baseBranchもフェッチ
+	}
+
+	slog.Info("差分計算のために、両ブランチの最新情報をフェッチしています。")
+	err = repo.FetchContext(ctx, &git.FetchOptions{
+		RemoteName: "origin",
+		RefSpecs:   fetchRefSpecs,
+		Auth:       ga.auth,
+		Progress:   io.Discard,
+	})
+	if err != nil && err != git.NoErrAlreadyUpToDate {
+		return "", fmt.Errorf("ブランチのフェッチに失敗: %w", err)
+	}
+
+	// --- 2. 差分計算ロジック ---
+
 	baseRefName := plumbing.NewRemoteReferenceName("origin", baseBranch)
 	baseRef, err := repo.Reference(baseRefName, false)
 	if err != nil {
@@ -180,7 +206,6 @@ func (ga *GitAdapter) GetCodeDiff(repo *git.Repository, baseBranch, featureBranc
 		return "", fmt.Errorf("フィーチャーブランチ '%s' の参照解決に失敗しました: %w", featureBranch, err)
 	}
 
-	// 2. コミットオブジェクトを取得 (ハッシュから)
 	baseCommit, err := repo.CommitObject(baseRef.Hash())
 	if err != nil {
 		return "", fmt.Errorf("ベースコミット '%s' の取得に失敗しました: %w", baseRef.Hash(), err)
@@ -191,7 +216,6 @@ func (ga *GitAdapter) GetCodeDiff(repo *git.Repository, baseBranch, featureBranc
 		return "", fmt.Errorf("フィーチャーコミット '%s' の取得に失敗しました: %w", featureRef.Hash(), err)
 	}
 
-	// 3. マージベース(共通祖先)の検索 (git diff A...B のため)
 	mergeBaseCommits, err := baseCommit.MergeBase(featureCommit)
 	if err != nil {
 		return "", fmt.Errorf("マージベースの検索に失敗しました: %w", err)
@@ -203,7 +227,6 @@ func (ga *GitAdapter) GetCodeDiff(repo *git.Repository, baseBranch, featureBranc
 
 	mergeBaseCommit := mergeBaseCommits[0]
 
-	// 4. ツリーの取得
 	baseTree, err := mergeBaseCommit.Tree()
 	if err != nil {
 		return "", fmt.Errorf("マージベースのツリー取得に失敗しました: %w", err)
@@ -214,7 +237,6 @@ func (ga *GitAdapter) GetCodeDiff(repo *git.Repository, baseBranch, featureBranc
 		return "", fmt.Errorf("フィーチャーブランチのツリー取得に失敗しました: %w", err)
 	}
 
-	// 5. 差分 (Changes) の生成とパッチへの変換
 	changes, err := baseTree.Diff(featureTree)
 	if err != nil {
 		return "", fmt.Errorf("ツリーの差分取得に失敗しました: %w", err)
@@ -229,13 +251,18 @@ func (ga *GitAdapter) GetCodeDiff(repo *git.Repository, baseBranch, featureBranc
 }
 
 // CheckRemoteBranchExists は指定されたブランチがリモート 'origin' に存在するか確認します。
-func (ga *GitAdapter) CheckRemoteBranchExists(repo *git.Repository, branch string) (bool, error) {
+func (ga *GitAdapter) CheckRemoteBranchExists(ctx context.Context, branch string) (bool, error) {
+	repo, err := ga.getRepository()
+	if err != nil {
+		return false, err
+	}
+
 	if branch == "" {
 		return false, fmt.Errorf("リモートブランチの存在確認に失敗しました: ブランチ名が空です")
 	}
 	refName := plumbing.NewRemoteReferenceName("origin", branch)
 
-	_, err := repo.Reference(refName, false)
+	_, err = repo.Reference(refName, false)
 
 	if err == plumbing.ErrReferenceNotFound {
 		return false, nil
@@ -247,32 +274,20 @@ func (ga *GitAdapter) CheckRemoteBranchExists(repo *git.Repository, branch strin
 	return true, nil
 }
 
-// Cleanup は処理後にローカルリポジトリをクリーンな状態に戻します。
-func (ga *GitAdapter) Cleanup(repo *git.Repository) error {
-	slog.Info("クリーンアップ: ベースブランチへのチェックアウトを開始します。", "base_branch", ga.BaseBranch)
+// Cleanup は処理後にローカルリポジトリディレクトリを完全に削除します。
+func (ga *GitAdapter) Cleanup(ctx context.Context) error {
+	slog.Info("クリーンアップ: ローカルリポジトリディレクトリを削除します。", "path", ga.LocalPath)
 
-	w, err := repo.Worktree()
-	if err != nil {
-		return fmt.Errorf("ワークツリーの取得に失敗しました: %w", err)
+	if err := os.RemoveAll(ga.LocalPath); err != nil {
+		return fmt.Errorf("ローカルリポジトリディレクトリ '%s' の削除に失敗しました: %w", ga.LocalPath, err)
 	}
-
-	// ローカルの状態を破棄し、BaseBranchにチェックアウトする
-	err = w.Checkout(&git.CheckoutOptions{
-		Branch: plumbing.NewBranchReferenceName(ga.BaseBranch), // <-- NewBranchReferenceNameを使用するように修正
-		Force:  true,
-	})
-
-	if err != nil {
-		// エラーメッセージの改善: ブランチ参照名を明記
-		return fmt.Errorf("ベースブランチ '%s' へのチェックアウトに失敗しました: %w", plumbing.NewBranchReferenceName(ga.BaseBranch).String(), err)
-	}
-
-	slog.Info("クリーンアップ: ローカルリポジトリをベースブランチにリセットしました。", "base_branch", ga.BaseBranch)
+	slog.Info("クリーンアップ: ローカルリポジトリディレクトリを削除しました。", "path", ga.LocalPath)
+	ga.repo = nil
 	return nil
 }
 
 // recloneRepository は、既存リポジトリを削除し、再クローンします。
-func (ga *GitAdapter) recloneRepository(repositoryURL, localPath, branch string) (*git.Repository, error) {
+func (ga *GitAdapter) recloneRepository(ctx context.Context, repositoryURL, localPath, branch string) (*git.Repository, error) {
 	if _, err := os.Stat(localPath); err == nil {
 		if err := os.RemoveAll(localPath); err != nil {
 			return nil, fmt.Errorf("既存リポジトリディレクトリ (%s) の削除に失敗しました: %w", localPath, err)
@@ -280,43 +295,46 @@ func (ga *GitAdapter) recloneRepository(repositoryURL, localPath, branch string)
 		slog.Info("再クローンのため、既存のリポジトリディレクトリを削除しました。", "path", localPath)
 	}
 
-	if err := ga.cloneRepository(repositoryURL, localPath, branch); err != nil {
+	repo, err := ga.cloneRepository(ctx, repositoryURL, localPath, branch)
+	if err != nil {
 		return nil, fmt.Errorf("リポジトリのクローンに失敗しました: %w", err)
 	}
 
-	repo, err := git.PlainOpen(localPath)
-	if err != nil {
-		return nil, fmt.Errorf("クローン後のリポジトリのオープンに失敗しました: %w", err)
-	}
 	return repo, nil
 }
 
 // cloneRepository は go-git.PlainClone を使用してクローン処理を実行するヘルパー関数です。
-func (ga *GitAdapter) cloneRepository(repositoryURL, localPath, branch string) error {
+func (ga *GitAdapter) cloneRepository(ctx context.Context, repositoryURL, localPath, branch string) (*git.Repository, error) {
 	parentDir := filepath.Dir(localPath)
 	if _, err := os.Stat(parentDir); os.IsNotExist(err) {
 		if err := os.MkdirAll(parentDir, 0755); err != nil {
-			return fmt.Errorf("親ディレクトリの作成に失敗しました: %w", err)
+			return nil, fmt.Errorf("親ディレクトリの作成に失敗しました: %w", err)
 		}
 	}
 
 	slog.Info("Go-gitを使用してリポジトリのクローンを開始します。", "url", repositoryURL, "path", localPath)
 
-	auth, err := ga.getAuthMethod(repositoryURL)
-	if err != nil {
-		return fmt.Errorf("go-git クローン用の認証情報取得に失敗しました: %w", err)
+	var auth transport.AuthMethod
+	if ga.auth != nil {
+		auth = ga.auth
+	} else {
+		var err error
+		auth, err = ga.getAuthMethod(repositoryURL)
+		if err != nil {
+			return nil, fmt.Errorf("go-git クローン用の認証情報取得に失敗しました: %w", err)
+		}
 	}
 
-	_, err = git.PlainClone(localPath, false, &git.CloneOptions{
+	repo, err := git.PlainCloneContext(ctx, localPath, false, &git.CloneOptions{
 		URL:           repositoryURL,
 		ReferenceName: plumbing.NewBranchReferenceName(branch),
-		SingleBranch:  true,
+		SingleBranch:  false, // 修正済み: フル履歴を取得するため
 		Auth:          auth,
 		Progress:      io.Discard,
 	})
 	if err != nil {
-		return fmt.Errorf("go-git クローンに失敗しました: %w", err)
+		return nil, fmt.Errorf("go-git クローンに失敗しました: %w", err)
 	}
 	slog.Info("Go-gitによるリポジトリのクローンに成功しました。")
-	return nil
+	return repo, nil
 }

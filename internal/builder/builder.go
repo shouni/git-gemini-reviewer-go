@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	"git-gemini-reviewer-go/internal/adapters"
 	"git-gemini-reviewer-go/internal/config"
 	"git-gemini-reviewer-go/internal/runner"
-	"git-gemini-reviewer-go/prompts"
+	"git-gemini-reviewer-go/pkg/adapters"
+	"git-gemini-reviewer-go/pkg/prompts"
 )
 
 // BuildGitService は、アプリケーションの設定に基づいて adapters.GitService の実装を構築します。
@@ -52,24 +52,11 @@ func BuildGeminiService(ctx context.Context, cfg config.ReviewConfig) (adapters.
 }
 
 // BuildReviewPromptBuilder は、レビューの種類に応じて適切な ReviewPromptBuilder を構築します。
-// レビューの種類（リリースノート用か詳細レビュー用か）は ReviewConfig から決定されると仮定します。
-func BuildReviewPromptBuilder(cfg config.ReviewConfig) (*prompts.ReviewPromptBuilder, error) {
-	var name string
-	var templateContent string
-
-	// ロジックを prompts パッケージに移譲し、テンプレート名と内容を取得
-	name, templateContent, err := prompts.GetReviewTemplate(cfg.ReviewMode)
-	if err != nil {
-		// 無効なモードのエラーを受け取る
-		return nil, err
-	}
-
-	builder, err := prompts.NewReviewPromptBuilder(name, templateContent)
+func BuildReviewPromptBuilder() (prompts.ReviewPromptBuilder, error) {
+	builder, err := prompts.NewPromptBuilder()
 	if err != nil {
 		return nil, fmt.Errorf("レビュープロンプトビルダーの初期化エラー: %w", err)
 	}
-
-	slog.Debug("ReviewPromptBuilderを構築しました。", slog.String("prompt_builder_id", name))
 
 	return builder, nil
 }
@@ -87,7 +74,7 @@ func BuildReviewRunner(ctx context.Context, cfg config.ReviewConfig) (*runner.Re
 	}
 
 	// 3. Prompt Builder の構築
-	promptBuilder, err := BuildReviewPromptBuilder(cfg)
+	promptBuilder, err := BuildReviewPromptBuilder()
 	if err != nil {
 		return nil, fmt.Errorf("Prompt Builder の構築に失敗しました: %w", err)
 	}
