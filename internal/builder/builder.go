@@ -46,7 +46,7 @@ func BuildReviewRunner(ctx context.Context, cfg config.ReviewConfig) (*runner.Re
 	if err != nil {
 		return nil, err
 	}
-	slog.Debug("GeminiService (Adapter) を構築しました。", "model", cfg.GeminiModel)
+	slog.Debug("GeminiService (Adapter) を構築しました。", slog.String("model", cfg.GeminiModel))
 
 	// 3. Prompt Builder の構築
 	promptBuilder, err := prompts.NewPromptBuilder()
