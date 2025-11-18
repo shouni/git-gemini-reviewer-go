@@ -11,9 +11,9 @@ import (
 	"git-gemini-reviewer-go/pkg/prompts"
 )
 
-// buildGitServiceInternal は adapters.GitService のインスタンスを構築します。
+// buildGitService は adapters.GitService のインスタンスを構築します。
 // この関数は BuildReviewRunner の内部ヘルパーとして使用されます。
-func buildGitServiceInternal(cfg config.ReviewConfig) adapters.GitService {
+func buildGitService(cfg config.ReviewConfig) adapters.GitService {
 	return adapters.NewGitAdapter(
 		cfg.LocalPath,
 		cfg.SSHKeyPath,
@@ -22,9 +22,9 @@ func buildGitServiceInternal(cfg config.ReviewConfig) adapters.GitService {
 	)
 }
 
-// buildGeminiServiceInternal は adapters.CodeReviewAI のインスタンスを構築します。
+// buildGeminiService は adapters.CodeReviewAI のインスタンスを構築します。
 // この関数は BuildReviewRunner の内部ヘルパーとして使用されます。
-func buildGeminiServiceInternal(ctx context.Context, cfg config.ReviewConfig) (adapters.CodeReviewAI, error) {
+func buildGeminiService(ctx context.Context, cfg config.ReviewConfig) (adapters.CodeReviewAI, error) {
 	geminiService, err := adapters.NewGeminiAdapter(ctx, cfg.GeminiModel)
 	if err != nil {
 		return nil, fmt.Errorf("Gemini Service の構築に失敗しました: %w", err)
@@ -37,14 +37,14 @@ func buildGeminiServiceInternal(ctx context.Context, cfg config.ReviewConfig) (a
 // 実行可能な ReviewRunner のインスタンスを返します。
 func BuildReviewRunner(ctx context.Context, cfg config.ReviewConfig) (*runner.ReviewRunner, error) {
 	// 1. GitService の構築
-	gitService := buildGitServiceInternal(cfg)
+	gitService := buildGitService(cfg)
 	slog.Debug("GitService (Adapter) を構築しました。",
 		slog.String("local_path", cfg.LocalPath),
 		slog.String("base_branch", cfg.BaseBranch),
 	)
 
 	// 2. GeminiService の構築
-	geminiService, err := buildGeminiServiceInternal(ctx, cfg)
+	geminiService, err := buildGeminiService(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
