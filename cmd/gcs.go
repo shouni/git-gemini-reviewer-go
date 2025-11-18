@@ -8,9 +8,11 @@ import (
 	"io"
 	"log/slog"
 
+	"git-gemini-reviewer-go/pkg/adapters"
+
 	"github.com/shouni/go-remote-io/pkg/factory"
 	"github.com/shouni/go-remote-io/pkg/remoteio"
-	"github.com/shouni/go-text-format/pkg/builder"
+
 	"github.com/spf13/cobra"
 )
 
@@ -61,7 +63,7 @@ func gcsCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	// 2. HTML変換
-	htmlBuffer, err := convertMarkdownToHTML(ctx, reviewResult, ReviewConfig)
+	htmlContentReader, err := convertMarkdownToHTML(ctx, reviewResult, ReviewConfig)
 	if err != nil {
 		return fmt.Errorf("レビュー結果をHTML変換に失敗しました: %w", err)
 	}
@@ -73,7 +75,8 @@ func gcsCommand(cmd *cobra.Command, args []string) error {
 		"object", objectPath,
 		"content_type", gcsFlags.ContentType)
 
-	err = uploadToGCS(ctx, bucketName, objectPath, htmlBuffer, gcsFlags.ContentType)
+	// 4. GCSへの結果保存
+	err = uploadToGCS(ctx, bucketName, objectPath, htmlContentReader, gcsFlags.ContentType)
 	if err != nil {
 		return fmt.Errorf("GCSへの書き込みに失敗しました (URI: %s): %w", gcsFlags.GCSURI, err)
 	}
@@ -86,19 +89,14 @@ func gcsCommand(cmd *cobra.Command, args []string) error {
 // ヘルパー関数
 // --------------------------------------------------------------------------
 
-// convertMarkdownToHTML Markdown形式の入力データを受け取り、HTML形式のデータに変換する。
-func convertMarkdownToHTML(ctx context.Context, reviewMarkdown string, opt config.ReviewConfig) (*bytes.Buffer, error) {
-	htmlBuilder, err := builder.NewBuilder()
+// convertMarkdownToHTML Markdown形式の入力データを受け取り、io.Readerを返す
+func convertMarkdownToHTML(ctx context.Context, reviewMarkdown string, opt config.ReviewConfig) (io.Reader, error) {
+	markdownRunner, err := adapters.NewMarkdownToHtmlRunner(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("HTML変換ビルダーの初期化に失敗しました: %w", err)
-	}
-	converter, err := htmlBuilder.BuildMarkdownToHtmlRunner()
-	if err != nil {
-		return nil, fmt.Errorf("MarkdownToHtmlRunnerの構築に失敗しました: %w", err)
+		return nil, fmt.Errorf("MarkdownToHtmlRunner の構築に失敗しました: %w", err)
 	}
 
 	// ヘッダー文字列の作成
-	htmlTitle := fmt.Sprintf("AIコードレビュー結果")
 	summaryMarkdown := fmt.Sprintf(
 		"レビュー対象リポジトリ: `%s`\n\nブランチ差分: `%s` ← `%s`\n\n",
 		opt.RepoURL,
@@ -106,7 +104,7 @@ func convertMarkdownToHTML(ctx context.Context, reviewMarkdown string, opt confi
 		opt.FeatureBranch,
 	)
 	var combinedContentBuffer bytes.Buffer
-	combinedContentBuffer.WriteString("## " + htmlTitle)
+	combinedContentBuffer.WriteString("## " + adapters.ReviewTitle)
 	combinedContentBuffer.WriteString("\n\n")
 	// 要約情報をヘッダーの下に配置
 	combinedContentBuffer.WriteString(summaryMarkdown)
@@ -114,7 +112,8 @@ func convertMarkdownToHTML(ctx context.Context, reviewMarkdown string, opt confi
 	// レビュー結果の本文を追加
 	combinedContentBuffer.WriteString(reviewMarkdown)
 
-	return converter.ConvertMarkdownToHtml(ctx, htmlTitle, combinedContentBuffer.Bytes())
+	slog.Debug("MarkdownToHtmlRunner.Run を実行します。")
+	return markdownRunner.Run(ctx, combinedContentBuffer.Bytes())
 }
 
 // uploadToGCS はレンダリングされたHTMLをGCSにアップロードします。
