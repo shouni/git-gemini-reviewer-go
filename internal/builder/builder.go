@@ -55,7 +55,7 @@ func BuildReviewRunner(ctx context.Context, cfg config.ReviewConfig) (*runner.Re
 	if err != nil {
 		return nil, fmt.Errorf("Prompt Builder の構築に失敗しました: %w", err)
 	}
-	slog.Debug("PromptBuilderを構築しました。", slog.String("status", "initialized"))
+	slog.Debug("PromptBuilderを構築しました。", slog.String("component", "PromptBuilder"))
 
 	// 4. 依存関係を注入して Runner を組み立てる
 	reviewRunner := runner.NewReviewRunner(
