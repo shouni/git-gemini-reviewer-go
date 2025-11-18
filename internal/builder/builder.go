@@ -12,6 +12,7 @@ import (
 )
 
 // buildGitServiceInternal は adapters.GitService のインスタンスを構築します。
+// この関数は BuildReviewRunner の内部ヘルパーとして使用されます。
 func buildGitServiceInternal(cfg config.ReviewConfig) adapters.GitService {
 	return adapters.NewGitAdapter(
 		cfg.LocalPath,
@@ -22,6 +23,7 @@ func buildGitServiceInternal(cfg config.ReviewConfig) adapters.GitService {
 }
 
 // buildGeminiServiceInternal は adapters.CodeReviewAI のインスタンスを構築します。
+// この関数は BuildReviewRunner の内部ヘルパーとして使用されます。
 func buildGeminiServiceInternal(ctx context.Context, cfg config.ReviewConfig) (adapters.CodeReviewAI, error) {
 	geminiService, err := adapters.NewGeminiAdapter(ctx, cfg.GeminiModel)
 	if err != nil {
