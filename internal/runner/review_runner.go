@@ -3,9 +3,9 @@ package runner
 import (
 	"context"
 	"fmt"
-	"git-gemini-reviewer-go/internal/adapters"
 	"git-gemini-reviewer-go/internal/config"
-	"git-gemini-reviewer-go/prompts"
+	"git-gemini-reviewer-go/pkg/adapters"
+	"git-gemini-reviewer-go/pkg/prompts"
 	"log/slog"
 	"strings"
 )
@@ -15,7 +15,7 @@ import (
 type ReviewRunner struct {
 	gitService    adapters.GitService
 	geminiService adapters.CodeReviewAI
-	promptBuilder *prompts.ReviewPromptBuilder
+	promptBuilder prompts.ReviewPromptBuilder
 }
 
 // NewReviewRunner は ReviewRunner の新しいインスタンスを生成します。
@@ -23,7 +23,7 @@ type ReviewRunner struct {
 func NewReviewRunner(
 	git adapters.GitService,
 	gemini adapters.CodeReviewAI,
-	pb *prompts.ReviewPromptBuilder,
+	pb prompts.ReviewPromptBuilder,
 ) *ReviewRunner {
 	return &ReviewRunner{
 		gitService:    git,
@@ -41,41 +41,38 @@ func (r *ReviewRunner) Run(
 
 	slog.Info("Gitリポジトリのセットアップと差分取得を開始します。")
 	// Gitリポジトリのクローンまたは更新
-	repo, err := r.gitService.CloneOrUpdate(cfg.RepoURL)
+	err := r.gitService.CloneOrUpdate(ctx, cfg.RepoURL)
 	if err != nil {
 		return "", fmt.Errorf("リポジトリのセットアップに失敗しました: %w", err)
 	}
 
 	// クリーンアップを遅延実行 (常に実行を保証)
 	defer func() {
-		if cleanupErr := r.gitService.Cleanup(repo); cleanupErr != nil {
+		if cleanupErr := r.gitService.Cleanup(ctx); cleanupErr != nil {
 			slog.Error("Gitリポジトリのクリーンアップに失敗しました。", "error", cleanupErr)
 		}
 	}()
 
 	// リモートから最新の変更をフェッチ
-	if err := r.gitService.Fetch(repo); err != nil {
+	if err := r.gitService.Fetch(ctx); err != nil {
 		return "", fmt.Errorf("最新の変更のフェッチに失敗しました: %w", err)
 	}
 
 	// コード差分を取得
-	diffContent, err := r.gitService.GetCodeDiff(repo, cfg.BaseBranch, cfg.FeatureBranch)
+	codeDiff, err := r.gitService.GetCodeDiff(ctx, cfg.BaseBranch, cfg.FeatureBranch)
 	if err != nil {
 		return "", fmt.Errorf("コード差分の取得に失敗しました: %w", err)
 	}
 
-	if strings.TrimSpace(diffContent) == "" {
+	if strings.TrimSpace(codeDiff) == "" {
 		return "", nil
 	}
-	slog.Info("Git差分の取得に成功しました。", "size_bytes", len(diffContent))
+	slog.Info("Git差分の取得に成功しました。", "size_bytes", len(codeDiff))
 
-	// プロンプトの組み立て
-	// 注入されたビルダーと新しいデータ構造を使用
-	reviewData := prompts.ReviewTemplateData{
-		DiffContent: diffContent,
-	}
-
-	finalPrompt, err := r.promptBuilder.Build(reviewData)
+	// 5. プロンプトの生成
+	slog.InfoContext(ctx, "3. AIプロンプトを生成中...", "mode", cfg.ReviewMode)
+	templateData := prompts.TemplateData{DiffContent: codeDiff}
+	finalPrompt, err := r.promptBuilder.Build(cfg.ReviewMode, templateData)
 	if err != nil {
 		return "", fmt.Errorf("プロンプトの組み立てに失敗しました: %w", err)
 	}
