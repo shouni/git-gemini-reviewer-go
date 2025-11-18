@@ -11,25 +11,40 @@ import (
 	"git-gemini-reviewer-go/pkg/prompts"
 )
 
-// BuildReviewRunner は、必要な依存関係をすべて構築し、
-// 実行可能な ReviewRunner のインスタンスを返します。
-func BuildReviewRunner(ctx context.Context, cfg config.ReviewConfig) (*runner.ReviewRunner, error) {
-	// 1. GitService の構築
-	gitService := adapters.NewGitAdapter(
+// buildGitServiceInternal は adapters.GitService のインスタンスを構築します。
+func buildGitServiceInternal(cfg config.ReviewConfig) adapters.GitService {
+	return adapters.NewGitAdapter(
 		cfg.LocalPath,
 		cfg.SSHKeyPath,
 		adapters.WithInsecureSkipHostKeyCheck(cfg.SkipHostKeyCheck),
 		adapters.WithBaseBranch(cfg.BaseBranch),
 	)
+}
+
+// buildGeminiServiceInternal は adapters.CodeReviewAI のインスタンスを構築します。
+func buildGeminiServiceInternal(ctx context.Context, cfg config.ReviewConfig) (adapters.CodeReviewAI, error) {
+	geminiService, err := adapters.NewGeminiAdapter(ctx, cfg.GeminiModel)
+	if err != nil {
+		return nil, fmt.Errorf("Gemini Service の構築に失敗しました: %w", err)
+	}
+	slog.Debug("GeminiService (Adapter) を構築しました。", slog.String("model", cfg.GeminiModel))
+	return geminiService, nil
+}
+
+// BuildReviewRunner は、必要な依存関係をすべて構築し、
+// 実行可能な ReviewRunner のインスタンスを返します。
+func BuildReviewRunner(ctx context.Context, cfg config.ReviewConfig) (*runner.ReviewRunner, error) {
+	// 1. GitService の構築
+	gitService := buildGitServiceInternal(cfg)
 	slog.Debug("GitService (Adapter) を構築しました。",
 		slog.String("local_path", cfg.LocalPath),
 		slog.String("base_branch", cfg.BaseBranch),
 	)
 
 	// 2. GeminiService の構築
-	geminiService, err := adapters.NewGeminiAdapter(ctx, cfg.GeminiModel)
+	geminiService, err := buildGeminiServiceInternal(ctx, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("Gemini Service の構築に失敗しました: %w", err)
+		return nil, err
 	}
 	slog.Debug("GeminiService (Adapter) を構築しました。", "model", cfg.GeminiModel)
 
@@ -38,7 +53,7 @@ func BuildReviewRunner(ctx context.Context, cfg config.ReviewConfig) (*runner.Re
 	if err != nil {
 		return nil, fmt.Errorf("Prompt Builder の構築に失敗しました: %w", err)
 	}
-	slog.Debug("PromptBuilderを構築しました。")
+	slog.Debug("PromptBuilderを構築しました。", slog.String("status", "initialized"))
 
 	// 4. 依存関係を注入して Runner を組み立てる
 	reviewRunner := runner.NewReviewRunner(
