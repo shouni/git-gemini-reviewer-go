@@ -5,7 +5,6 @@ package config
 type ReviewConfig struct {
 	ReviewMode       string
 	GeminiModel      string
-	PromptContent    string
 	RepoURL          string
 	BaseBranch       string
 	FeatureBranch    string

@@ -33,7 +33,6 @@ func NewReviewRunner(
 }
 
 // Run はGit Diffを取得し、Gemini AIでレビューを実行します。
-// 以前の RunReviewAndGetResult のロジックを引き継ぎます。
 func (r *ReviewRunner) Run(
 	ctx context.Context,
 	cfg config.ReviewConfig,
