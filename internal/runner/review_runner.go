@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"git-gemini-reviewer-go/internal/config"
-	"git-gemini-reviewer-go/pkg/adapters"
-	"git-gemini-reviewer-go/pkg/prompts"
 	"log/slog"
 	"strings"
+
+	"github.com/shouni/gemini-reviewer-core/pkg/adapters"
+	"github.com/shouni/gemini-reviewer-core/pkg/prompts"
 )
 
 // ReviewRunner はコードレビューのビジネスロジックを実行します。
