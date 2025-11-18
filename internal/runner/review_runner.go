@@ -88,15 +88,3 @@ func (r *ReviewRunner) Run(
 
 	return reviewResult, nil
 }
-
-// 差分がない場合に返す、最小限の静的Markdownメッセージ
-func generateNoDiffMessage(base, feature string) string {
-	// リリース可否判定や詳細な指摘事項は省略し、総評のみに集中する。
-	return fmt.Sprintf("### 1. レビュー結果の概要\n\n"+
-		"**【ステータス】** 正常終了 (No Diff)\n\n"+
-		"### 2. 総評 (Summary)\n\n"+
-		"ベースブランチ ('%s') とフィーチャーブランチ ('%s') 間に有効な差分が見つからなかったため、コードの品質に関する評価は実施できませんでした。AIレビューはスキップされました。\n",
-		base,
-		feature,
-	)
-}
