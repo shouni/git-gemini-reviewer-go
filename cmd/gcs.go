@@ -7,6 +7,7 @@ import (
 	"git-gemini-reviewer-go/internal/config"
 	"io"
 	"log/slog"
+	"strings"
 
 	"git-gemini-reviewer-go/pkg/adapters"
 
@@ -76,7 +77,7 @@ func gcsCommand(cmd *cobra.Command, args []string) error {
 		"content_type", gcsFlags.ContentType)
 
 	// 4. GCSへの結果保存
-	err = uploadToGCS(ctx, bucketName, objectPath, bytes.NewReader([]byte(finalHTML)), gcsFlags.ContentType)
+	err = uploadToGCS(ctx, bucketName, objectPath, strings.NewReader(finalHTML), gcsFlags.ContentType)
 	if err != nil {
 		return fmt.Errorf("GCSへの書き込みに失敗しました (URI: %s): %w", gcsFlags.GCSURI, err)
 	}
@@ -95,7 +96,6 @@ func convertMarkdownToHTML(ctx context.Context, reviewMarkdown string, opt confi
 	if err != nil {
 		return "", fmt.Errorf("MarkdownToHtmlRunner の構築に失敗しました: %w", err)
 	}
-	slog.Debug("MarkdownToHtmlRunner を構築しました。")
 
 	// ヘッダー文字列の作成
 	summaryMarkdown := fmt.Sprintf(
@@ -113,6 +113,7 @@ func convertMarkdownToHTML(ctx context.Context, reviewMarkdown string, opt confi
 	// レビュー結果の本文を追加
 	combinedContentBuffer.WriteString(reviewMarkdown)
 
+	slog.Debug("MarkdownToHtmlRunner.Run を実行します。")
 	return markdownRunner.Run(ctx, combinedContentBuffer.Bytes())
 }
 
