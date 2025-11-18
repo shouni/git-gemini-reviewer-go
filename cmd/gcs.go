@@ -105,7 +105,7 @@ func convertMarkdownToHTML(ctx context.Context, reviewMarkdown string, opt confi
 		opt.FeatureBranch,
 	)
 	var combinedContentBuffer bytes.Buffer
-	combinedContentBuffer.WriteString("## " + "AIコードレビュー結果")
+	combinedContentBuffer.WriteString("## " + adapters.ReviewTitle)
 	combinedContentBuffer.WriteString("\n\n")
 	// 要約情報をヘッダーの下に配置
 	combinedContentBuffer.WriteString(summaryMarkdown)

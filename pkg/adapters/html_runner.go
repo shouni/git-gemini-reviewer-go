@@ -8,6 +8,8 @@ import (
 	"github.com/shouni/go-text-format/pkg/md2htmlrunner"
 )
 
+const ReviewTitle = "AIコードレビュー結果"
+
 // MarkdownToHtmlRunner は、Markdown コンテンツを完全な HTML ドキュメントに変換する契約です。
 // Runner の ConvertMarkdownToHtml のシグネチャに合わせます。
 type MarkdownToHtmlRunner interface {
@@ -43,11 +45,8 @@ func NewMarkdownToHtmlRunner(ctx context.Context) (MarkdownToHtmlRunner, error) 
 
 // Run は MarkdownToHtmlRunner インターフェースを満たします。
 func (a *MarkdownConverterAdapter) Run(ctx context.Context, markdownContent []byte) (string, error) {
-	// Web Runner のレビュー結果に設定する固定タイトル
-	const reviewTitle = "AIコードレビュー結果"
-
 	// ターゲットのコアメソッドを呼び出す
-	buffer, err := a.coreRunner.ConvertMarkdownToHtml(ctx, reviewTitle, markdownContent)
+	buffer, err := a.coreRunner.ConvertMarkdownToHtml(ctx, ReviewTitle, markdownContent)
 	if err != nil {
 		return "", fmt.Errorf("MarkdownからHTMLへの変換に失敗: %w", err)
 	}
