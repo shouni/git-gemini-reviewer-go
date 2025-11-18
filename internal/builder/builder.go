@@ -29,7 +29,7 @@ func buildGeminiServiceInternal(ctx context.Context, cfg config.ReviewConfig) (a
 	if err != nil {
 		return nil, fmt.Errorf("Gemini Service の構築に失敗しました: %w", err)
 	}
-	slog.Debug("GeminiService (Adapter) を構築しました。", slog.String("model", cfg.GeminiModel))
+
 	return geminiService, nil
 }
 
