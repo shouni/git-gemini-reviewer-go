@@ -8,7 +8,7 @@ import (
 	"io"
 	"log/slog"
 
-	"git-gemini-reviewer-go/pkg/adapters"
+	"github.com/shouni/gemini-reviewer-core/pkg/adapters"
 
 	"github.com/shouni/go-remote-io/pkg/factory"
 	"github.com/shouni/go-remote-io/pkg/remoteio"

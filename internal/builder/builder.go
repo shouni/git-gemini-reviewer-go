@@ -7,8 +7,9 @@ import (
 
 	"git-gemini-reviewer-go/internal/config"
 	"git-gemini-reviewer-go/internal/runner"
-	"git-gemini-reviewer-go/pkg/adapters"
-	"git-gemini-reviewer-go/pkg/prompts"
+
+	"github.com/shouni/gemini-reviewer-core/pkg/adapters"
+	"github.com/shouni/gemini-reviewer-core/pkg/prompts"
 )
 
 // buildGitService は adapters.GitService のインスタンスを構築します。
