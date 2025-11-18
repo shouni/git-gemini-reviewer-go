@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/shouni/go-text-format/pkg/builder"
 	"github.com/shouni/go-text-format/pkg/md2htmlrunner"
@@ -13,8 +14,8 @@ const ReviewTitle = "AIコードレビュー結果"
 // MarkdownToHtmlRunner は、Markdown コンテンツを完全な HTML ドキュメントに変換する契約です。
 // Runner の ConvertMarkdownToHtml のシグネチャに合わせます。
 type MarkdownToHtmlRunner interface {
-	// Run のシグネチャをターゲットパッケージのコアメソッドに合わせます。
-	Run(ctx context.Context, markdownContent []byte) (htmlContent string, err error)
+	// Run は Markdown コンテンツをバイトスライスで受け取り、HTML コンテンツを含む io.Reader を返します。
+	Run(ctx context.Context, markdownContent []byte) (io.Reader, error)
 }
 
 // MarkdownConverterAdapter は go-text-format のロジックをラップしたアダプターです。
@@ -44,13 +45,11 @@ func NewMarkdownToHtmlRunner(ctx context.Context) (MarkdownToHtmlRunner, error) 
 }
 
 // Run は MarkdownToHtmlRunner インターフェースを満たします。
-func (a *MarkdownConverterAdapter) Run(ctx context.Context, markdownContent []byte) (string, error) {
-	// ターゲットのコアメソッドを呼び出す
+func (a *MarkdownConverterAdapter) Run(ctx context.Context, markdownContent []byte) (io.Reader, error) {
 	buffer, err := a.coreRunner.ConvertMarkdownToHtml(ctx, ReviewTitle, markdownContent)
 	if err != nil {
-		return "", fmt.Errorf("MarkdownからHTMLへの変換に失敗: %w", err)
+		return nil, fmt.Errorf("MarkdownからHTMLへの変換に失敗: %w", err)
 	}
 
-	// bytes.Buffer の内容を文字列として返す
-	return buffer.String(), nil
+	return buffer, nil
 }

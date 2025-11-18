@@ -7,7 +7,6 @@ import (
 	"git-gemini-reviewer-go/internal/config"
 	"io"
 	"log/slog"
-	"strings"
 
 	"git-gemini-reviewer-go/pkg/adapters"
 
@@ -64,7 +63,7 @@ func gcsCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	// 2. HTML変換
-	finalHTML, err := convertMarkdownToHTML(ctx, reviewResult, ReviewConfig)
+	htmlContentReader, err := convertMarkdownToHTML(ctx, reviewResult, ReviewConfig)
 	if err != nil {
 		return fmt.Errorf("レビュー結果をHTML変換に失敗しました: %w", err)
 	}
@@ -77,7 +76,7 @@ func gcsCommand(cmd *cobra.Command, args []string) error {
 		"content_type", gcsFlags.ContentType)
 
 	// 4. GCSへの結果保存
-	err = uploadToGCS(ctx, bucketName, objectPath, strings.NewReader(finalHTML), gcsFlags.ContentType)
+	err = uploadToGCS(ctx, bucketName, objectPath, htmlContentReader, gcsFlags.ContentType)
 	if err != nil {
 		return fmt.Errorf("GCSへの書き込みに失敗しました (URI: %s): %w", gcsFlags.GCSURI, err)
 	}
@@ -90,11 +89,11 @@ func gcsCommand(cmd *cobra.Command, args []string) error {
 // ヘルパー関数
 // --------------------------------------------------------------------------
 
-// convertMarkdownToHTML Markdown形式の入力データを受け取り、HTML形式のデータに変換する。
-func convertMarkdownToHTML(ctx context.Context, reviewMarkdown string, opt config.ReviewConfig) (string, error) {
+// convertMarkdownToHTML Markdown形式の入力データを受け取り、io.Readerを返す
+func convertMarkdownToHTML(ctx context.Context, reviewMarkdown string, opt config.ReviewConfig) (io.Reader, error) {
 	markdownRunner, err := adapters.NewMarkdownToHtmlRunner(ctx)
 	if err != nil {
-		return "", fmt.Errorf("MarkdownToHtmlRunner の構築に失敗しました: %w", err)
+		return nil, fmt.Errorf("MarkdownToHtmlRunner の構築に失敗しました: %w", err)
 	}
 
 	// ヘッダー文字列の作成
