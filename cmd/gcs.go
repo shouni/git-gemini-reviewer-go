@@ -62,9 +62,10 @@ func gcsCommand(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("クライアントファクトリの初期化に失敗しました: %w", err)
 	}
 	meta := publisher.ReviewMetadata{
-		RepoURL:       ReviewConfig.RepoURL,
-		BaseBranch:    ReviewConfig.BaseBranch,
-		FeatureBranch: ReviewConfig.FeatureBranch,
+		RepoURL:        ReviewConfig.RepoURL,
+		BaseBranch:     ReviewConfig.BaseBranch,
+		FeatureBranch:  ReviewConfig.FeatureBranch,
+		DestinationURI: gcsFlags.GCSURI,
 	}
 	err = writer.Publish(ctx, reviewResult, meta)
 	if err != nil {
