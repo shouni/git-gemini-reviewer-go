@@ -53,7 +53,10 @@ func gcsCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	// 2. GCSへの結果保存
-	ioFactory, _ := factory.NewClientFactory(ctx)
+	ioFactory, err := factory.NewClientFactory(ctx)
+	if err != nil {
+		return fmt.Errorf("クライアントファクトリの初期化に失敗しました: %w", err)
+	}
 	pub := publisher.NewGCSPublisher(ioFactory, gcsURI, "text/html")
 	meta := publisher.ReviewMetadata{RepoURL: ReviewConfig.RepoURL, BaseBranch: ReviewConfig.BaseBranch, FeatureBranch: ReviewConfig.FeatureBranch}
 	err = pub.Publish(ctx, reviewResult, meta)
