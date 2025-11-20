@@ -59,7 +59,7 @@ func gcsCommand(cmd *cobra.Command, args []string) error {
 	}
 	writer, err := publisher.NewGCSPublisher(ioFactory)
 	if err != nil {
-		return fmt.Errorf("クライアントファクトリの初期化に失敗しました: %w", err)
+		return fmt.Errorf("GCSパブリッシャーの初期化に失敗しました: %w", err)
 	}
 	meta := publisher.ReviewData{
 		RepoURL:        ReviewConfig.RepoURL,
