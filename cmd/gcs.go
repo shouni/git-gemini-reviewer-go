@@ -61,13 +61,13 @@ func gcsCommand(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("クライアントファクトリの初期化に失敗しました: %w", err)
 	}
-	meta := publisher.ReviewMetadata{
+	meta := publisher.ReviewData{
 		RepoURL:        ReviewConfig.RepoURL,
 		BaseBranch:     ReviewConfig.BaseBranch,
 		FeatureBranch:  ReviewConfig.FeatureBranch,
-		DestinationURI: gcsFlags.GCSURI,
+		ReviewMarkdown: reviewResult,
 	}
-	err = writer.Publish(ctx, reviewResult, meta)
+	err = writer.Publish(ctx, gcsFlags.GCSURI, meta)
 	if err != nil {
 		return fmt.Errorf("GCSへの書き込みに失敗しました (URI: %s): %w", gcsFlags.GCSURI, err)
 	}
