@@ -11,14 +11,13 @@ import (
 	"github.com/shouni/go-utils/urlpath"
 )
 
-const baseRepoDirName = "reviewerRepos"
-
 // executeReviewPipeline は、すべての依存関係を構築し、レビューパイプラインを実行します。
 // 実行結果の文字列とエラーを返します。
 func executeReviewPipeline(
 	ctx context.Context,
 	cfg config.ReviewConfig,
 ) (string, error) {
+	const baseRepoDirName = "reviewerRepos"
 
 	// LocalPathが指定されていない場合、RepoURLから動的に生成しcfgを更新します。
 	if cfg.LocalPath == "" {
