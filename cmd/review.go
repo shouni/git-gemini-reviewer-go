@@ -11,6 +11,8 @@ import (
 	"github.com/shouni/go-utils/urlpath"
 )
 
+const baseRepoDirName = "reviewerRepos"
+
 // executeReviewPipeline は、すべての依存関係を構築し、レビューパイプラインを実行します。
 // 実行結果の文字列とエラーを返します。
 func executeReviewPipeline(
@@ -20,7 +22,7 @@ func executeReviewPipeline(
 
 	// LocalPathが指定されていない場合、RepoURLから動的に生成しcfgを更新します。
 	if cfg.LocalPath == "" {
-		cfg.LocalPath = urlpath.SanitizeURLToUniquePath(cfg.RepoURL)
+		cfg.LocalPath = urlpath.SanitizeURLToUniquePath(cfg.RepoURL, baseRepoDirName)
 		slog.Debug("LocalPathが未指定のため、URLから動的にパスを生成しました。", "generatedPath", cfg.LocalPath)
 	}
 
