@@ -17,10 +17,11 @@ func executeReviewPipeline(
 	ctx context.Context,
 	cfg config.ReviewConfig,
 ) (string, error) {
+	const baseRepoDirName = "reviewerRepos"
 
 	// LocalPathが指定されていない場合、RepoURLから動的に生成しcfgを更新します。
 	if cfg.LocalPath == "" {
-		cfg.LocalPath = urlpath.SanitizeURLToUniquePath(cfg.RepoURL)
+		cfg.LocalPath = urlpath.SanitizeURLToUniquePath(cfg.RepoURL, baseRepoDirName)
 		slog.Debug("LocalPathが未指定のため、URLから動的にパスを生成しました。", "generatedPath", cfg.LocalPath)
 	}
 
