@@ -138,8 +138,8 @@ github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 h1:n661drycOFuPLCN3Uc8sB6B/s6Z4t2xvBgU1htSHuq8=
 github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3/go.mod h1:A0bzQcvG0E7Rwjx0REVgAGH58e96+X0MeOfepqsbeW4=
-github.com/shouni/gemini-reviewer-core v1.0.5 h1:KVyem+mG8t6nMMlUjWU+VgZfOz8JA9gypzakDpVXi10=
-github.com/shouni/gemini-reviewer-core v1.0.5/go.mod h1:nReaO5CoTzNtaELsKqUyuboN9a3J5s1/u1FpiwthgNY=
+github.com/shouni/gemini-reviewer-core v1.0.6 h1:gmcQRaOWihOOT99/JdKWAj6gYG2IvIP1cWlW9iMFGbo=
+github.com/shouni/gemini-reviewer-core v1.0.6/go.mod h1:nReaO5CoTzNtaELsKqUyuboN9a3J5s1/u1FpiwthgNY=
 github.com/shouni/go-ai-client/v2 v2.0.5 h1:L/5eka9043iGBgTyt6rLh7lkGFjBVhosjk09WlUTj+c=
 github.com/shouni/go-ai-client/v2 v2.0.5/go.mod h1:TVIOcCZEvDG+7YXs49EGu46CeVtMLoMw2eOPFbunk9E=
 github.com/shouni/go-cli-base v1.0.5 h1:Wn09yji6/DIesFwo81/xlzWaJMqZVG07gXoRxMIre4c=
