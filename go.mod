@@ -3,7 +3,7 @@ module git-gemini-reviewer-go
 go 1.25
 
 require (
-	github.com/shouni/gemini-reviewer-core v1.0.6
+	github.com/shouni/gemini-reviewer-core v1.0.7
 	github.com/shouni/go-cli-base v1.0.5
 	github.com/shouni/go-http-kit v1.1.2
 	github.com/shouni/go-notifier v1.1.3
